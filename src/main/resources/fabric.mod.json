@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "minepiece-qol",
+  "version": "${version}",
+  "name": "Minepiece QoL",
+  "description": "Client-side QoL overlays and parsers for play.minepiece.net.",
+  "authors": [
+    "Codex"
+  ],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "net.minepiece.qol.MinepieceQolClient"
+    ]
+  },
+  "mixins": [
+    "minepiece-qol.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.14",
+    "minecraft": "1.21.8",
+    "java": ">=21",
+    "fabric-api": ">=0.129.0+1.21.8"
+  }
+}

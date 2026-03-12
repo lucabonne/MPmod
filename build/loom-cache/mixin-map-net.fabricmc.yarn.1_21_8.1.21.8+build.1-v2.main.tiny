@@ -1,0 +1,4 @@
+v1	named	intermediary
+FIELD	net/minepiece/qol/mixin/HandledScreenDrawSlotMixin	I	y	field_2800
+FIELD	net/minepiece/qol/mixin/HandledScreenDrawSlotMixin	I	x	field_2776
+FIELD	net/minepiece/qol/mixin/HandledScreenDrawSlotMixin	Lnet/minecraft/screen/slot/Slot;	focusedSlot	field_2787

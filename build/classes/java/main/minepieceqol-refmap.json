@@ -1,0 +1,40 @@
+{
+  "mappings": {
+    "net/minepiece/qol/mixin/ChatHudMixin": {
+      "addMessage(Lnet/minecraft/text/Text;)V": "Lnet/minecraft/class_338;method_1812(Lnet/minecraft/class_2561;)V"
+    },
+    "net/minepiece/qol/mixin/HandledScreenDrawSlotMixin": {
+      "drawMouseoverTooltip": "Lnet/minecraft/class_465;method_2380(Lnet/minecraft/class_332;II)V",
+      "drawSlot": "Lnet/minecraft/class_465;method_2385(Lnet/minecraft/class_332;Lnet/minecraft/class_1735;)V"
+    },
+    "net/minepiece/qol/mixin/InGameHudMixin": {
+      "setOverlayMessage(Lnet/minecraft/text/Text;Z)V": "Lnet/minecraft/class_329;method_1758(Lnet/minecraft/class_2561;Z)V",
+      "setSubtitle(Lnet/minecraft/text/Text;)V": "Lnet/minecraft/class_329;method_34002(Lnet/minecraft/class_2561;)V",
+      "setTitle(Lnet/minecraft/text/Text;)V": "Lnet/minecraft/class_329;method_34004(Lnet/minecraft/class_2561;)V"
+    },
+    "net/minepiece/qol/mixin/PlayerListHudAccessor": {
+      "footer": "field_2154:Lnet/minecraft/class_2561;",
+      "header": "field_2153:Lnet/minecraft/class_2561;"
+    }
+  },
+  "data": {
+    "named:intermediary": {
+      "net/minepiece/qol/mixin/ChatHudMixin": {
+        "addMessage(Lnet/minecraft/text/Text;)V": "Lnet/minecraft/class_338;method_1812(Lnet/minecraft/class_2561;)V"
+      },
+      "net/minepiece/qol/mixin/HandledScreenDrawSlotMixin": {
+        "drawMouseoverTooltip": "Lnet/minecraft/class_465;method_2380(Lnet/minecraft/class_332;II)V",
+        "drawSlot": "Lnet/minecraft/class_465;method_2385(Lnet/minecraft/class_332;Lnet/minecraft/class_1735;)V"
+      },
+      "net/minepiece/qol/mixin/InGameHudMixin": {
+        "setOverlayMessage(Lnet/minecraft/text/Text;Z)V": "Lnet/minecraft/class_329;method_1758(Lnet/minecraft/class_2561;Z)V",
+        "setSubtitle(Lnet/minecraft/text/Text;)V": "Lnet/minecraft/class_329;method_34002(Lnet/minecraft/class_2561;)V",
+        "setTitle(Lnet/minecraft/text/Text;)V": "Lnet/minecraft/class_329;method_34004(Lnet/minecraft/class_2561;)V"
+      },
+      "net/minepiece/qol/mixin/PlayerListHudAccessor": {
+        "footer": "field_2154:Lnet/minecraft/class_2561;",
+        "header": "field_2153:Lnet/minecraft/class_2561;"
+      }
+    }
+  }
+}
