@@ -19,6 +19,10 @@ public final class TooltipParsers {
         Pattern.compile("Coord[^0-9-]*(-?\\d+)\\D+(-?\\d+)\\D+(-?\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern CYCLE_MINUTES_PATTERN =
         Pattern.compile("\\(?\\s*(?:Every\\s+)?(\\d+)\\s*Minutes?\\s*\\)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CYCLE_SLASH_M_PATTERN =
+        Pattern.compile("/\\s*(\\d+)\\s*m\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CYCLE_PAREN_M_PATTERN =
+        Pattern.compile("\\((\\d+)\\s*m\\)", Pattern.CASE_INSENSITIVE);
     private static final Pattern HOURS_PATTERN = Pattern.compile("(\\d+)h", Pattern.CASE_INSENSITIVE);
     private static final Pattern MINUTES_PATTERN = Pattern.compile("(\\d+)m", Pattern.CASE_INSENSITIVE);
     private static final Pattern SECONDS_PATTERN = Pattern.compile("(\\d+)s", Pattern.CASE_INSENSITIVE);
@@ -39,13 +43,13 @@ public final class TooltipParsers {
     private static final Pattern PET_STAT_SPACES = Pattern.compile("\\s+");
     private static final Pattern PET_DIACRITICS = Pattern.compile("\\p{M}+");
     private static final Pattern PET_LEADING_DECORATION = Pattern.compile("^[^A-Za-z0-9]+");
-    private static final Pattern POWER_PATTERN = Pattern.compile("Power\\s*\\+?\\s*([0-9.]+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern STRENGTH_PATTERN = Pattern.compile("Strength\\s*\\+?\\s*([0-9.]+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern SPEED_PATTERN = Pattern.compile("Speed\\s*\\+?\\s*([0-9.]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PROFILE_VALUE_PATTERN = Pattern.compile("([+-]?[0-9][0-9.,]*)");
     private static final String PET_HIDDEN_LEGENDARY_MARKER = "伴叹";
     private static final String PET_HIDDEN_MYTHIC_MARKER = "愈潮";
+    private static final int DEFAULT_BOSS_CYCLE_SECONDS = 15 * 60;
 
-    private static final Map<String, Double> PET_BASES = createPetBaseTable();
+    private static final Map<String, PetRange> PET_RANGES_LEGENDARY = createLegendaryPetRangeTable();
+    private static final Map<String, PetRange> PET_RANGES_MYTHIC = createMythicPetRangeTable();
 
     private TooltipParsers() {
     }
@@ -96,19 +100,23 @@ public final class TooltipParsers {
 
             String lower = line.toLowerCase(Locale.ROOT);
             if (lower.contains("respawn") || lower.contains("spawn") || lower.contains("apparition")) {
-                Integer cycleMinutes = findFirstInt(CYCLE_MINUTES_PATTERN, line);
-                if (cycleMinutes == null || cycleMinutes <= 0) {
-                    continue;
-                }
-
                 int hours = findFirstInt(HOURS_PATTERN, line, 0);
                 int minutes = findFirstInt(MINUTES_PATTERN, line, 0);
                 int seconds = findFirstInt(SECONDS_PATTERN, line, 0);
                 boolean ready = line.toLowerCase(Locale.ROOT).contains("ready");
                 boolean hasExplicitDuration = ready || hours > 0 || minutes > 0 || seconds > 0;
+                int explicitRemainingSeconds = ready ? 0 : (hours * 3600 + minutes * 60 + seconds);
 
-                cycleSeconds = cycleMinutes * 60;
-                remainingSeconds = hasExplicitDuration ? (ready ? 0 : hours * 3600 + minutes * 60 + seconds) : cycleSeconds;
+                Integer cycleMinutes = findCycleMinutes(line);
+                if (cycleMinutes != null && cycleMinutes > 0) {
+                    cycleSeconds = cycleMinutes * 60;
+                } else if (explicitRemainingSeconds > 0) {
+                    cycleSeconds = Math.max(DEFAULT_BOSS_CYCLE_SECONDS, explicitRemainingSeconds);
+                } else {
+                    cycleSeconds = DEFAULT_BOSS_CYCLE_SECONDS;
+                }
+
+                remainingSeconds = hasExplicitDuration ? explicitRemainingSeconds : cycleSeconds;
             }
         }
 
@@ -123,30 +131,38 @@ public final class TooltipParsers {
         return Optional.of(new BossTooltipData(bossName, x, y, z, remainingSeconds, cycleSeconds));
     }
 
+    private static Integer findCycleMinutes(String line) {
+        Integer cycle = findFirstInt(CYCLE_MINUTES_PATTERN, line);
+        if (cycle != null && cycle > 0) {
+            return cycle;
+        }
+        cycle = findFirstInt(CYCLE_SLASH_M_PATTERN, line);
+        if (cycle != null && cycle > 0) {
+            return cycle;
+        }
+        cycle = findFirstInt(CYCLE_PAREN_M_PATTERN, line);
+        return (cycle != null && cycle > 0) ? cycle : null;
+    }
+
     public static List<PetStatLine> parsePetRolls(List<String> lines) {
         return parsePetRolls(lines, null);
     }
 
     public static List<PetStatLine> parsePetRolls(List<String> lines, Consumer<String> debugLogger) {
-        boolean explicitLegendary = false;
-        boolean explicitMythic = false;
-        boolean hiddenLegendary = false;
-        boolean hiddenMythic = false;
+        boolean isMythic = false;
+        boolean isLegendary = false;
         int petCurrentLevel = -1;
 
         for (String line : lines) {
             Matcher rarityMatcher = RARITY_PATTERN.matcher(line);
             if (rarityMatcher.find()) {
                 String detected = rarityMatcher.group(1).toUpperCase(Locale.ROOT);
-                if ("MYTHIC".equals(detected)) {
-                    explicitMythic = true;
-                } else if ("LEGENDARY".equals(detected)) {
-                    explicitLegendary = true;
-                }
+                isMythic |= "MYTHIC".equals(detected);
+                isLegendary |= "LEGENDARY".equals(detected);
             } else if (line.contains(PET_HIDDEN_MYTHIC_MARKER)) {
-                hiddenMythic = true;
+                isMythic = true;
             } else if (line.contains(PET_HIDDEN_LEGENDARY_MARKER)) {
-                hiddenLegendary = true;
+                isLegendary = true;
             }
 
             Matcher levelMatcher = PET_CURRENT_LEVEL_PATTERN.matcher(line);
@@ -155,13 +171,11 @@ public final class TooltipParsers {
             }
         }
 
-        String rarity = explicitMythic ? "MYTHIC"
-            : (hiddenMythic ? "MYTHIC" : (explicitLegendary ? "LEGENDARY" : (hiddenLegendary ? "LEGENDARY" : "")));
-        if (rarity.isBlank()) {
+        String rarity = isMythic ? "MYTHIC" : (isLegendary ? "LEGENDARY" : "");
+        if (rarity.isEmpty()) {
             return List.of();
         }
 
-        double rarityFactor = "MYTHIC".equals(rarity) ? 1.25D : 1.0D;
         List<PetStatLine> matches = new ArrayList<>();
         Integer pendingUnlockLevel = null;
         boolean inPetEffects = false;
@@ -210,7 +224,7 @@ public final class TooltipParsers {
 
             Matcher valueMatcher = PET_VALUE_STAT_PATTERN.matcher(statCandidate);
             if (valueMatcher.find()) {
-                appendPetStatLine(matches, i, rarity, rarityFactor, unlockLevel, petCurrentLevel,
+                appendPetStatLine(matches, i, rarity, unlockLevel, petCurrentLevel,
                     valueMatcher.group(1), valueMatcher.group(2), line, debugLogger);
             }
         }
@@ -219,36 +233,103 @@ public final class TooltipParsers {
     }
 
     public static Optional<ProfileStatsData> parseProfileStats(List<String> lines) {
-        Double power = null;
+        Double level = null;
+        Double health = null;
         Double strength = null;
+        Double damage = null;
+        Double criticalChance = null;
+        Double criticalDamage = null;
+        Double power = null;
+        Double energy = null;
+        Double energyRegeneration = null;
         Double speed = null;
+        Double dexterity = null;
+        Double defense = null;
+        Double regeneration = null;
 
         for (String line : lines) {
-            Matcher powerMatcher = POWER_PATTERN.matcher(line);
-            if (powerMatcher.find()) {
-                power = Double.parseDouble(powerMatcher.group(1));
+            String lower = line.toLowerCase(Locale.ROOT);
+            if (level == null) level = parseProfileValueAfterLabel(line, "Level");
+            if (health == null) health = parseProfileValueAfterLabel(line, "Health");
+            if (strength == null) strength = parseProfileValueAfterLabel(line, "Strength");
+            if (criticalChance == null) criticalChance = parseProfileValueAfterLabel(line, "Critical Chance");
+            if (criticalDamage == null) criticalDamage = parseProfileValueAfterLabel(line, "Critical Damage");
+            if (damage == null && !lower.contains("critical damage")) {
+                damage = parseProfileValueAfterLabel(line, "Damage");
             }
-
-            Matcher strengthMatcher = STRENGTH_PATTERN.matcher(line);
-            if (strengthMatcher.find()) {
-                strength = Double.parseDouble(strengthMatcher.group(1));
+            if (power == null) power = parseProfileValueAfterLabel(line, "Power");
+            if (energyRegeneration == null) energyRegeneration = parseProfileValueAfterLabel(line, "Energy Regeneration");
+            if (energy == null && !lower.contains("energy regeneration")) {
+                energy = parseProfileValueAfterLabel(line, "Energy");
             }
-
-            Matcher speedMatcher = SPEED_PATTERN.matcher(line);
-            if (speedMatcher.find()) {
-                speed = Double.parseDouble(speedMatcher.group(1));
+            if (speed == null) speed = parseProfileValueAfterLabel(line, "Speed");
+            if (dexterity == null) dexterity = parseProfileValueAfterLabel(line, "Dexterity");
+            if (defense == null) {
+                defense = parseProfileValueAfterLabel(line, "Defense");
+                if (defense == null) {
+                    defense = parseProfileValueAfterLabel(line, "Defence");
+                }
             }
+            if (regeneration == null) regeneration = parseProfileValueAfterLabel(line, "Regeneration");
         }
 
-        if (power == null && strength == null && speed == null) {
+        if (level == null
+            && health == null
+            && strength == null
+            && damage == null
+            && criticalChance == null
+            && criticalDamage == null
+            && power == null
+            && energy == null
+            && energyRegeneration == null
+            && speed == null
+            && dexterity == null
+            && defense == null
+            && regeneration == null) {
             return Optional.empty();
         }
 
-        return Optional.of(new ProfileStatsData(power, strength, speed));
+        return Optional.of(new ProfileStatsData(
+            level,
+            health,
+            strength,
+            damage,
+            criticalChance,
+            criticalDamage,
+            power,
+            energy,
+            energyRegeneration,
+            speed,
+            dexterity,
+            defense,
+            regeneration
+        ));
     }
 
-    private static int parseOptionalInt(String value) {
-        return value == null || value.isBlank() ? 0 : Integer.parseInt(value);
+    private static Double parseProfileValueAfterLabel(String line, String label) {
+        if (line == null || label == null || label.isBlank()) {
+            return null;
+        }
+        String lowerLine = line.toLowerCase(Locale.ROOT);
+        String lowerLabel = label.toLowerCase(Locale.ROOT);
+        int labelIndex = lowerLine.indexOf(lowerLabel);
+        if (labelIndex < 0) {
+            return null;
+        }
+        int tailStart = Math.min(line.length(), labelIndex + label.length());
+        Matcher matcher = PROFILE_VALUE_PATTERN.matcher(line.substring(tailStart));
+        if (!matcher.find()) {
+            return null;
+        }
+        String token = matcher.group(1);
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(token.replace(",", ""));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private static Integer findFirstInt(Pattern pattern, String line) {
@@ -256,7 +337,8 @@ public final class TooltipParsers {
         if (!matcher.find()) {
             return null;
         }
-        return parseOptionalInt(matcher.group(1));
+        String value = matcher.group(1);
+        return value == null || value.isBlank() ? 0 : Integer.parseInt(value);
     }
 
     private static int findFirstInt(Pattern pattern, String line, int fallback) {
@@ -264,25 +346,44 @@ public final class TooltipParsers {
         return value == null ? fallback : value;
     }
 
-    private static Map<String, Double> createPetBaseTable() {
-        Map<String, Double> values = new LinkedHashMap<>();
-        putPetBase(values, "Health", 100.0D);
-        putPetBase(values, "Energy", 100.0D);
-        putPetBase(values, "Power", 20.0D);
-        putPetBase(values, "Strength", 10.0D);
-        putPetBase(values, "Defence", 10.0D);
-        putPetBase(values, "Defense", 10.0D);
-        putPetBase(values, "Dexterity", 5.0D);
-        putPetBase(values, "Speed", 5.0D);
-        putPetBase(values, "Regeneration", 5.0D);
-        putPetBase(values, "Energy Regeneration", 5.0D);
-        putPetBase(values, "Critical Damage", 5.0D);
-        putPetBase(values, "Critical Chance", 2.5D);
-        return values;
+    private static Map<String, PetRange> createLegendaryPetRangeTable() {
+        Map<String, PetRange> ranges = new LinkedHashMap<>();
+        putPetRange(ranges, "Strength", 5.0D, 10.0D);
+        putPetRange(ranges, "Power", 10.0D, 20.0D);
+        putPetRange(ranges, "Critical Chance", 1.25D, 2.5D);
+        putPetRange(ranges, "Critical Damage", 2.5D, 5.0D);
+        putPetRange(ranges, "Defense", 5.0D, 10.0D);
+        putPetRange(ranges, "Defence", 5.0D, 10.0D);
+        putPetRange(ranges, "Speed", 2.5D, 5.0D);
+        putPetRange(ranges, "Regeneration", 2.5D, 5.0D);
+        putPetRange(ranges, "Life Regeneration", 2.5D, 5.0D);
+        putPetRange(ranges, "Health", 50.0D, 100.0D);
+        putPetRange(ranges, "Energy", 50.0D, 100.0D);
+        putPetRange(ranges, "Energy Regeneration", 2.5D, 5.0D);
+        putPetRange(ranges, "Dexterity", 2.5D, 5.0D);
+        return ranges;
     }
 
-    private static void putPetBase(Map<String, Double> values, String rawKey, double baseValue) {
-        values.put(normalizePetStatKey(rawKey), baseValue);
+    private static Map<String, PetRange> createMythicPetRangeTable() {
+        Map<String, PetRange> ranges = new LinkedHashMap<>();
+        putPetRange(ranges, "Strength", 7.5D, 12.5D);
+        putPetRange(ranges, "Power", 15.0D, 25.0D);
+        putPetRange(ranges, "Critical Chance", 1.875D, 3.125D);
+        putPetRange(ranges, "Critical Damage", 3.75D, 6.25D);
+        putPetRange(ranges, "Energy", 75.0D, 150.0D);
+        putPetRange(ranges, "Energy Regeneration", 3.75D, 6.25D);
+        putPetRange(ranges, "Health", 75.0D, 150.0D);
+        putPetRange(ranges, "Regeneration", 3.75D, 6.25D);
+        putPetRange(ranges, "Life Regeneration", 3.75D, 6.25D);
+        putPetRange(ranges, "Dexterity", 3.75D, 6.25D);
+        putPetRange(ranges, "Speed", 3.75D, 6.25D);
+        putPetRange(ranges, "Defense", 7.5D, 12.5D);
+        putPetRange(ranges, "Defence", 7.5D, 12.5D);
+        return ranges;
+    }
+
+    private static void putPetRange(Map<String, PetRange> values, String rawKey, double min, double max) {
+        values.put(normalizePetStatKey(rawKey), new PetRange(min, max));
     }
 
     private static String normalizePetStatKey(String rawStatName) {
@@ -292,7 +393,7 @@ public final class TooltipParsers {
         return withoutAccents.toLowerCase(Locale.ROOT);
     }
 
-    private static void appendPetStatLine(List<PetStatLine> matches, int lineIndex, String rarity, double rarityFactor, int unlockLevel,
+    private static void appendPetStatLine(List<PetStatLine> matches, int lineIndex, String rarity, int unlockLevel,
                                           int petCurrentLevel, String rawStatName, String rawValue, String rawLine,
                                           Consumer<String> debugLogger) {
         if (unlockLevel <= 0) {
@@ -301,28 +402,32 @@ public final class TooltipParsers {
 
         String cleanedStatName = rawStatName.trim();
         String key = normalizePetStatKey(cleanedStatName);
-        Double baseValue = PET_BASES.get(key);
-        if (baseValue == null) {
+        Map<String, PetRange> ranges = "MYTHIC".equals(rarity) ? PET_RANGES_MYTHIC : PET_RANGES_LEGENDARY;
+        PetRange baseRange = ranges.get(key);
+        if (baseRange == null) {
             return;
         }
 
         double value = Double.parseDouble(rawValue);
         int scalingLevel = resolvePetScalingLevel(unlockLevel, petCurrentLevel);
-        double maxAtLevel = baseValue * rarityFactor * (scalingLevel / 10.0D);
-        if (maxAtLevel <= 0.0D) {
+        double scale = scalingLevel / 10.0D;
+        double minAtLevel = baseRange.min() * scale;
+        double maxAtLevel = baseRange.max() * scale;
+        if (maxAtLevel <= minAtLevel) {
             return;
         }
 
-        double percent = Math.max(0.0D, Math.min(100.0D, value / maxAtLevel * 100.0D));
+        double percent = Math.max(0.0D, Math.min(100.0D, (value - minAtLevel) / (maxAtLevel - minAtLevel) * 100.0D));
         if (debugLogger != null) {
             debugLogger.accept(String.format(
                 Locale.ROOT,
-                "[PET] rarity=%s unlock=%d level=%d stat=%s value=%.2f max=%.2f pct=%.2f",
+                "[PET] rarity=%s unlock=%d level=%d stat=%s value=%.2f min=%.2f max=%.2f pct=%.2f",
                 rarity,
                 unlockLevel,
                 scalingLevel,
                 cleanedStatName,
                 value,
+                minAtLevel,
                 maxAtLevel,
                 percent
             ));
@@ -386,6 +491,23 @@ public final class TooltipParsers {
     public record PetStatLine(int lineIndex, String statName, double value, double percent, String rawLine) {
     }
 
-    public record ProfileStatsData(Double power, Double strength, Double speed) {
+    public record ProfileStatsData(
+        Double level,
+        Double health,
+        Double strength,
+        Double damage,
+        Double criticalChance,
+        Double criticalDamage,
+        Double power,
+        Double energy,
+        Double energyRegeneration,
+        Double speed,
+        Double dexterity,
+        Double defense,
+        Double regeneration
+    ) {
+    }
+
+    private record PetRange(double min, double max) {
     }
 }

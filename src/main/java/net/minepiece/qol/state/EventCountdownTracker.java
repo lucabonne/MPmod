@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public final class EventCountdownTracker {
     private static final ZoneId EVENT_ZONE = ZoneId.of("Europe/Rome");
@@ -61,6 +62,10 @@ public final class EventCountdownTracker {
     }
 
     public String getDisplayLine() {
+        return getDisplayLine(null);
+    }
+
+    public String getDisplayLine(Function<String, String> localizer) {
         if (this.nextAt == null || !this.nextAt.isAfter(ZonedDateTime.now(EVENT_ZONE))) {
             tick();
         }
@@ -69,7 +74,14 @@ public final class EventCountdownTracker {
         long hours = totalSeconds / 3600L;
         long minutes = (totalSeconds % 3600L) / 60L;
         long seconds = totalSeconds % 60L;
-        return String.format(Locale.ROOT, "Next: %s (%d:%02d:%02d)", this.nextName, hours, minutes, seconds);
+        return String.format(
+            Locale.ROOT,
+            localized(localizer, "events.next_line", "Next: %s (%d:%02d:%02d)"),
+            this.nextName,
+            hours,
+            minutes,
+            seconds
+        );
     }
 
     public String getNextName() {
@@ -85,13 +97,17 @@ public final class EventCountdownTracker {
     }
 
     public String addEvent(String name, String time) {
+        return addEvent(name, time, null);
+    }
+
+    public String addEvent(String name, String time, Function<String, String> localizer) {
         String cleanName = name == null ? "" : name.trim();
         if (cleanName.isBlank()) {
-            return "Event name is required.";
+            return localized(localizer, "cmd.events.name_required", "Event name is required.");
         }
         Optional<LocalTime> parsedTime = parseTime(time);
         if (parsedTime.isEmpty()) {
-            return "Invalid time. Use CET format HH:mm (e.g. 19:30).";
+            return localized(localizer, "cmd.events.invalid_time", "Invalid time. Use CET format HH:mm (e.g. 19:30).");
         }
         LocalTime localTime = parsedTime.get();
         for (PersistentState.ScheduledEvent existing : this.state.scheduledEvents) {
@@ -100,7 +116,7 @@ public final class EventCountdownTracker {
             }
             if (cleanName.equalsIgnoreCase(safeTrim(existing.name))
                 && TIME_FORMAT.format(localTime).equals(safeTrim(existing.time))) {
-                return "Event already exists.";
+                return localized(localizer, "cmd.events.already_exists", "Event already exists.");
             }
         }
 
@@ -111,39 +127,95 @@ public final class EventCountdownTracker {
         sortStateEvents(this.state.scheduledEvents);
         this.stateSaver.accept(this.state);
         tick();
-        return "Added event: " + cleanName + " at " + event.time + " CET.";
+        return String.format(
+            Locale.ROOT,
+            localized(localizer, "cmd.events.added", "Added event: %s at %s CET."),
+            cleanName,
+            event.time
+        );
     }
 
     public String removeEvent(String name, String time) {
+        return removeEvent(name, time, null);
+    }
+
+    public String removeEvent(String name, String time, Function<String, String> localizer) {
         String cleanName = name == null ? "" : name.trim();
         if (cleanName.isBlank()) {
-            return "Event name is required.";
+            return localized(localizer, "cmd.events.name_required", "Event name is required.");
         }
         Optional<LocalTime> parsedTime = parseTime(time);
         if (parsedTime.isEmpty()) {
-            return "Invalid time. Use CET format HH:mm (e.g. 19:30).";
+            return localized(localizer, "cmd.events.invalid_time", "Invalid time. Use CET format HH:mm (e.g. 19:30).");
         }
         String normalizedTime = TIME_FORMAT.format(parsedTime.get());
         boolean removed = this.state.scheduledEvents.removeIf(event -> event != null
             && cleanName.equalsIgnoreCase(safeTrim(event.name))
             && normalizedTime.equals(safeTrim(event.time)));
         if (!removed) {
-            return "No matching event found for " + cleanName + " at " + normalizedTime + " CET.";
+            return String.format(
+                Locale.ROOT,
+                localized(localizer, "cmd.events.not_found_time", "No matching event found for %s at %s CET."),
+                cleanName,
+                normalizedTime
+            );
         }
 
         sortStateEvents(this.state.scheduledEvents);
         this.stateSaver.accept(this.state);
         tick();
-        return "Removed event: " + cleanName + " at " + normalizedTime + " CET.";
+        return String.format(
+            Locale.ROOT,
+            localized(localizer, "cmd.events.removed", "Removed event: %s at %s CET."),
+            cleanName,
+            normalizedTime
+        );
+    }
+
+    public List<PersistentState.ScheduledEvent> getRawEvents() {
+        return this.state.scheduledEvents;
+    }
+
+    public String editEvent(String oldName, String oldTime, String newName, String newTime) {
+        return editEvent(oldName, oldTime, newName, newTime, null);
+    }
+
+    public String editEvent(String oldName, String oldTime, String newName, String newTime, Function<String, String> localizer) {
+        Optional<LocalTime> parsedOld = parseTime(oldTime);
+        Optional<LocalTime> parsedNew = parseTime(newTime);
+        if (parsedOld.isEmpty() || parsedNew.isEmpty()) {
+            return localized(localizer, "cmd.events.invalid_time_short", "Invalid time format. Use HH:mm.");
+        }
+        String normalizedOld = TIME_FORMAT.format(parsedOld.get());
+        String cleanNew = newName == null ? "" : newName.trim();
+        if (cleanNew.isBlank()) {
+            return localized(localizer, "cmd.events.name_required", "Event name is required.");
+        }
+        String normalizedNew = TIME_FORMAT.format(parsedNew.get());
+        for (PersistentState.ScheduledEvent ev : this.state.scheduledEvents) {
+            if (ev != null && oldName.equalsIgnoreCase(safeTrim(ev.name)) && normalizedOld.equals(safeTrim(ev.time))) {
+                ev.name = cleanNew;
+                ev.time = normalizedNew;
+                sortStateEvents(this.state.scheduledEvents);
+                this.stateSaver.accept(this.state);
+                tick();
+                return localized(localizer, "cmd.events.updated", "Updated event.");
+            }
+        }
+        return localized(localizer, "cmd.events.not_found", "Event not found.");
     }
 
     public List<String> infoLines() {
+        return infoLines(null);
+    }
+
+    public List<String> infoLines(Function<String, String> localizer) {
         List<ScheduledEvent> events = getOrderedEvents();
         if (events.isEmpty()) {
-            return List.of("No events configured.");
+            return List.of(localized(localizer, "cmd.events.none_configured", "No events configured."));
         }
         List<String> lines = new ArrayList<>();
-        lines.add("Events (CET):");
+        lines.add(localized(localizer, "cmd.events.header", "Events (CET):"));
         for (ScheduledEvent event : events) {
             lines.add(TIME_FORMAT.format(event.time()) + " - " + event.name());
         }
@@ -213,23 +285,10 @@ public final class EventCountdownTracker {
     }
 
     private static void sortStateEvents(List<PersistentState.ScheduledEvent> events) {
-        events.sort((a, b) -> {
-            Optional<LocalTime> timeA = parseTime(a == null ? "" : a.time);
-            Optional<LocalTime> timeB = parseTime(b == null ? "" : b.time);
-            if (timeA.isPresent() && timeB.isPresent()) {
-                int compare = timeA.get().compareTo(timeB.get());
-                if (compare != 0) {
-                    return compare;
-                }
-            } else if (timeA.isPresent()) {
-                return -1;
-            } else if (timeB.isPresent()) {
-                return 1;
-            }
-            String nameA = safeTrim(a == null ? "" : a.name).toLowerCase(Locale.ROOT);
-            String nameB = safeTrim(b == null ? "" : b.name).toLowerCase(Locale.ROOT);
-            return nameA.compareTo(nameB);
-        });
+        events.sort(Comparator
+            .<PersistentState.ScheduledEvent, LocalTime>comparing(
+                e -> parseTime(e == null ? "" : e.time).orElse(LocalTime.MAX))
+            .thenComparing(e -> safeTrim(e == null ? "" : e.name).toLowerCase(Locale.ROOT)));
     }
 
     private static String safeTrim(String value) {
@@ -240,5 +299,13 @@ public final class EventCountdownTracker {
     }
 
     private record NextEvent(String name, ZonedDateTime at) {
+    }
+
+    private static String localized(Function<String, String> localizer, String key, String fallback) {
+        if (localizer == null) {
+            return fallback;
+        }
+        String value = localizer.apply(key);
+        return value == null || value.isBlank() || value.equals(key) ? fallback : value;
     }
 }

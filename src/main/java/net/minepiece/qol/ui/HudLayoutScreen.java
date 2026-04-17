@@ -6,8 +6,10 @@ import net.minepiece.qol.MinepieceQolClient;
 import net.minepiece.qol.config.ConfigManager;
 import net.minepiece.qol.state.BossTracker;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
@@ -22,7 +24,7 @@ public final class HudLayoutScreen extends Screen {
     private int draggingOffsetY;
 
     public HudLayoutScreen(MinepieceQolClient mod) {
-        super(Text.literal("Minepiece HUD Layout"));
+        super(Text.literal(mod == null ? "Minepiece HUD Layout" : mod.tr("hud.layout.title")));
         this.mod = mod;
     }
 
@@ -37,25 +39,26 @@ public final class HudLayoutScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyInput keyInput) {
+        int keyCode = keyInput.key();
         if (keyCode == GLFW.GLFW_KEY_ESCAPE || keyCode == GLFW.GLFW_KEY_PERIOD) {
             close();
             return true;
         }
-        if (keyCode >= GLFW.GLFW_KEY_1 && keyCode <= GLFW.GLFW_KEY_6) {
+        if (keyCode >= GLFW.GLFW_KEY_1 && keyCode <= GLFW.GLFW_KEY_9) {
             this.mod.setHudEditSelectedPanel(keyCode - GLFW.GLFW_KEY_0);
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(keyInput);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-            return super.mouseClicked(mouseX, mouseY, button);
+    public boolean mouseClicked(Click click, boolean doubled) {
+        if (click.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            return super.mouseClicked(click, doubled);
         }
 
-        int panelId = findPanelAt((int) mouseX, (int) mouseY);
+        int panelId = findPanelAt((int) click.x(), (int) click.y());
         if (panelId <= 0) {
             return false;
         }
@@ -66,31 +69,31 @@ public final class HudLayoutScreen extends Screen {
         }
         this.mod.setHudEditSelectedPanel(panelId);
         this.draggingPanelId = panelId;
-        this.draggingOffsetX = (int) mouseX - rect.x();
-        this.draggingOffsetY = (int) mouseY - rect.y();
+        this.draggingOffsetX = (int) click.x() - rect.x();
+        this.draggingOffsetY = (int) click.y() - rect.y();
         return true;
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT || this.draggingPanelId <= 0) {
-            return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+    public boolean mouseDragged(Click click, double deltaX, double deltaY) {
+        if (click.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT || this.draggingPanelId <= 0) {
+            return super.mouseDragged(click, deltaX, deltaY);
         }
-        int newX = (int) mouseX - this.draggingOffsetX;
-        int newY = (int) mouseY - this.draggingOffsetY;
+        int newX = (int) click.x() - this.draggingOffsetX;
+        int newY = (int) click.y() - this.draggingOffsetY;
         float scale = this.mod.getHudPanelScale(this.draggingPanelId);
         applyPanelLayout(this.draggingPanelId, newX, newY, scale);
         return true;
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && this.draggingPanelId > 0) {
+    public boolean mouseReleased(Click click) {
+        if (click.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT && this.draggingPanelId > 0) {
             this.draggingPanelId = -1;
             this.mod.saveConfig();
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(click);
     }
 
     @Override
@@ -137,30 +140,39 @@ public final class HudLayoutScreen extends Screen {
     public void close() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client != null) {
-            client.setScreen(null);
+            client.setScreen(new MinepieceMenuScreen(this.mod));
         }
     }
 
     private void drawEditorHelp(DrawContext drawContext) {
-        String line1 = "HUD Editor: drag panels with mouse, wheel to resize.";
-        String line2 = "Panels: 1 Jobs 2 Money 3 Stats 4 Bosses 5 Event 6 Haki | . or ESC to close";
-        int width = Math.max(this.textRenderer.getWidth(line1), this.textRenderer.getWidth(line2)) + 10;
+        String line1 = this.mod.tr("hud.layout.line1");
+        String line2 = this.mod.tr("hud.layout.panels") + ": 1 " + this.mod.getHudPanelName(1)
+            + " 2 " + this.mod.getHudPanelName(2)
+            + " 3 " + this.mod.getHudPanelName(3)
+            + " 4 " + this.mod.getHudPanelName(4)
+            + " 5 " + this.mod.getHudPanelName(5)
+            + " 6 " + this.mod.getHudPanelName(6)
+            + " 7 " + this.mod.getHudPanelName(7)
+            + " 8 " + this.mod.getHudPanelName(8)
+            + " 9 " + this.mod.getHudPanelName(9);
+        String line3 = this.mod.tr("hud.layout.line3");
+        String line4 = this.mod.tr("hud.layout.line4");
+        int width = Math.max(
+            Math.max(this.textRenderer.getWidth(line1), this.textRenderer.getWidth(line2)),
+            Math.max(this.textRenderer.getWidth(line3), this.textRenderer.getWidth(line4))
+        ) + 10;
         int x = 8;
         int y = 8;
-        drawContext.fill(x, y, x + width, y + 24, 0xAA000000);
-        drawOutline(drawContext, x, y, width, 24, 0x66000000);
+        drawContext.fill(x, y, x + width, y + 44, 0xAA000000);
+        drawOutline(drawContext, x, y, width, 44, 0x66000000);
         drawContext.drawTextWithShadow(this.textRenderer, line1, x + 5, y + 4, 0xFFFFFFFF);
         drawContext.drawTextWithShadow(this.textRenderer, line2, x + 5, y + 14, 0xFFFFDD88);
+        drawContext.drawTextWithShadow(this.textRenderer, line3, x + 5, y + 24, 0xFFAEE8FF);
+        drawContext.drawTextWithShadow(this.textRenderer, line4, x + 5, y + 34, 0xFFFFDD88);
     }
 
     private int findPanelAt(int mouseX, int mouseY) {
-        List<Integer> ids = new ArrayList<>();
-        for (int panelId = 1; panelId <= this.mod.getHudPanelCount(); panelId++) {
-            ids.add(panelId);
-        }
-        // Prefer top-most visually: last IDs generally render after.
-        for (int i = ids.size() - 1; i >= 0; i--) {
-            int panelId = ids.get(i);
+        for (int panelId = this.mod.getHudPanelCount(); panelId >= 1; panelId--) {
             PanelRect rect = getPanelRect(panelId);
             if (rect != null && rect.contains(mouseX, mouseY)) {
                 return panelId;
@@ -199,23 +211,23 @@ public final class HudLayoutScreen extends Screen {
             case 1 -> {
                 ConfigManager.ModConfig cfg = this.mod.getConfig();
                 if (!cfg.jobsOverviewVisible) {
-                    yield List.of("Hidden");
+                    yield List.of(this.mod.tr("common.hidden"));
                 }
-                List<String> value = this.mod.getJobsTracker().getOverviewHudLines();
-                yield value.isEmpty() ? List.of("No data") : value;
+                List<String> value = this.mod.getJobsTracker().getOverviewHudLines(this.mod::tr);
+                yield value.isEmpty() ? List.of(this.mod.tr("common.no_data")) : value;
             }
             case 2 -> {
-                List<String> value = this.mod.getMoneyTracker().getHudLines();
-                yield value.isEmpty() ? List.of("No data") : value;
+                List<String> value = this.mod.getMoneyTracker().getHudLines(this.mod::tr);
+                yield value.isEmpty() ? List.of(this.mod.tr("common.no_data")) : value;
             }
             case 3 -> {
-                List<String> value = this.mod.getProfileStatsTracker().getHudLines();
-                yield value.isEmpty() ? List.of("No data") : value;
+                List<String> value = this.mod.getProfileStatsTracker().getHudLines(this.mod::tr);
+                yield value.isEmpty() ? List.of(this.mod.tr("common.no_data")) : value;
             }
             case 4 -> {
-                List<BossTracker.HudLine> boss = this.mod.getBossTracker().getHudLines(false);
+                List<BossTracker.HudLine> boss = this.mod.getBossTracker().getZoneBossHudLines(false, this.mod::tr);
                 if (boss.isEmpty()) {
-                    yield List.of("No data");
+                    yield List.of(this.mod.tr("common.no_data"));
                 }
                 List<String> rendered = new ArrayList<>(boss.size());
                 for (BossTracker.HudLine line : boss) {
@@ -223,15 +235,52 @@ public final class HudLayoutScreen extends Screen {
                 }
                 yield rendered;
             }
-            case 5 -> List.of(this.mod.getEventCountdownTracker().getDisplayLine());
-            case 6 -> {
-                String hakiLine = this.mod.getCooldownTracker().getHakiHudText();
-                yield List.of(hakiLine.isBlank() ? "Haki ready" : hakiLine);
+            case 5 -> {
+                if (!this.mod.isMinibossHudEnabled()) {
+                    yield List.of(this.mod.tr("common.hidden"));
+                }
+                List<BossTracker.HudLine> miniboss = this.mod.getBossTracker().getMinibossHudLines(false, this.mod::tr);
+                if (miniboss.isEmpty()) {
+                    yield List.of(this.mod.tr("common.no_data"));
+                }
+                List<String> rendered = new ArrayList<>(miniboss.size());
+                for (BossTracker.HudLine line : miniboss) {
+                    rendered.add(line.text());
+                }
+                yield rendered;
+            }
+            case 6 -> List.of(this.mod.getEventCountdownTracker().getDisplayLine(this.mod::tr));
+            case 7 -> {
+                String hakiLine = this.mod.getCooldownTracker().getHakiHudText(this.mod::tr);
+                yield List.of(hakiLine.isBlank() ? this.mod.tr("common.ready") : hakiLine);
+            }
+            case 8 -> {
+                ConfigManager.ModConfig cfg = this.mod.getConfig();
+                if (!cfg.scrollsEnabled) {
+                    yield List.of(this.mod.tr("common.hidden"));
+                }
+                List<BossTracker.HudLine> scrolls = this.mod.getScrollTracker().getHudLines(this.mod::tr);
+                if (scrolls.isEmpty()) {
+                    yield List.of(this.mod.tr("common.no_data"));
+                }
+                List<String> rendered = new ArrayList<>(scrolls.size());
+                for (BossTracker.HudLine line : scrolls) {
+                    rendered.add(line.text());
+                }
+                yield rendered;
+            }
+            case 9 -> {
+                ConfigManager.ModConfig cfg = this.mod.getConfig();
+                if (!cfg.inventoryXpHudEnabled) {
+                    yield List.of(this.mod.tr("common.hidden"));
+                }
+                List<String> invXp = this.mod.getInventoryXpTracker().getHudLines(this.mod::tr);
+                yield invXp.isEmpty() ? List.of(this.mod.tr("common.no_data")) : invXp;
             }
             default -> List.of();
         };
         if (lines.isEmpty()) {
-            lines = List.of("No data");
+            lines = List.of(this.mod.tr("common.no_data"));
         }
 
         String title = this.mod.getHudPanelName(panelId);

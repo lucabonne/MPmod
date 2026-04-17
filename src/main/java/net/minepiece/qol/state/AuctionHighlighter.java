@@ -3,7 +3,6 @@ package net.minepiece.qol.state;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalInt;
 import net.minepiece.qol.parse.TooltipParsers;
 
 public final class AuctionHighlighter {
@@ -38,19 +37,11 @@ public final class AuctionHighlighter {
         ));
     }
 
-    public Optional<ActiveHighlight> getActiveHighlight() {
-        return Optional.empty();
-    }
-
     public Optional<ActiveHighlight> getCachedHighlight(String itemKey) {
         if (itemKey == null || itemKey.isBlank()) {
             return Optional.empty();
         }
         return Optional.ofNullable(this.cachedHighlights.get(itemKey));
-    }
-
-    public OptionalInt getActiveColor() {
-        return OptionalInt.empty();
     }
 
     private static int computeColor(double delta, double intensity) {

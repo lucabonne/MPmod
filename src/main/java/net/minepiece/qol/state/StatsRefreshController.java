@@ -2,6 +2,7 @@ package net.minepiece.qol.state;
 
 import java.util.ArrayDeque;
 import java.util.Locale;
+import java.util.function.Function;
 import net.minepiece.qol.util.TextUtil;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
@@ -15,11 +16,12 @@ public final class StatsRefreshController {
     private static final long CALIBRATION_STEP_DELAY_MS = 900L;
     private static final long PROFILE_COOLDOWN_MS = 4_000L;
     private static final long INITIAL_PROFILE_DELAY_MS = 1_500L;
+    private static final long LEVEL_UP_RECALIBRATION_COOLDOWN_MS = 60_000L;
+    private static final long AUTO_PROFILE_RECENT_WINDOW_MS = 30_000L;
     private static final long HINT_COOLDOWN_MS = 30_000L;
     private static final long HINT_VISIBLE_MS = 5_000L;
     private static final long PROFILE_SYNC_TIMEOUT_MS = 10_000L;
     private static final long PETS_COMMAND_TIMEOUT_MS = 15_000L;
-    private static final int HOTBAR_SLOTS = 9;
     private static final EquipmentSlot[] ARMOR_SLOTS = {
         EquipmentSlot.HEAD,
         EquipmentSlot.CHEST,
@@ -31,6 +33,7 @@ public final class StatsRefreshController {
     private final ProfileStatsTracker tracker;
     private final Runnable profileCommandSender;
     private final DebugLogManager debugLogManager;
+    private final Function<String, String> localizer;
 
     private boolean primed;
     private boolean initialProfileScheduled;
@@ -47,6 +50,7 @@ public final class StatsRefreshController {
 
     private long scheduledProfileAtMs;
     private long lastProfileRequestMs;
+    private long lastCalibrationStartedMs;
     private long lastHintShownMs;
     private long hintVisibleUntilMs;
     private String hintText = "";
@@ -55,10 +59,16 @@ public final class StatsRefreshController {
     private boolean petsScreenSeen;
     private long petsCommandExpireAtMs;
 
-    public StatsRefreshController(ProfileStatsTracker tracker, Runnable profileCommandSender, DebugLogManager debugLogManager) {
+    public StatsRefreshController(
+        ProfileStatsTracker tracker,
+        Runnable profileCommandSender,
+        DebugLogManager debugLogManager,
+        Function<String, String> localizer
+    ) {
         this.tracker = tracker;
         this.profileCommandSender = profileCommandSender;
         this.debugLogManager = debugLogManager;
+        this.localizer = localizer;
     }
 
     public void tick(MinecraftClient client) {
@@ -106,6 +116,13 @@ public final class StatsRefreshController {
 
         String lower = normalizedChat.toLowerCase(Locale.ROOT);
         if (lower.contains(LEVEL_UP_FRAGMENT)) {
+            long now = System.currentTimeMillis();
+            if (this.calibrationInProgress
+                || this.awaitingProfileSync
+                || now - this.lastProfileRequestMs < AUTO_PROFILE_RECENT_WINDOW_MS
+                || now - this.lastCalibrationStartedMs < LEVEL_UP_RECALIBRATION_COOLDOWN_MS) {
+                return;
+            }
             requestCalibration(DEBOUNCE_MS, "level-up");
         }
     }
@@ -221,7 +238,7 @@ public final class StatsRefreshController {
             advanceCalibration();
             return;
         }
-        showHint("Run /profile if stats stop syncing");
+        showHint(localized("stats.hint_profile_sync", "Run /profile if stats stop syncing"));
     }
 
     private void resolvePetsScreenLifecycle(Screen currentScreen) {
@@ -287,12 +304,8 @@ public final class StatsRefreshController {
         this.calibrationSlots.clear();
         this.calibrationRestoreSlot = client.player.getInventory().getSelectedSlot();
         this.calibrationSlots.add(this.calibrationRestoreSlot);
-        for (int slot = 0; slot < HOTBAR_SLOTS; slot++) {
-            if (slot != this.calibrationRestoreSlot) {
-                this.calibrationSlots.add(slot);
-            }
-        }
         this.calibrationInProgress = true;
+        this.lastCalibrationStartedMs = System.currentTimeMillis();
         scheduleProfile("slot-calibration-start", 0L);
     }
 
@@ -340,6 +353,14 @@ public final class StatsRefreshController {
         if (this.debugLogManager != null) {
             this.debugLogManager.logInternal("[STATS] " + message);
         }
+    }
+
+    private String localized(String key, String fallback) {
+        if (this.localizer == null) {
+            return fallback;
+        }
+        String value = this.localizer.apply(key);
+        return value == null || value.isBlank() || value.equals(key) ? fallback : value;
     }
 
     private static String fingerprint(ItemStack stack) {

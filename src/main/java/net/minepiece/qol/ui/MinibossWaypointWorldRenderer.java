@@ -1,27 +1,31 @@
 package net.minepiece.qol.ui;
 
 import java.util.List;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.minepiece.qol.MinepieceQolClient;
 import net.minepiece.qol.state.BossTracker;
 import net.minepiece.qol.util.NumberParser;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.render.LightmapTextureManager;
-import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.VertexRendering;
 import net.minecraft.client.render.block.entity.BeaconBlockEntityRenderer;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.render.state.WorldRenderState;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.shape.VoxelShapes;
 
 public final class MinibossWaypointWorldRenderer {
     private static final float TIMER_TARGET_SCREEN_SCALE = 2.2F;
     private static final float TIMER_MIN_WORLD_SCALE = 0.03F;
+    private static final int BOSS_WAYPOINT_COLOR = 0x6FA8FF;
     private static final int[] COLORS = {
         0xFFAA00,
         0x55CCFF,
@@ -42,111 +46,166 @@ public final class MinibossWaypointWorldRenderer {
     }
 
     private void render(WorldRenderContext context) {
-        if (!this.mod.getConfig().allFeaturesVisible) {
+        if (!this.mod.getConfig().modEnabled || !this.mod.getConfig().allFeaturesVisible) {
             return;
         }
-        if (context.matrixStack() == null || context.consumers() == null || context.camera() == null || context.world() == null) {
-            return;
-        }
-
-        List<BossTracker.MinibossWaypoint> waypoints = this.mod.getBossTracker().getActiveMinibossWaypoints();
-        if (waypoints.isEmpty()) {
-            return;
-        }
-
-        MatrixStack matrices = context.matrixStack();
+        MatrixStack matrices = context.matrices();
         VertexConsumerProvider consumers = context.consumers();
-        Vec3d cameraPos = context.camera().getPos();
+        OrderedRenderCommandQueue commandQueue = context.commandQueue();
+        WorldRenderState worldState = context.worldState();
+        if (matrices == null || consumers == null || commandQueue == null || worldState == null) {
+            return;
+        }
+        CameraRenderState cameraState = worldState.cameraRenderState;
+        if (cameraState == null || cameraState.pos == null) {
+            return;
+        }
+
+        List<BossTracker.MinibossWaypoint> minibossWaypoints = this.mod.getBossTracker().getActiveMinibossWaypoints();
+        List<BossTracker.BossWaypoint> bossWaypoints = this.mod.getBossTracker().getActiveBossWaypoints();
+        if (minibossWaypoints.isEmpty() && bossWaypoints.isEmpty()) {
+            return;
+        }
+
+        Vec3d cameraPos = cameraState.pos;
         MinecraftClient client = MinecraftClient.getInstance();
         TextRenderer textRenderer = client.textRenderer;
-        float tickDelta = context.tickCounter() == null ? 0.0F : context.tickCounter().getTickProgress(true);
-        long worldTime = context.world().getTime();
+        float tickDelta = client.getRenderTickCounter().getTickProgress(true);
 
         matrices.push();
         matrices.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
         int index = 0;
-        for (BossTracker.MinibossWaypoint waypoint : waypoints) {
+        for (BossTracker.MinibossWaypoint waypoint : minibossWaypoints) {
             int rgb = colorFor(waypoint.symbol(), index);
-            float red = ((rgb >> 16) & 0xFF) / 255.0F;
-            float green = ((rgb >> 8) & 0xFF) / 255.0F;
-            float blue = (rgb & 0xFF) / 255.0F;
-
-            double x = waypoint.x();
-            double y = waypoint.y();
-            double z = waypoint.z();
-
-            VertexConsumer fill = consumers.getBuffer(RenderLayer.getDebugFilledBox());
-            VertexRendering.drawFilledBox(matrices, fill, x, y, z, x + 1.0D, y + 1.0D, z + 1.0D, red, green, blue, 0.18F);
-
-            VertexConsumer outline = consumers.getBuffer(RenderLayer.getLines());
-            VertexRendering.drawBox(matrices, outline, new Box(x, y, z, x + 1.0D, y + 1.0D, z + 1.0D), red, green, blue, 0.95F);
-
-            matrices.push();
-            matrices.translate(x, y, z);
-            BeaconBlockEntityRenderer.renderBeam(
+            drawWaypoint(
                 matrices,
                 consumers,
-                BeaconBlockEntityRenderer.BEAM_TEXTURE,
+                commandQueue,
+                textRenderer,
+                client,
+                cameraPos,
+                cameraState,
                 tickDelta,
-                1.0F,
-                worldTime,
-                0,
-                256,
-                rgb,
-                0.18F,
-                0.24F
+                waypoint.x(),
+                waypoint.y(),
+                waypoint.z(),
+                waypoint.remainingMs(),
+                rgb
             );
-            matrices.pop();
-
-            String timer = waypoint.remainingMs() <= 0L ? "READY" : NumberParser.formatTimer(waypoint.remainingMs());
-            Text timerText = Text.literal(timer);
-            double dx = (x + 0.5D) - cameraPos.x;
-            double dy = (y + 1.02D) - cameraPos.y;
-            double dz = (z + 0.5D) - cameraPos.z;
-            double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-            double fovDeg = client.options.getFov().getValue();
-            double focalLength = (client.getWindow().getScaledWidth() / 2.0D) / Math.tan(Math.toRadians(fovDeg) * 0.5D);
-            // Keep label roughly constant on-screen size regardless of distance/FOV.
-            float textScale = (float) (TIMER_TARGET_SCREEN_SCALE * distance / Math.max(1.0D, focalLength));
-            if (textScale < TIMER_MIN_WORLD_SCALE) {
-                textScale = TIMER_MIN_WORLD_SCALE;
-            }
-            matrices.push();
-            matrices.translate(x + 0.5D, y + 1.02D, z + 0.5D);
-            matrices.multiply(client.getEntityRenderDispatcher().getRotation());
-            matrices.scale(textScale, -textScale, textScale);
-            float textX = -textRenderer.getWidth(timerText) / 2.0F;
-            int bgColor = (int) (client.options.getTextBackgroundOpacity(0.25F) * 255.0F) << 24;
-            int textColor = 0xFF000000 | rgb;
-            textRenderer.draw(
-                timerText,
-                textX,
-                0.0F,
-                textColor,
-                false,
-                matrices.peek().getPositionMatrix(),
-                consumers,
-                TextRenderer.TextLayerType.SEE_THROUGH,
-                bgColor,
-                0x00F000F0
-            );
-            textRenderer.draw(
-                timerText,
-                textX,
-                0.0F,
-                textColor,
-                false,
-                matrices.peek().getPositionMatrix(),
-                consumers,
-                TextRenderer.TextLayerType.NORMAL,
-                0x00000000,
-                LightmapTextureManager.applyEmission(0x00F000F0, 2)
-            );
-            matrices.pop();
             index++;
         }
 
+        for (BossTracker.BossWaypoint waypoint : bossWaypoints) {
+            drawWaypoint(
+                matrices,
+                consumers,
+                commandQueue,
+                textRenderer,
+                client,
+                cameraPos,
+                cameraState,
+                tickDelta,
+                waypoint.x(),
+                waypoint.y(),
+                waypoint.z(),
+                waypoint.remainingMs(),
+                BOSS_WAYPOINT_COLOR
+            );
+        }
+
+        matrices.pop();
+    }
+
+    private static void drawWaypoint(
+        MatrixStack matrices,
+        VertexConsumerProvider consumers,
+        OrderedRenderCommandQueue commandQueue,
+        TextRenderer textRenderer,
+        MinecraftClient client,
+        Vec3d cameraPos,
+        CameraRenderState cameraState,
+        float tickDelta,
+        int xBlock,
+        int yBlock,
+        int zBlock,
+        long remainingMs,
+        int rgb
+    ) {
+        float red = ((rgb >> 16) & 0xFF) / 255.0F;
+        float green = ((rgb >> 8) & 0xFF) / 255.0F;
+        float blue = (rgb & 0xFF) / 255.0F;
+
+        double x = xBlock;
+        double y = yBlock;
+        double z = zBlock;
+
+        // Draw block outline
+        int outlineColor = (0xFF << 24) | rgb;
+        VertexConsumer outline = consumers.getBuffer(RenderLayers.lines());
+        VertexRendering.drawOutline(matrices, outline, VoxelShapes.fullCube(), x, y, z, outlineColor, 1.0F);
+
+        // Beacon beam
+        matrices.push();
+        matrices.translate(x, y, z);
+        BeaconBlockEntityRenderer.renderBeam(
+            matrices,
+            commandQueue,
+            BeaconBlockEntityRenderer.BEAM_TEXTURE,
+            tickDelta,
+            1.0F,
+            0,
+            256,
+            rgb,
+            0.18F,
+            0.24F
+        );
+        matrices.pop();
+
+        // Timer text billboard
+        String timer = remainingMs <= 0L ? "READY" : NumberParser.formatTimer(remainingMs);
+        Text timerText = Text.literal(timer);
+        double dx = (x + 0.5D) - cameraPos.x;
+        double dy = (y + 1.02D) - cameraPos.y;
+        double dz = (z + 0.5D) - cameraPos.z;
+        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        double fovDeg = client.options.getFov().getValue();
+        double focalLength = (client.getWindow().getScaledWidth() / 2.0D) / Math.tan(Math.toRadians(fovDeg) * 0.5D);
+        float textScale = (float) (TIMER_TARGET_SCREEN_SCALE * distance / Math.max(1.0D, focalLength));
+        if (textScale < TIMER_MIN_WORLD_SCALE) {
+            textScale = TIMER_MIN_WORLD_SCALE;
+        }
+        matrices.push();
+        matrices.translate(x + 0.5D, y + 1.02D, z + 0.5D);
+        matrices.multiply(cameraState.orientation);
+        matrices.scale(textScale, -textScale, textScale);
+        float textX = -textRenderer.getWidth(timerText) / 2.0F;
+        int bgColor = (int) (client.options.getTextBackgroundOpacity(0.25F) * 255.0F) << 24;
+        int textColor = 0xFF000000 | rgb;
+        textRenderer.draw(
+            timerText,
+            textX,
+            0.0F,
+            textColor,
+            false,
+            matrices.peek().getPositionMatrix(),
+            consumers,
+            TextRenderer.TextLayerType.SEE_THROUGH,
+            bgColor,
+            0x00F000F0
+        );
+        textRenderer.draw(
+            timerText,
+            textX,
+            0.0F,
+            textColor,
+            false,
+            matrices.peek().getPositionMatrix(),
+            consumers,
+            TextRenderer.TextLayerType.NORMAL,
+            0x00000000,
+            LightmapTextureManager.applyEmission(0x00F000F0, 2)
+        );
         matrices.pop();
     }
 
