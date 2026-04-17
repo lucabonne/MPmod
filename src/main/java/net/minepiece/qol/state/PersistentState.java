@@ -2,8 +2,10 @@ package net.minepiece.qol.state;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public final class PersistentState {
     public Map<String, BossSpawnState> bosses = new LinkedHashMap<>();
@@ -11,9 +13,27 @@ public final class PersistentState {
     public String currentJob = "";
     public String jobsDayId = "";
     public double jobsDailyMoney;
-    public double jobsDailyXp;
     public List<ScheduledEvent> scheduledEvents = new ArrayList<>();
     public MoneyLedger money = new MoneyLedger();
+    public Set<String> bossRegistry = new LinkedHashSet<>();
+    public Set<String> ignoredBosses = new LinkedHashSet<>();
+    public ProfileStats profileStats = new ProfileStats();
+
+    public static final class ProfileStats {
+        public double level;
+        public double health;
+        public double power;
+        public double strength;
+        public double damage;
+        public double criticalChance;
+        public double criticalDamage;
+        public double energy;
+        public double energyRegeneration;
+        public double speed;
+        public double dexterity;
+        public double defense;
+        public double regeneration;
+    }
 
     public static final class BossSpawnState {
         public String spawnId = "";

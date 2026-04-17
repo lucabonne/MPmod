@@ -33,14 +33,6 @@ public final class ChatParsers {
         return trailingMatcher.find() ? Optional.of(trailingMatcher.group(1).trim()) : Optional.empty();
     }
 
-    public static boolean isHakiActivated(String chatLine) {
-        return "You have activated haki.".equalsIgnoreCase(chatLine);
-    }
-
-    public static boolean isHakiReady(String chatLine) {
-        return "You can use your haki.".equalsIgnoreCase(chatLine);
-    }
-
     public static Optional<MoneyEvent> parseMoneyEvent(String chatLine) {
         Matcher sellMatcher = SELL_PATTERN.matcher(chatLine);
         if (sellMatcher.find()) {

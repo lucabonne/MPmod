@@ -19,6 +19,7 @@ import net.minecraft.text.Text;
 
 public final class BossGuiAutoScanner {
     private static final long SCAN_INTERVAL_MS = 500L;
+    private static final String GLOBAL_SPAWN_ID = "__global__";
 
     private final BossTracker bossTracker;
     private final DebugLogManager debugLogManager;
@@ -43,10 +44,6 @@ public final class BossGuiAutoScanner {
             return;
         }
 
-        if (this.bossTracker.getCurrentSpawnId().isBlank()) {
-            return;
-        }
-
         boolean screenChanged = currentScreen != this.lastScreen;
         if (screenChanged) {
             this.lastScreen = currentScreen;
@@ -62,6 +59,7 @@ public final class BossGuiAutoScanner {
 
         int changedSlotsScanned = 0;
         String screenTitle = TextUtil.normalize(currentScreen.getTitle());
+        boolean likelyBossSelectionScreen = isLikelyBossSelectionScreen(screenTitle);
 
         for (int slotIndex = 0; slotIndex < handledScreen.getScreenHandler().slots.size(); slotIndex++) {
             Slot slot = handledScreen.getScreenHandler().slots.get(slotIndex);
@@ -79,37 +77,47 @@ public final class BossGuiAutoScanner {
             changedSlotsScanned++;
             List<Text> tooltip = stack.getTooltip(Item.TooltipContext.DEFAULT, client.player, TooltipType.BASIC);
             List<String> normalizedLines = TextUtil.normalizeLines(tooltip);
-            if (!containsBossKeywords(normalizedLines)) {
-                log(String.format(Locale.ROOT, "[BOSS] skip slot=%d missing coords/timer keywords spawn=%s",
-                    slotIndex,
-                    this.bossTracker.getCurrentSpawnId()));
-                continue;
-            }
 
             Optional<TooltipParsers.BossTooltipData> parsed =
                 TooltipParsers.parseBossTooltip(normalizedLines, TextUtil.normalize(stack.getName()));
-            if (parsed.isEmpty()) {
-                log(String.format(Locale.ROOT, "[BOSS] skip slot=%d incomplete coords/timer data spawn=%s",
+            if (parsed.isPresent()) {
+                TooltipParsers.BossTooltipData data = parsed.get();
+                this.bossTracker.captureParsedTooltip(data);
+                log(String.format(
+                    Locale.ROOT,
+                    "[BOSS] parsed title=%s slot=%d name=%s coords=(%d,%d,%d) remaining=%ds cycle=%dm spawn=%s",
+                    quote(screenTitle),
                     slotIndex,
-                    this.bossTracker.getCurrentSpawnId()));
+                    data.bossName(),
+                    data.x(),
+                    data.y(),
+                    data.z(),
+                    data.remainingSeconds(),
+                    data.cycleSeconds() / 60,
+                    activeOrUnknownSpawn()
+                ));
                 continue;
             }
 
-            TooltipParsers.BossTooltipData data = parsed.get();
-            this.bossTracker.captureParsedTooltip(data);
-            log(String.format(
-                Locale.ROOT,
-                "[BOSS] parsed title=%s slot=%d name=%s coords=(%d,%d,%d) remaining=%ds cycle=%dm spawn=%s",
-                quote(screenTitle),
+            if (likelyBossSelectionScreen || containsBossKeywords(normalizedLines)) {
+                String candidateName = bossCandidateName(stack, normalizedLines);
+                if (!candidateName.isBlank() && !isControlOrPlaceholderName(candidateName)) {
+                    this.bossTracker.registerEncounteredBoss(candidateName);
+                    log(String.format(
+                        Locale.ROOT,
+                        "[BOSS] registry add title=%s slot=%d name=%s spawn=%s",
+                        quote(screenTitle),
+                        slotIndex,
+                        quote(candidateName),
+                        activeOrUnknownSpawn()
+                    ));
+                    continue;
+                }
+            }
+
+            log(String.format(Locale.ROOT, "[BOSS] skip slot=%d incomplete boss data spawn=%s",
                 slotIndex,
-                data.bossName(),
-                data.x(),
-                data.y(),
-                data.z(),
-                data.remainingSeconds(),
-                data.cycleSeconds() / 60,
-                this.bossTracker.getCurrentSpawnId()
-            ));
+                activeOrUnknownSpawn()));
         }
 
         if (screenChanged || changedSlotsScanned > 0) {
@@ -117,7 +125,7 @@ public final class BossGuiAutoScanner {
                 quote(screenTitle),
                 changedSlotsScanned,
                 handledScreen.getScreenHandler().slots.size(),
-                this.bossTracker.getCurrentSpawnId()));
+                activeOrUnknownSpawn()));
         }
     }
 
@@ -133,21 +141,71 @@ public final class BossGuiAutoScanner {
         }
     }
 
+    private String activeOrUnknownSpawn() {
+        String spawnId = this.bossTracker.getCurrentSpawnId();
+        return spawnId == null || spawnId.isBlank() ? GLOBAL_SPAWN_ID : spawnId;
+    }
+
+    private static boolean isLikelyBossSelectionScreen(String screenTitle) {
+        if (screenTitle == null || screenTitle.isBlank()) {
+            return false;
+        }
+        String lower = screenTitle.toLowerCase(Locale.ROOT);
+        return lower.contains("island")
+            || lower.contains("boss")
+            || lower.contains("raid")
+            || lower.contains("marines")
+            || lower.contains("pirates");
+    }
+
     private static boolean containsBossKeywords(List<String> lines) {
-        boolean hasCoords = false;
-        boolean hasRespawn = false;
+        if (lines == null || lines.isEmpty()) {
+            return false;
+        }
         for (String line : lines) {
-            if (line.contains("Coordonn")) {
-                hasCoords = true;
+            if (line == null || line.isBlank()) {
+                continue;
             }
-            if (line.contains("Respawn")) {
-                hasRespawn = true;
-            }
-            if (hasCoords && hasRespawn) {
+            String lower = line.toLowerCase(Locale.ROOT);
+            if (lower.contains("coord")
+                || lower.contains("respawn")
+                || lower.contains("apparition")
+                || lower.contains("spawn")) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static String bossCandidateName(ItemStack stack, List<String> normalizedLines) {
+        if (normalizedLines != null) {
+            for (String line : normalizedLines) {
+                if (line != null && !line.isBlank()) {
+                    return line.trim();
+                }
+            }
+        }
+        return TextUtil.normalize(stack == null ? null : stack.getName());
+    }
+
+    private static boolean isControlOrPlaceholderName(String name) {
+        if (name == null || name.isBlank()) {
+            return true;
+        }
+        String lower = name.toLowerCase(Locale.ROOT);
+        return lower.equals("back")
+            || lower.equals("return")
+            || lower.equals("retour")
+            || lower.equals("close")
+            || lower.equals("fermer")
+            || lower.equals("next")
+            || lower.equals("suivant")
+            || lower.equals("previous")
+            || lower.equals("precedent")
+            || lower.equals("page")
+            || lower.equals("empty")
+            || lower.equals("???")
+            || lower.equals("-");
     }
 
     private static String buildSignature(ItemStack stack) {

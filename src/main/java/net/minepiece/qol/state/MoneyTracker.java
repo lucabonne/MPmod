@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.minepiece.qol.parse.ChatParsers;
@@ -25,6 +26,10 @@ public final class MoneyTracker {
     private static final Pattern MONEY_TOKEN_PATTERN = Pattern.compile("([0-9][0-9,]*(?:\\.[0-9]+)?)([KMB])?\\s*实", Pattern.CASE_INSENSITIVE);
     private static final Pattern POSITIVE_CHAT_PATTERN = Pattern.compile(
         "(?:increased by|received|gained|earned|won)\\s+([0-9][0-9,]*(?:\\.[0-9]+)?)([KMB])?\\s*实",
+        Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern ISLAND_BANK_WITHDRAW_PATTERN = Pattern.compile(
+        "you have withdrawn\\s+([0-9][0-9,]*(?:\\.[0-9]+)?)([KMB])?\\s*实\\s+from your island bank",
         Pattern.CASE_INSENSITIVE
     );
     private static final Pattern PET_BROUGHT_YOU_PATTERN = Pattern.compile(
@@ -51,6 +56,7 @@ public final class MoneyTracker {
     private long lastNonAhAppliedMs;
     private long lastNonAhAppliedDelta;
     private String lastNonAhAppliedSource = "";
+    private long pendingNonAhDeltaBeforeInit;
 
     public MoneyTracker(PersistentState state, Consumer<PersistentState> stateSaver, Path baseDir) {
         this.state = state;
@@ -106,20 +112,38 @@ public final class MoneyTracker {
     }
 
     public List<String> commandSummaryLines() {
+        return commandSummaryLines(null);
+    }
+
+    public List<String> commandSummaryLines(Function<String, String> localizer) {
         ensureDailyRollover();
-        List<String> lines = new ArrayList<>(4);
-        lines.add("Total: " + formatTotalValue());
-        lines.add("Made today: " + formatMadeTodayValue());
-        lines.add("AH sold: " + formatUnsigned(this.state.money.ahMadeToday));
-        lines.add("AH bought: " + formatUnsigned(this.state.money.ahSpentToday));
-        return lines;
+        String total = this.balanceInitializedThisSession ? formatUnsigned(this.state.money.currentBalance) : "?";
+        String madeToday = this.balanceInitializedThisSession ? formatSigned(totalMadeTodayDelta()) : "?";
+        return List.of(
+            localized(localizer, "money.total", "Total:") + " " + total,
+            localized(localizer, "money.made_today", "Made today:") + " " + madeToday,
+            localized(localizer, "money.ah_sold", "AH sold:") + " " + formatUnsigned(this.state.money.ahMadeToday),
+            localized(localizer, "money.ah_bought", "AH bought:") + " " + formatUnsigned(this.state.money.ahSpentToday)
+        );
     }
 
     public String getBalanceInitializationHint() {
-        return this.balanceInitializedThisSession ? "" : "Run /balance to initialize total.";
+        return getBalanceInitializationHint(null);
+    }
+
+    public String getBalanceInitializationHint(Function<String, String> localizer) {
+        return this.balanceInitializedThisSession ? "" : localized(
+            localizer,
+            "cmd.money.balance_hint",
+            "Run /balance to initialize total."
+        );
     }
 
     public List<String> recentLogLines(int limit) {
+        return recentLogLines(limit, null);
+    }
+
+    public List<String> recentLogLines(int limit, Function<String, String> localizer) {
         if (limit <= 0 || this.state.money.history.isEmpty()) {
             return List.of();
         }
@@ -131,7 +155,14 @@ public final class MoneyTracker {
             PersistentState.Transaction tx = this.state.money.history.get(i);
             String sign = "SELL".equalsIgnoreCase(tx.type) ? "+" : "-";
             String amount = String.format(Locale.ROOT, "%,d", Math.round(tx.amount));
-            lines.add(String.format(Locale.ROOT, "[%s] %s%s 实 - %s", tx.type, sign, amount, tx.itemName));
+            lines.add(String.format(
+                Locale.ROOT,
+                localized(localizer, "cmd.money.log_entry", "[%s] %s%s 实 - %s"),
+                tx.type,
+                sign,
+                amount,
+                tx.itemName
+            ));
         }
         return lines;
     }
@@ -158,17 +189,143 @@ public final class MoneyTracker {
         this.stateSaver.accept(this.state);
     }
 
+    public List<PersistentState.Transaction> getHistory() {
+        return this.state.money.history;
+    }
+
+    public long getCurrentBalance() {
+        return this.state.money.currentBalance;
+    }
+
+    public long getMadeToday() {
+        return totalMadeTodayDelta();
+    }
+
+    public long getAhMadeToday() {
+        return this.state.money.ahMadeToday;
+    }
+
+    public long getAhSpentToday() {
+        return this.state.money.ahSpentToday;
+    }
+
+    public long getNonAhToday() {
+        return this.state.money.nonAhToday;
+    }
+
+    public boolean isBalanceInitialized() {
+        return this.balanceInitializedThisSession;
+    }
+
+    public void setCurrentBalance(long value) {
+        this.state.money.currentBalance = Math.max(0L, value);
+        this.balanceInitializedThisSession = true;
+        this.stateSaver.accept(this.state);
+    }
+
+    public void setMadeToday(long value) {
+        long ahDelta = this.state.money.ahMadeToday - this.state.money.ahSpentToday;
+        this.state.money.nonAhToday = value - ahDelta;
+        this.stateSaver.accept(this.state);
+    }
+
+    public void setAhMadeToday(long value) {
+        this.state.money.ahMadeToday = Math.max(0L, value);
+        this.stateSaver.accept(this.state);
+    }
+
+    public void setAhSpentToday(long value) {
+        this.state.money.ahSpentToday = Math.max(0L, value);
+        this.stateSaver.accept(this.state);
+    }
+
+    public boolean removeTransaction(String id) {
+        if (id == null || id.isBlank()) {
+            return false;
+        }
+        boolean removed = this.state.money.history.removeIf(tx -> id.equals(tx.id));
+        if (removed) {
+            this.state.money.transactions = this.state.money.history.size();
+            recomputeTodayFromHistory();
+            this.stateSaver.accept(this.state);
+        }
+        return removed;
+    }
+
+    public boolean editTransaction(String id, String type, String itemName, double amount) {
+        if (id == null || id.isBlank()) {
+            return false;
+        }
+        for (PersistentState.Transaction tx : this.state.money.history) {
+            if (id.equals(tx.id)) {
+                tx.type = type == null ? tx.type : type.toUpperCase(Locale.ROOT);
+                tx.itemName = itemName == null ? tx.itemName : itemName;
+                tx.amount = amount;
+                recomputeTodayFromHistory();
+                this.stateSaver.accept(this.state);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void recomputeTodayFromHistory() {
+        String todayId = LocalDate.now(MONEY_ZONE).toString();
+        long ahMade = 0L;
+        long ahSpent = 0L;
+        for (PersistentState.Transaction tx : this.state.money.history) {
+            String txDay = LocalDate.ofInstant(java.time.Instant.ofEpochMilli(tx.epochMs), MONEY_ZONE).toString();
+            if (!todayId.equals(txDay)) {
+                continue;
+            }
+            long rounded = Math.max(0L, Math.round(tx.amount));
+            if ("SELL".equalsIgnoreCase(tx.type)) {
+                ahMade += rounded;
+            } else if ("BUY".equalsIgnoreCase(tx.type)) {
+                ahSpent += rounded;
+            }
+        }
+        this.state.money.ahMadeToday = ahMade;
+        this.state.money.ahSpentToday = ahSpent;
+    }
+
+    public void resetAll() {
+        this.awaitingBalanceReplyUntilMs = 0L;
+        this.balanceInitializedThisSession = false;
+        this.lastActionbarMoneyDisplay = -1L;
+        this.lastActionbarDisplayMs = 0L;
+        this.lastNonAhAppliedMs = 0L;
+        this.lastNonAhAppliedDelta = 0L;
+        this.lastNonAhAppliedSource = "";
+        this.pendingNonAhDeltaBeforeInit = 0L;
+
+        this.state.money.currentBalance = 0L;
+        this.state.money.lastLoggedBalance = 0L;
+        this.state.money.dayStartBalance = 0L;
+        this.state.money.dayId = "";
+        this.state.money.nonAhToday = 0L;
+        this.state.money.ahSpentToday = 0L;
+        this.state.money.ahMadeToday = 0L;
+        this.state.money.transactions = 0;
+        this.state.money.history.clear();
+        this.stateSaver.accept(this.state);
+    }
+
     public List<String> getHudLines() {
+        return getHudLines(null);
+    }
+
+    public List<String> getHudLines(Function<String, String> localizer) {
         ensureDailyRollover();
         List<String> lines = new ArrayList<>(4);
-        lines.add("Total: " + (this.balanceInitializedThisSession
-            ? String.format(Locale.ROOT, "%,d", this.state.money.currentBalance)
+        lines.add(localized(localizer, "money.total", "Total:") + " " + (this.balanceInitializedThisSession
+            ? formatCompact(this.state.money.currentBalance)
             : "?"));
-        lines.add("Made today: " + (this.balanceInitializedThisSession
-            ? formatSignedPlain(totalMadeTodayDelta())
+        lines.add(localized(localizer, "money.made_today", "Made today:") + " " + (this.balanceInitializedThisSession
+            ? formatSignedCompact(totalMadeTodayDelta())
             : "?"));
-        lines.add("AH sold: " + String.format(Locale.ROOT, "%,d", Math.max(0L, this.state.money.ahMadeToday)));
-        lines.add("AH bought: " + String.format(Locale.ROOT, "%,d", Math.max(0L, this.state.money.ahSpentToday)));
+        lines.add(localized(localizer, "money.ah_sold", "AH sold:") + " " + formatCompact(Math.max(0L, this.state.money.ahMadeToday)));
+        lines.add(localized(localizer, "money.ah_bought", "AH bought:") + " " + formatCompact(Math.max(0L, this.state.money.ahSpentToday)));
         return lines;
     }
 
@@ -208,6 +365,11 @@ public final class MoneyTracker {
         this.state.money.lastLoggedBalance = previous > 0L ? previous : 0L;
         this.state.money.currentBalance = parsedBalance;
         this.balanceInitializedThisSession = true;
+        if (this.pendingNonAhDeltaBeforeInit != 0L) {
+            this.state.money.currentBalance = Math.max(0L, this.state.money.currentBalance + this.pendingNonAhDeltaBeforeInit);
+            this.state.money.nonAhToday += this.pendingNonAhDeltaBeforeInit;
+            this.pendingNonAhDeltaBeforeInit = 0L;
+        }
         this.stateSaver.accept(this.state);
     }
 
@@ -242,7 +404,7 @@ public final class MoneyTracker {
     }
 
     private void applyNonAhDelta(long signedDelta, String source) {
-        if (signedDelta == 0L || !this.balanceInitializedThisSession) {
+        if (signedDelta == 0L) {
             return;
         }
         long now = System.currentTimeMillis();
@@ -252,37 +414,36 @@ public final class MoneyTracker {
             return;
         }
 
-        this.state.money.currentBalance += signedDelta;
-        this.state.money.nonAhToday += signedDelta;
         this.lastNonAhAppliedMs = now;
         this.lastNonAhAppliedDelta = signedDelta;
         this.lastNonAhAppliedSource = source;
+        if (!this.balanceInitializedThisSession) {
+            this.pendingNonAhDeltaBeforeInit += signedDelta;
+            return;
+        }
+
+        this.state.money.currentBalance += signedDelta;
+        this.state.money.nonAhToday += signedDelta;
         this.stateSaver.accept(this.state);
     }
 
     private Optional<Long> parseChatMoneyDelta(String line) {
-        Matcher inventorySoldMatcher = INVENTORY_SOLD_PATTERN.matcher(line);
-        if (inventorySoldMatcher.find()) {
-            long amount = Math.round(NumberParser.parse(inventorySoldMatcher.group(1), inventorySoldMatcher.group(2)));
-            return amount > 0L ? Optional.of(amount) : Optional.empty();
+        Optional<Long> positive = firstMatchAmount(line,
+            ISLAND_BANK_WITHDRAW_PATTERN, INVENTORY_SOLD_PATTERN,
+            PET_BROUGHT_YOU_PATTERN, POSITIVE_CHAT_PATTERN);
+        if (positive.isPresent()) {
+            return positive;
         }
+        return firstMatchAmount(line, NEGATIVE_CHAT_PATTERN).map(amount -> -amount);
+    }
 
-        Matcher petBroughtMatcher = PET_BROUGHT_YOU_PATTERN.matcher(line);
-        if (petBroughtMatcher.find()) {
-            long amount = Math.round(NumberParser.parse(petBroughtMatcher.group(1), petBroughtMatcher.group(2)));
-            return amount > 0L ? Optional.of(amount) : Optional.empty();
-        }
-
-        Matcher positiveMatcher = POSITIVE_CHAT_PATTERN.matcher(line);
-        if (positiveMatcher.find()) {
-            long amount = Math.round(NumberParser.parse(positiveMatcher.group(1), positiveMatcher.group(2)));
-            return amount > 0L ? Optional.of(amount) : Optional.empty();
-        }
-
-        Matcher negativeMatcher = NEGATIVE_CHAT_PATTERN.matcher(line);
-        if (negativeMatcher.find()) {
-            long amount = Math.round(NumberParser.parse(negativeMatcher.group(1), negativeMatcher.group(2)));
-            return amount > 0L ? Optional.of(-amount) : Optional.empty();
+    private static Optional<Long> firstMatchAmount(String line, Pattern... patterns) {
+        for (Pattern pattern : patterns) {
+            Matcher matcher = pattern.matcher(line);
+            if (matcher.find()) {
+                long amount = Math.round(NumberParser.parse(matcher.group(1), matcher.group(2)));
+                return amount > 0L ? Optional.of(amount) : Optional.empty();
+            }
         }
         return Optional.empty();
     }
@@ -345,18 +506,6 @@ public final class MoneyTracker {
         return max;
     }
 
-    private String formatTotalValue() {
-        return this.balanceInitializedThisSession
-            ? formatUnsigned(this.state.money.currentBalance)
-            : "?";
-    }
-
-    private String formatMadeTodayValue() {
-        return this.balanceInitializedThisSession
-            ? formatSigned(totalMadeTodayDelta())
-            : "?";
-    }
-
     private long totalMadeTodayDelta() {
         return this.state.money.nonAhToday + this.state.money.ahMadeToday - this.state.money.ahSpentToday;
     }
@@ -372,15 +521,48 @@ public final class MoneyTracker {
         return String.format(Locale.ROOT, "%s%,d 实", value > 0L ? "+" : "-", Math.abs(value));
     }
 
-    private static String formatSignedPlain(long value) {
+    private static String formatCompact(long value) {
+        String[] units = {"", "k", "M", "B", "T"};
+        long abs = Math.abs(value);
+        if (abs < 1_000L) {
+            return Long.toString(value);
+        }
+
+        double scaled = abs;
+        int unitIndex = 0;
+        while (scaled >= 1_000.0D && unitIndex < units.length - 1) {
+            scaled /= 1_000.0D;
+            unitIndex++;
+        }
+
+        // Avoid 1000.00k / 1000.00M after rounding by promoting to next unit.
+        double rounded = Math.round(scaled * 100.0D) / 100.0D;
+        if (rounded >= 1_000.0D && unitIndex < units.length - 1) {
+            rounded /= 1_000.0D;
+            unitIndex++;
+        }
+
+        String sign = value < 0L ? "-" : "";
+        return String.format(Locale.ROOT, "%s%.2f%s", sign, rounded, units[unitIndex]);
+    }
+
+    private static String formatSignedCompact(long value) {
         if (value == 0L) {
             return "0";
         }
-        return String.format(Locale.ROOT, "%s%,d", value > 0L ? "+" : "-", Math.abs(value));
+        return (value > 0L ? "+" : "-") + formatCompact(Math.abs(value));
     }
 
     private static String csv(String raw) {
         String safe = raw == null ? "" : raw;
         return "\"" + safe.replace("\"", "\"\"") + "\"";
+    }
+
+    private static String localized(Function<String, String> localizer, String key, String fallback) {
+        if (localizer == null) {
+            return fallback;
+        }
+        String value = localizer.apply(key);
+        return value == null || value.isBlank() || value.equals(key) ? fallback : value;
     }
 }

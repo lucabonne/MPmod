@@ -1,0 +1,12 @@
+# Gradle / build output
+.gradle/
+build/
+bin/
+
+# OS cruft
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.iml

@@ -1,65 +1,56 @@
 package net.minepiece.qol.state;
 
 import java.util.Locale;
+import java.util.function.Function;
 
 public final class CooldownTracker {
-    // --- Haki cooldown ---
     private static final String HAKI_USED = "You have activated haki.";
     private static final String HAKI_READY = "You can use your haki.";
-    private static final int HAKI_DEFAULT_SECONDS = 30;
-    private static final int HAKI_READY_VISIBLE_SECONDS = 30;
+    private static final long HAKI_COOLDOWN_MS = 30_000L;
+    private static final long HAKI_READY_VISIBLE_MS = 30_000L;
 
-    private long hakiCooldownEndMs = 0L;
-    private long hakiVisibleUntilMs = 0L;
-
-    public CooldownTracker() {
-    }
+    private long hakiCooldownEndMs;
+    private long hakiVisibleUntilMs;
 
     public void onChatMessage(String normalizedChat) {
-        // --- Haki cooldown parsing ---
         long now = System.currentTimeMillis();
         if (normalizedChat.contains(HAKI_USED)) {
-            this.hakiCooldownEndMs = now + (HAKI_DEFAULT_SECONDS * 1000L);
-            this.hakiVisibleUntilMs = this.hakiCooldownEndMs + (HAKI_READY_VISIBLE_SECONDS * 1000L);
+            this.hakiCooldownEndMs = now + HAKI_COOLDOWN_MS;
+            this.hakiVisibleUntilMs = this.hakiCooldownEndMs + HAKI_READY_VISIBLE_MS;
         } else if (normalizedChat.contains(HAKI_READY)) {
             this.hakiCooldownEndMs = now;
-            this.hakiVisibleUntilMs = now + (HAKI_READY_VISIBLE_SECONDS * 1000L);
+            this.hakiVisibleUntilMs = now + HAKI_READY_VISIBLE_MS;
         }
     }
 
     public String getHakiHudText() {
-        if (!shouldShowHakiHud()) {
-            return "";
-        }
-
-        long remainingMs = getHakiRemainingMillis();
-        if (remainingMs <= 0L) {
-            return "Haki ready";
-        }
-        double seconds = remainingMs / 1000.0D;
-        return String.format(Locale.ROOT, "Cooldown: %.1fs", seconds);
+        return getHakiHudText(null);
     }
 
-    public boolean shouldShowHakiHud() {
-        long now = System.currentTimeMillis();
-        return getHakiRemainingMillis() > 0L || now < this.hakiVisibleUntilMs;
+    public String getHakiHudText(Function<String, String> localizer) {
+        long remainingMs = getHakiRemainingMillis();
+        if (remainingMs > 0L) {
+            return String.format(Locale.ROOT, localized(localizer, "cooldown.label", "Cooldown: %.1fs"), remainingMs / 1000.0D);
+        }
+        if (System.currentTimeMillis() < this.hakiVisibleUntilMs) {
+            return localized(localizer, "cooldown.haki_ready", "Haki ready");
+        }
+        return "";
     }
 
     public boolean isHakiReady() {
-        return getHakiRemainingSeconds() <= 0L;
+        return getHakiRemainingMillis() <= 0L;
     }
 
     public long getHakiRemainingMillis() {
-        long remainingMs = this.hakiCooldownEndMs - System.currentTimeMillis();
-        return Math.max(0L, remainingMs);
+        return Math.max(0L, this.hakiCooldownEndMs - System.currentTimeMillis());
     }
 
-    public long getHakiRemainingSeconds() {
-        long remainingMs = getHakiRemainingMillis();
-        if (remainingMs <= 0L) {
-            return 0L;
+    private static String localized(Function<String, String> localizer, String key, String fallback) {
+        if (localizer == null) {
+            return fallback;
         }
-        return (remainingMs + 999L) / 1000L;
+        String value = localizer.apply(key);
+        return value == null || value.isBlank() || value.equals(key) ? fallback : value;
     }
-
 }

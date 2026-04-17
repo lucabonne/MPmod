@@ -7,6 +7,7 @@ import java.util.Map;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.minepiece.qol.parse.ActionbarParser;
@@ -14,7 +15,7 @@ import net.minepiece.qol.parse.ActionbarParser;
 public final class JobsTracker {
     private static final long ACTIONBAR_VISIBLE_MS = 4_000L;
     private static final double XP_EPSILON = 0.0001D;
-    private static final List<String> HUD_JOB_ORDER = List.of("fisherman", "farmer", "miner", "lumberjack");
+    public static final List<String> HUD_JOB_ORDER = List.of("fisherman", "farmer", "miner", "lumberjack");
     private static final ZoneId JOBS_ZONE = ZoneId.of("Europe/Rome");
     private static final Pattern LEVEL_UP_PATTERN = Pattern.compile(
         "you have reached level\\s+(\\d+)\\s+in the job\\s+([a-zA-Z]+)\\s*!",
@@ -40,6 +41,10 @@ public final class JobsTracker {
     }
 
     public String initFromSpec(String rawSpec) {
+        return initFromSpec(rawSpec, null);
+    }
+
+    public String initFromSpec(String rawSpec, Function<String, String> localizer) {
         String[] chunks = rawSpec.split(";");
         int loaded = 0;
 
@@ -83,7 +88,14 @@ public final class JobsTracker {
 
         this.state.currentJob = "";
         this.stateSaver.accept(this.state);
-        return loaded == 0 ? "No jobs loaded." : "Loaded " + loaded + " job baselines.";
+        if (loaded == 0) {
+            return localized(localizer, "cmd.jobs.init_none_loaded", "No jobs loaded.");
+        }
+        return String.format(
+            Locale.ROOT,
+            localized(localizer, "cmd.jobs.init_loaded", "Loaded %d job baselines."),
+            loaded
+        );
     }
 
     public void reset() {
@@ -103,43 +115,86 @@ public final class JobsTracker {
     }
 
     public String resetDailyXp() {
+        return resetDailyXp((Function<String, String>) null);
+    }
+
+    public String resetDailyXp(Function<String, String> localizer) {
         rolloverDailyIfNeeded();
         this.state.jobsDailyMoney = 0.0D;
         for (PersistentState.JobInfo info : this.state.jobs.values()) {
             info.dailyXp = 0.0D;
         }
         this.stateSaver.accept(this.state);
-        return "Reset daily money and daily XP for all jobs.";
+        return localized(localizer, "cmd.jobs.reset_daily_all", "Reset daily money and daily XP for all jobs.");
     }
 
     public String resetDailyXp(String rawJobName) {
+        return resetDailyXp(rawJobName, null);
+    }
+
+    public String resetDailyXp(String rawJobName, Function<String, String> localizer) {
         if (rawJobName == null) {
-            return "Unknown job. Use fisherman, farmer, miner, or lumberjack.";
+            return localized(localizer, "cmd.jobs.unknown_job", "Unknown job. Use fisherman, farmer, miner, or lumberjack.");
         }
 
         rolloverDailyIfNeeded();
         String jobName = rawJobName.trim().toLowerCase(Locale.ROOT);
         if (!HUD_JOB_ORDER.contains(jobName)) {
-            return "Unknown job. Use fisherman, farmer, miner, or lumberjack.";
+            return localized(localizer, "cmd.jobs.unknown_job", "Unknown job. Use fisherman, farmer, miner, or lumberjack.");
         }
 
         PersistentState.JobInfo info = this.state.jobs.computeIfAbsent(jobName, key -> new PersistentState.JobInfo());
         info.dailyXp = 0.0D;
         this.stateSaver.accept(this.state);
-        return "Reset daily XP for " + capitalize(jobName) + ".";
+        return String.format(
+            Locale.ROOT,
+            localized(localizer, "cmd.jobs.reset_daily_job", "Reset daily XP for %s."),
+            displayJobName(jobName, localizer)
+        );
+    }
+
+    public PersistentState.JobInfo getJob(String rawJobName) {
+        if (rawJobName == null) {
+            return null;
+        }
+        return this.state.jobs.get(rawJobName.trim().toLowerCase(Locale.ROOT));
+    }
+
+    public void setJobValues(String rawJobName, int level, double currentXp, double neededXp) {
+        if (rawJobName == null) {
+            return;
+        }
+        String jobName = rawJobName.trim().toLowerCase(Locale.ROOT);
+        if (!HUD_JOB_ORDER.contains(jobName)) {
+            return;
+        }
+        PersistentState.JobInfo info = this.state.jobs.computeIfAbsent(jobName, key -> new PersistentState.JobInfo());
+        info.level = Math.max(0, level);
+        info.currentXp = Math.max(0.0D, currentXp);
+        info.neededXp = Math.max(0.0D, neededXp);
+        info.lastSeenMs = System.currentTimeMillis();
+        this.stateSaver.accept(this.state);
     }
 
     public String setJobBaseline(String rawJobName, int level, double neededXp) {
+        return setJobBaseline(rawJobName, level, neededXp, null);
+    }
+
+    public String setJobBaseline(String rawJobName, int level, double neededXp, Function<String, String> localizer) {
         if (rawJobName == null) {
-            return "Unknown job. Use fisherman, farmer, miner, or lumberjack.";
+            return localized(localizer, "cmd.jobs.unknown_job", "Unknown job. Use fisherman, farmer, miner, or lumberjack.");
         }
 
         String jobName = rawJobName.trim().toLowerCase(Locale.ROOT);
         if (!HUD_JOB_ORDER.contains(jobName)) {
-            return "Unknown job. Use fisherman, farmer, miner, or lumberjack.";
+            return localized(localizer, "cmd.jobs.unknown_job", "Unknown job. Use fisherman, farmer, miner, or lumberjack.");
         }
         if (level < 0 || neededXp < 10.0D || neededXp > 1_000_000_000.0D) {
-            return "Invalid values. Level must be 0+ and needed XP must be between 10 and 1000000000.";
+            return localized(
+                localizer,
+                "cmd.jobs.invalid_values",
+                "Invalid values. Level must be 0+ and needed XP must be between 10 and 1000000000."
+            );
         }
 
         PersistentState.JobInfo info = this.state.jobs.computeIfAbsent(jobName, key -> new PersistentState.JobInfo());
@@ -152,7 +207,13 @@ public final class JobsTracker {
             this.state.currentJob = "";
         }
         this.stateSaver.accept(this.state);
-        return "Set " + capitalize(jobName) + " baseline to LVL " + level + " " + formatXpValue(neededXp) + " XP.";
+        return String.format(
+            Locale.ROOT,
+            localized(localizer, "cmd.jobs.set_baseline", "Set %s baseline to LVL %d %s XP."),
+            displayJobName(jobName, localizer),
+            level,
+            formatXpValue(neededXp)
+        );
     }
 
     public void captureActionbar(String actionbar) {
@@ -250,38 +311,61 @@ public final class JobsTracker {
     }
 
     public String summary() {
+        return summary(null);
+    }
+
+    public String summary(Function<String, String> localizer) {
         if (this.state.jobs.isEmpty()) {
-            return "No jobs initialized.";
+            return localized(localizer, "cmd.jobs.no_jobs_initialized", "No jobs initialized.");
         }
 
         List<String> parts = new ArrayList<>();
         for (Map.Entry<String, PersistentState.JobInfo> entry : this.state.jobs.entrySet()) {
             PersistentState.JobInfo info = entry.getValue();
-            parts.add(entry.getKey() + " LVL " + info.level + " " + formatXpProgress(info));
+            parts.add(displayJobName(entry.getKey(), localizer) + " LVL " + info.level + " " + formatXpProgress(info));
         }
         return String.join(" | ", parts);
     }
 
     public String debugSummary() {
-        return "currentJob=" + (this.state.currentJob.isBlank() ? "<none>" : this.state.currentJob)
-            + ", jobs=" + this.state.jobs.size()
-            + ", lastMoney=" + String.format(Locale.ROOT, "%.2f", this.lastMoneyGain)
-            + ", lastXp=" + String.format(Locale.ROOT, "%.2f", this.lastXpGain);
+        return debugSummary(null);
+    }
+
+    public String debugSummary(Function<String, String> localizer) {
+        String currentJob = this.state.currentJob.isBlank()
+            ? localized(localizer, "cmd.common.none_value", "<none>")
+            : displayJobName(this.state.currentJob, localizer);
+        return String.format(
+            Locale.ROOT,
+            localized(localizer, "cmd.jobs.debug_summary", "currentJob=%s, jobs=%d, lastMoney=%.2f, lastXp=%.2f"),
+            currentJob,
+            this.state.jobs.size(),
+            this.lastMoneyGain,
+            this.lastXpGain
+        );
     }
 
     public List<String> getOverviewHudLines() {
+        return getOverviewHudLines(null);
+    }
+
+    public List<String> getOverviewHudLines(Function<String, String> localizer) {
         rolloverDailyIfNeeded();
         List<String> lines = new ArrayList<>(HUD_JOB_ORDER.size());
         for (String jobName : HUD_JOB_ORDER) {
             PersistentState.JobInfo info = this.state.jobs.get(jobName);
-            lines.add(formatOverviewLine(jobName, info));
-            lines.add("Today XP: " + formatDailyValue(info == null ? 0.0D : info.dailyXp));
+            lines.add(formatOverviewLine(jobName, info, localizer));
+            lines.add(localized(localizer, "jobs.today_xp", "Today XP:") + " " + formatDailyValue(info == null ? 0.0D : info.dailyXp));
         }
-        lines.add("Today money: " + formatDailyValue(this.state.jobsDailyMoney));
+        lines.add(localized(localizer, "jobs.today_money", "Today money:") + " " + formatDailyValue(this.state.jobsDailyMoney));
         return lines;
     }
 
     public List<String> getHudLines() {
+        return getHudLines(null);
+    }
+
+    public List<String> getHudLines(Function<String, String> localizer) {
         if (this.state.currentJob.isBlank() || System.currentTimeMillis() > this.visibleUntilMs) {
             return List.of();
         }
@@ -292,9 +376,14 @@ public final class JobsTracker {
         }
 
         return List.of(
-            "Job: " + capitalize(this.state.currentJob) + " LVL " + info.level,
-            "XP: " + formatXpProgress(info),
-            String.format(Locale.ROOT, "Tick: +%.2f money / +%.2f XP", this.lastMoneyGain, this.lastXpGain)
+            localized(localizer, "jobs.hud_job", "Job:") + " " + displayJobName(this.state.currentJob, localizer) + " LVL " + info.level,
+            localized(localizer, "jobs.hud_xp", "XP:") + " " + formatXpProgress(info),
+            String.format(
+                Locale.ROOT,
+                localized(localizer, "jobs.hud_tick", "Tick: +%.2f money / +%.2f XP"),
+                this.lastMoneyGain,
+                this.lastXpGain
+            )
         );
     }
 
@@ -324,10 +413,31 @@ public final class JobsTracker {
         return Character.toUpperCase(raw.charAt(0)) + raw.substring(1);
     }
 
-    private static String formatOverviewLine(String jobName, PersistentState.JobInfo info) {
-        String label = capitalize(jobName);
+    private static String formatOverviewLine(String jobName, PersistentState.JobInfo info, Function<String, String> localizer) {
+        String label = displayJobName(jobName, localizer);
         String level = info == null || info.level <= 0 ? "?" : Integer.toString(info.level);
         return label + " LVL " + level + " " + formatXpProgress(info);
+    }
+
+    private static String displayJobName(String jobName, Function<String, String> localizer) {
+        if (jobName == null || jobName.isBlank()) {
+            return "";
+        }
+        return switch (jobName.toLowerCase(Locale.ROOT)) {
+            case "fisherman" -> localized(localizer, "jobs.name.fisherman", "Fisherman");
+            case "farmer" -> localized(localizer, "jobs.name.farmer", "Farmer");
+            case "miner" -> localized(localizer, "jobs.name.miner", "Miner");
+            case "lumberjack" -> localized(localizer, "jobs.name.lumberjack", "Lumberjack");
+            default -> capitalize(jobName);
+        };
+    }
+
+    private static String localized(Function<String, String> localizer, String key, String fallback) {
+        if (localizer == null) {
+            return fallback;
+        }
+        String value = localizer.apply(key);
+        return value == null || value.isBlank() || value.equals(key) ? fallback : value;
     }
 
     private static String formatXpProgress(PersistentState.JobInfo info) {
