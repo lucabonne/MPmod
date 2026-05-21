@@ -46,10 +46,15 @@ public final class NumberParser {
     }
 
     private static String sanitize(String input) {
-        String trimmed = input.trim();
+        String trimmed = input.trim().replace(" ", "").replace("\u00a0", "");
         boolean hasComma = trimmed.contains(",");
         boolean hasDot = trimmed.contains(".");
         if (hasComma && hasDot) {
+            int lastComma = trimmed.lastIndexOf(',');
+            int lastDot = trimmed.lastIndexOf('.');
+            if (lastComma > lastDot) {
+                return trimmed.replace(".", "").replace(',', '.');
+            }
             return trimmed.replace(",", "");
         }
         if (hasComma) {
@@ -59,6 +64,13 @@ public final class NumberParser {
                 return trimmed.replace(",", "");
             }
             return trimmed.replace(',', '.');
+        }
+        if (hasDot) {
+            int lastDot = trimmed.lastIndexOf('.');
+            int digitsAfterDot = trimmed.length() - lastDot - 1;
+            if (digitsAfterDot == 3) {
+                return trimmed.replace(".", "");
+            }
         }
         return trimmed;
     }

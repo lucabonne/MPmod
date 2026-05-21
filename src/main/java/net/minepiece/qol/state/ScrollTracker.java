@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minepiece.qol.util.LocalizedText;
 import net.minepiece.qol.util.TextUtil;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
@@ -17,8 +18,9 @@ import net.minecraft.item.tooltip.TooltipType;
 import net.minecraft.text.Text;
 
 public final class ScrollTracker {
-    private static final Pattern SCROLL_NAME_PATTERN = Pattern.compile("\\bscroll\\b(?:\\s*\\(([^)]+)\\))?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern OBJECTIVE_PATTERN = Pattern.compile("^objective\\s*:?\\s*(.*)$", Pattern.CASE_INSENSITIVE);
+    private static final long SCAN_INTERVAL_MS = 750L;
+    private static final Pattern SCROLL_NAME_PATTERN = Pattern.compile("\\b(?:scroll|parchemin|pergamino|schriftrolle|pergamena|pergamin|gulungan|tomar)\\b(?:\\s*\\(([^)]+)\\))?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern OBJECTIVE_PATTERN = Pattern.compile("^(?:objective|objectif|objetivo|ziel|obiettivo|cel|tujuan|gorev|görev)\\s*:?\\s*(.*)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PROGRESS_PATTERN = Pattern.compile("\\(([0-9][0-9.,]*)\\s*/\\s*([0-9][0-9.,]*)\\)");
     private static final Pattern DIGITS_ONLY = Pattern.compile("[^0-9]");
     private static final int MAX_OBJECTIVE_CHARS = 32;
@@ -35,6 +37,7 @@ public final class ScrollTracker {
 
     private List<ScrollEntry> entries = List.of();
     private String lastFingerprint = "";
+    private long nextScanAtMs = 0L;
 
     public ScrollTracker(DebugLogManager debugLogManager) {
         this.debugLogManager = debugLogManager;
@@ -46,6 +49,7 @@ public final class ScrollTracker {
         }
         this.entries = List.of();
         this.lastFingerprint = "";
+        this.nextScanAtMs = 0L;
     }
 
     public void scanInventory(PlayerEntity player) {
@@ -53,6 +57,12 @@ public final class ScrollTracker {
             clear();
             return;
         }
+
+        long now = System.currentTimeMillis();
+        if (now < this.nextScanAtMs) {
+            return;
+        }
+        this.nextScanAtMs = now + SCAN_INTERVAL_MS;
 
         List<ScrollEntry> parsed = new ArrayList<>();
         for (int slot = 0; slot < player.getInventory().size(); slot++) {
@@ -187,7 +197,7 @@ public final class ScrollTracker {
             }
             for (int j = i + 1; j < lines.size(); j++) {
                 String next = lines.get(j);
-                if (next == null || next.isBlank() || isRarityLine(next) || next.toLowerCase(Locale.ROOT).startsWith("expires")) {
+                if (next == null || next.isBlank() || isRarityLine(next) || LocalizedText.startsWithAny(next, "expires", "expire", "expira", "läuft ab", "läuft", "scade", "wygasa", "kedaluwarsa", "suresi dolar", "süresi dolar")) {
                     continue;
                 }
                 return next.trim();
@@ -236,7 +246,7 @@ public final class ScrollTracker {
                 continue;
             }
             String lower = line.toLowerCase(Locale.ROOT);
-            if (lower.startsWith("objective")) {
+            if (LocalizedText.startsWithAny(lower, "objective", "objectif", "objetivo", "ziel", "obiettivo", "cel", "tujuan", "gorev", "görev")) {
                 hasObjective = true;
             }
             if (PROGRESS_PATTERN.matcher(line).find()) {
@@ -256,7 +266,13 @@ public final class ScrollTracker {
             || "EPIC".equals(upper)
             || "LEGENDARY".equals(upper)
             || "MYTHIC".equals(upper)
-            || "MYTHICAL".equals(upper);
+            || "MYTHICAL".equals(upper)
+            || LocalizedText.containsAny(upper,
+                "commun", "comun", "gemein", "comune", "zwykly", "zwykły", "umum", "yaygin", "yaygın",
+                "raro", "selten", "rzadki", "langka", "nadir",
+                "epique", "épique", "epico", "épico", "episch", "epicki", "destansi", "destansı",
+                "legendaire", "légendaire", "legendario", "legendarna", "legendarny", "legendaris", "efsanevi",
+                "mitico", "mítico", "mityczny", "mitos", "mitik");
     }
 
     private static long parseLongDigits(String token) {

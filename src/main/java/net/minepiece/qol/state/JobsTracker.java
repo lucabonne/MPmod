@@ -11,6 +11,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.minepiece.qol.parse.ActionbarParser;
+import net.minepiece.qol.util.LocalizedText;
 
 public final class JobsTracker {
     private static final long ACTIONBAR_VISIBLE_MS = 4_000L;
@@ -18,8 +19,14 @@ public final class JobsTracker {
     public static final List<String> HUD_JOB_ORDER = List.of("fisherman", "farmer", "miner", "lumberjack");
     private static final ZoneId JOBS_ZONE = ZoneId.of("Europe/Rome");
     private static final Pattern LEVEL_UP_PATTERN = Pattern.compile(
-        "you have reached level\\s+(\\d+)\\s+in the job\\s+([a-zA-Z]+)\\s*!",
+        "(?:level|lvl|niveau|nivel|stufe|livello|poziom|seviye)\\s*[:.]?\\s*(\\d{1,4})",
         Pattern.CASE_INSENSITIVE
+    );
+    private static final Map<String, List<String>> JOB_KEYWORDS = Map.of(
+        "fisherman", List.of("fisherman", "fisher", "pecheur", "pêcheur", "pescador", "fischer", "pescatore", "rybak", "nelayan", "balikci", "balıkçı"),
+        "farmer", List.of("farmer", "fermier", "agriculteur", "granjero", "bauer", "contadino", "agricoltore", "rolnik", "petani", "ciftci", "çiftçi"),
+        "miner", List.of("miner", "mineur", "minero", "bergmann", "minatore", "gornik", "górnik", "penambang", "madenci"),
+        "lumberjack", List.of("lumberjack", "woodcutter", "bucheron", "bûcheron", "lenador", "leñador", "holzfaller", "holzfäller", "taglialegna", "boscaiolo", "drwal", "penebang kayu", "oduncu")
     );
 
     private final PersistentState state;
@@ -225,20 +232,13 @@ public final class JobsTracker {
             return;
         }
 
-        Matcher matcher = LEVEL_UP_PATTERN.matcher(text);
-        if (!matcher.find()) {
+        String jobName = findMentionedJob(text);
+        if (jobName.isBlank()) {
             return;
         }
 
-        String jobName = matcher.group(2).trim().toLowerCase(Locale.ROOT);
-        if (!HUD_JOB_ORDER.contains(jobName)) {
-            return;
-        }
-
-        int level;
-        try {
-            level = Integer.parseInt(matcher.group(1));
-        } catch (RuntimeException ignored) {
+        int level = parseMentionedLevel(text);
+        if (level < 0) {
             return;
         }
 
@@ -397,13 +397,25 @@ public final class JobsTracker {
     }
 
     private static String findMentionedJob(String text) {
-        String lower = text.toLowerCase(Locale.ROOT);
         for (String jobName : HUD_JOB_ORDER) {
-            if (lower.contains(jobName)) {
+            List<String> keywords = JOB_KEYWORDS.getOrDefault(jobName, List.of(jobName));
+            if (LocalizedText.containsAny(text, keywords.toArray(String[]::new))) {
                 return jobName;
             }
         }
         return "";
+    }
+
+    private static int parseMentionedLevel(String text) {
+        Matcher matcher = LEVEL_UP_PATTERN.matcher(text);
+        if (!matcher.find()) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (RuntimeException ignored) {
+            return -1;
+        }
     }
 
     private static String capitalize(String raw) {

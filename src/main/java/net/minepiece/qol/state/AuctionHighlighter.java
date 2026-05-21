@@ -8,6 +8,11 @@ import net.minepiece.qol.parse.TooltipParsers;
 public final class AuctionHighlighter {
     private static final int MIN_ALPHA = 0x30;
     private static final int MAX_ALPHA = 0xA0;
+    private static final int RGB_CHEAP = 0x00FF00;
+    private static final int RGB_EXPENSIVE = 0xFF0000;
+    private static final int RGB_DISCOUNT_50 = 0xAA00FF;
+    private static final int RGB_DISCOUNT_74 = 0x0000FF;
+    private static final int RGB_DISCOUNT_90 = 0xFFFF00;
     private final Map<String, ActiveHighlight> cachedHighlights = new HashMap<>();
 
     public void update(String itemKey, TooltipParsers.AuctionParseResult result) {
@@ -51,10 +56,23 @@ public final class AuctionHighlighter {
 
         int alpha = MIN_ALPHA + (int) Math.round(intensity * (MAX_ALPHA - MIN_ALPHA));
         alpha = Math.max(MIN_ALPHA, Math.min(MAX_ALPHA, alpha));
-        if (delta < 0.0D) {
-            return (alpha << 24) | 0x0000FF00;
+        return (alpha << 24) | rgbForDelta(delta);
+    }
+
+    static int rgbForDelta(double delta) {
+        if (delta <= -0.90D) {
+            return RGB_DISCOUNT_90;
         }
-        return (alpha << 24) | 0x00FF0000;
+        if (delta <= -0.74D) {
+            return RGB_DISCOUNT_74;
+        }
+        if (delta <= -0.50D) {
+            return RGB_DISCOUNT_50;
+        }
+        if (delta < 0.0D) {
+            return RGB_CHEAP;
+        }
+        return RGB_EXPENSIVE;
     }
 
     public record ActiveHighlight(long sellingPrice, long averagePrice, int quantity, long unitPrice, double delta, int argbColor) {

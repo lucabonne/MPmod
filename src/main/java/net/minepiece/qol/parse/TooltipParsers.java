@@ -10,15 +10,30 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minepiece.qol.util.LocalizedText;
 import net.minepiece.qol.util.NumberParser;
 
 public final class TooltipParsers {
-    private static final Pattern SELLING_PATTERN = Pattern.compile("Selling price:\\s*([0-9.,]+)\\s*([KMB])?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern AVERAGE_PATTERN = Pattern.compile("Average price:\\s*([0-9.,]+)\\s*([KMB])?", Pattern.CASE_INSENSITIVE);
+    private static final String NUMBER_TOKEN = "[0-9][0-9., \\u00a0]*";
+    private static final String[] AUCTION_SELLING_LABELS = {
+        "Selling price",
+        "Prix de vente",
+        "Precio de venta",
+        "Verkaufspreis",
+        "Prezzo di vendita",
+        "Preço de venda",
+        "Cena sprzedaży",
+        "Harga jual",
+        "Satis fiyati",
+        "Satış fiyatı"
+    };
+    private static final String AUCTION_SELLING_LABEL_PATTERN = String.join("|", AUCTION_SELLING_LABELS);
+    private static final Pattern SELLING_PATTERN = Pattern.compile("(?:" + AUCTION_SELLING_LABEL_PATTERN + ")\\s*:?\\s*(" + NUMBER_TOKEN + ")\\s*([KMB])?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern AVERAGE_PATTERN = Pattern.compile("(?:Average price|Prix moyen|Precio medio|Durchschnittspreis|Prezzo medio|Preço médio|Srednia cena|Średnia cena|Harga rata-rata|Ortalama fiyat)\\s*:?\\s*(" + NUMBER_TOKEN + ")\\s*([KMB])?", Pattern.CASE_INSENSITIVE);
     private static final Pattern COORDS_PATTERN =
-        Pattern.compile("Coord[^0-9-]*(-?\\d+)\\D+(-?\\d+)\\D+(-?\\d+)", Pattern.CASE_INSENSITIVE);
+        Pattern.compile("(?:Coord|Coordonnees|Coordonnées|Coordenadas|Koordinaten|Coordinate|Koordynaty|Koordinat)[^0-9-]*(-?\\d+)\\D+(-?\\d+)\\D+(-?\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern CYCLE_MINUTES_PATTERN =
-        Pattern.compile("\\(?\\s*(?:Every\\s+)?(\\d+)\\s*Minutes?\\s*\\)?", Pattern.CASE_INSENSITIVE);
+        Pattern.compile("\\(?\\s*(?:(?:Every|Toutes les|Cada|Alle|Ogni|Co|Setiap|Her)\\s+)?(\\d+)\\s*(?:Minutes?|Minutos?|Minuten?|Minuti|Minuty|Menit|Dakika)\\s*\\)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern CYCLE_SLASH_M_PATTERN =
         Pattern.compile("/\\s*(\\d+)\\s*m\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern CYCLE_PAREN_M_PATTERN =
@@ -26,20 +41,20 @@ public final class TooltipParsers {
     private static final Pattern HOURS_PATTERN = Pattern.compile("(\\d+)h", Pattern.CASE_INSENSITIVE);
     private static final Pattern MINUTES_PATTERN = Pattern.compile("(\\d+)m", Pattern.CASE_INSENSITIVE);
     private static final Pattern SECONDS_PATTERN = Pattern.compile("(\\d+)s", Pattern.CASE_INSENSITIVE);
-    private static final Pattern RARITY_PATTERN = Pattern.compile("\\b(LEGENDARY|MYTHIC)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern RARITY_PATTERN = Pattern.compile("\\b(LEGENDARY|MYTHIC|LEGENDAIRE|LÉGENDAIRE|LEGENDARIO|LEGENDARIA|LEGENDARNY|MITICO|MÍTICO|MITYCZNY|MITOS|MITIK|EFSANEVI)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern PET_INLINE_UNLOCK_PATTERN =
-        Pattern.compile("^\\(?LVL\\s*(\\d+)\\)?\\s*(.*)$", Pattern.CASE_INSENSITIVE);
+        Pattern.compile("^[^\\p{L}\\p{N}]*(?:\\(?\\s*(?:LVL|LV|LEVEL|NIVEL)\\s*(\\d+)\\s*\\)?)\\s*(.*)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PET_ENCODED_UNLOCK_PATTERN =
-        Pattern.compile("^S\\.([0-9.]+)\\.E\\s*(.*)$", Pattern.CASE_INSENSITIVE);
+        Pattern.compile("^[^\\p{L}\\p{N}]*S\\.([0-9.]+)\\.E\\s*(.*)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PET_UNLOCK_ONLY_PATTERN =
-        Pattern.compile("^(?:\\(?LVL\\s*(\\d+)\\)?|S\\.([0-9.]+)\\.E)\\s*$", Pattern.CASE_INSENSITIVE);
+        Pattern.compile("^[^\\p{L}\\p{N}]*(?:\\(?\\s*(?:LVL|LV|LEVEL|NIVEL)\\s*(\\d+)\\s*\\)?|S\\.([0-9.]+)\\.E)\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PET_VALUE_STAT_PATTERN =
-        Pattern.compile("(.+?)\\s*\\+\\s*([0-9.]+)\\s*%?$", Pattern.CASE_INSENSITIVE);
+        Pattern.compile("(.+?)\\s*\\+\\s*(" + NUMBER_TOKEN + ")\\s*%?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PET_APPENDED_PERCENT_PATTERN = Pattern.compile("\\(\\d+%\\)\\s*$");
-    private static final Pattern PET_CURRENT_LEVEL_PATTERN = Pattern.compile("Level:\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PET_EFFECTS_HEADER_PATTERN = Pattern.compile("^Pet Effects:?$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern FAMILIAR_EFFECTS_HEADER_PATTERN = Pattern.compile("^Familiar Effects:?$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern MINION_EFFECTS_HEADER_PATTERN = Pattern.compile("^Minion Effects:?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PET_CURRENT_LEVEL_PATTERN = Pattern.compile("(?:Level|Niveau|Nivel|Stufe|Livello|Poziom|Seviye)\\s*:?\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PET_EFFECTS_HEADER_PATTERN = Pattern.compile("^(?:Pet Effects|Stats|Statistics|Estadisticas|Estadísticas|Effets du familier|Efectos de mascota|Haustier Effekte|Effetti pet|Efeitos do pet|Efekty peta|Efek pet|Evcil hayvan etkileri)\\s*:?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FAMILIAR_EFFECTS_HEADER_PATTERN = Pattern.compile("^(?:Familiar Effects|Effets du familier|Efectos de familiar|Efectos del familiar|Vertrauten Effekte|Effetti famiglio|Efeitos do familiar|Efekty towarzysza|Efek familiar|Yoldas etkileri|Yoldaş etkileri)\\s*:?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MINION_EFFECTS_HEADER_PATTERN = Pattern.compile("^(?:Minion Effects|Effets du serviteur|Efectos de esbirro|Efectos de minion|Efectos del minion|Diener Effekte|Effetti servitore|Efeitos do minion|Efekty miniona|Efek minion|Minyon etkileri)\\s*:?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PET_STAT_SPACES = Pattern.compile("\\s+");
     private static final Pattern PET_DIACRITICS = Pattern.compile("\\p{M}+");
     private static final Pattern PET_LEADING_DECORATION = Pattern.compile("^[^A-Za-z0-9]+");
@@ -82,6 +97,10 @@ public final class TooltipParsers {
         return Optional.of(new AuctionParseResult(selling, average, quantity, unitPrice, delta, intensity));
     }
 
+    public static boolean isAuctionSellingPriceLine(String line) {
+        return LocalizedText.startsWithAny(line, AUCTION_SELLING_LABELS);
+    }
+
     public static Optional<BossTooltipData> parseBossTooltip(List<String> lines, String fallbackName) {
         Integer x = null;
         Integer y = null;
@@ -99,11 +118,11 @@ public final class TooltipParsers {
             }
 
             String lower = line.toLowerCase(Locale.ROOT);
-            if (lower.contains("respawn") || lower.contains("spawn") || lower.contains("apparition")) {
+            if (isBossTimerLine(line)) {
                 int hours = findFirstInt(HOURS_PATTERN, line, 0);
                 int minutes = findFirstInt(MINUTES_PATTERN, line, 0);
                 int seconds = findFirstInt(SECONDS_PATTERN, line, 0);
-                boolean ready = line.toLowerCase(Locale.ROOT).contains("ready");
+                boolean ready = LocalizedText.containsAny(line, "ready", "pret", "prêt", "listo", "bereit", "pronto", "gotowy", "siap", "hazir", "hazır");
                 boolean hasExplicitDuration = ready || hours > 0 || minutes > 0 || seconds > 0;
                 int explicitRemainingSeconds = ready ? 0 : (hours * 3600 + minutes * 60 + seconds);
 
@@ -149,6 +168,10 @@ public final class TooltipParsers {
     }
 
     public static List<PetStatLine> parsePetRolls(List<String> lines, Consumer<String> debugLogger) {
+        return parsePetRolls(lines, debugLogger, "");
+    }
+
+    public static List<PetStatLine> parsePetRolls(List<String> lines, Consumer<String> debugLogger, String rarityHint) {
         boolean isMythic = false;
         boolean isLegendary = false;
         int petCurrentLevel = -1;
@@ -156,9 +179,9 @@ public final class TooltipParsers {
         for (String line : lines) {
             Matcher rarityMatcher = RARITY_PATTERN.matcher(line);
             if (rarityMatcher.find()) {
-                String detected = rarityMatcher.group(1).toUpperCase(Locale.ROOT);
-                isMythic |= "MYTHIC".equals(detected);
-                isLegendary |= "LEGENDARY".equals(detected);
+                String detected = LocalizedText.normalized(rarityMatcher.group(1));
+                isMythic |= detected.contains("mythic") || detected.contains("mitic") || detected.contains("mitycz") || detected.contains("mitos") || detected.contains("mitik");
+                isLegendary |= detected.contains("legend");
             } else if (line.contains(PET_HIDDEN_MYTHIC_MARKER)) {
                 isMythic = true;
             } else if (line.contains(PET_HIDDEN_LEGENDARY_MARKER)) {
@@ -173,6 +196,12 @@ public final class TooltipParsers {
 
         String rarity = isMythic ? "MYTHIC" : (isLegendary ? "LEGENDARY" : "");
         if (rarity.isEmpty()) {
+            String normalizedHint = rarityHint == null ? "" : rarityHint.trim().toUpperCase(Locale.ROOT);
+            if ("MYTHIC".equals(normalizedHint) || "LEGENDARY".equals(normalizedHint)) {
+                rarity = normalizedHint;
+            }
+        }
+        if (rarity.isEmpty()) {
             return List.of();
         }
 
@@ -182,13 +211,12 @@ public final class TooltipParsers {
 
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
-            if (PET_EFFECTS_HEADER_PATTERN.matcher(line).matches()
-                || FAMILIAR_EFFECTS_HEADER_PATTERN.matcher(line).matches()) {
+            if (isPetEffectsHeader(line)) {
                 inPetEffects = true;
                 pendingUnlockLevel = null;
                 continue;
             }
-            if (MINION_EFFECTS_HEADER_PATTERN.matcher(line).matches()) {
+            if (isMinionEffectsHeader(line)) {
                 break;
             }
             if (!inPetEffects) {
@@ -211,19 +239,27 @@ public final class TooltipParsers {
                 }
             }
 
-            int unlockLevel;
+            Integer unlockLevel = null;
             if (inlineUnlock != null) {
                 unlockLevel = inlineUnlock;
                 pendingUnlockLevel = null;
             } else if (pendingUnlockLevel != null) {
                 unlockLevel = pendingUnlockLevel;
                 pendingUnlockLevel = null;
-            } else {
-                continue;
             }
 
             Matcher valueMatcher = PET_VALUE_STAT_PATTERN.matcher(statCandidate);
             if (valueMatcher.find()) {
+                String canonicalStatName = canonicalPetStatName(valueMatcher.group(1));
+                if (unlockLevel == null && canonicalStatName.isBlank()) {
+                    continue;
+                }
+                if (unlockLevel == null && petCurrentLevel <= 0) {
+                    continue;
+                }
+                if (unlockLevel == null) {
+                    unlockLevel = petCurrentLevel;
+                }
                 appendPetStatLine(matches, i, rarity, unlockLevel, petCurrentLevel,
                     valueMatcher.group(1), valueMatcher.group(2), line, debugLogger);
             }
@@ -249,28 +285,28 @@ public final class TooltipParsers {
 
         for (String line : lines) {
             String lower = line.toLowerCase(Locale.ROOT);
-            if (level == null) level = parseProfileValueAfterLabel(line, "Level");
-            if (health == null) health = parseProfileValueAfterLabel(line, "Health");
-            if (strength == null) strength = parseProfileValueAfterLabel(line, "Strength");
-            if (criticalChance == null) criticalChance = parseProfileValueAfterLabel(line, "Critical Chance");
-            if (criticalDamage == null) criticalDamage = parseProfileValueAfterLabel(line, "Critical Damage");
-            if (damage == null && !lower.contains("critical damage")) {
-                damage = parseProfileValueAfterLabel(line, "Damage");
+            if (level == null) level = parseProfileValueAfterLabels(line, "Level", "Niveau", "Nivel", "Stufe", "Livello", "Poziom", "Seviye");
+            if (health == null) health = parseProfileValueAfterLabels(line, "Health", "Sante", "Santé", "Salud", "Leben", "Salute", "Vida", "Zdrowie", "Kesehatan", "Can");
+            if (strength == null) strength = parseProfileValueAfterLabels(line, "Strength", "Force", "Fuerza", "Starke", "Stärke", "Forza", "Sila", "Siła", "Kekuatan", "Guc", "Güç");
+            if (criticalChance == null) criticalChance = parseProfileValueAfterLabels(line, "Critical Chance", "Chance critique", "Probabilidad critica", "Probabilidad crítica", "Kritische Chance", "Probabilita critica", "Probabilità critica", "Szansa krytyczna", "Peluang kritis", "Kritik sans", "Kritik şans");
+            if (criticalDamage == null) criticalDamage = parseProfileValueAfterLabels(line, "Critical Damage", "Degats critiques", "Dégâts critiques", "Dano critico", "Daño crítico", "Kritischer Schaden", "Danno critico", "Obrazenia krytyczne", "Obrażenia krytyczne", "Kerusakan kritis", "Kritik hasar");
+            if (damage == null && !containsAnyLabel(lower, "critical damage", "degats critiques", "dégâts critiques", "dano critico", "daño crítico", "kritischer schaden", "danno critico", "obrazenia krytyczne", "obrażenia krytyczne", "kerusakan kritis", "kritik hasar")) {
+                damage = parseProfileValueAfterLabels(line, "Damage", "Degats", "Dégâts", "Dano", "Daño", "Schaden", "Danno", "Obrazenia", "Obrażenia", "Kerusakan", "Hasar");
             }
-            if (power == null) power = parseProfileValueAfterLabel(line, "Power");
-            if (energyRegeneration == null) energyRegeneration = parseProfileValueAfterLabel(line, "Energy Regeneration");
-            if (energy == null && !lower.contains("energy regeneration")) {
-                energy = parseProfileValueAfterLabel(line, "Energy");
+            if (power == null) power = parseProfileValueAfterLabels(line, "Power", "Puissance", "Poder", "Kraft", "Potere", "Moc", "Kekuatan", "Guc", "Güç");
+            if (energyRegeneration == null) energyRegeneration = parseProfileValueAfterLabels(line, "Energy Regeneration", "Regeneration d'energie", "Régénération d'énergie", "Regeneracion de energia", "Regeneración de energía", "Energieregeneration", "Rigenerazione energia", "Regeneracja energii", "Regenerasi energi", "Enerji yenilenmesi");
+            if (energy == null && !containsAnyLabel(lower, "energy regeneration", "regeneration d'energie", "régénération d'énergie", "regeneracion de energia", "regeneración de energía", "energieregeneration", "rigenerazione energia", "regeneracja energii", "regenerasi energi", "enerji yenilenmesi")) {
+                energy = parseProfileValueAfterLabels(line, "Energy", "Energie", "Énergie", "Energia", "Energía", "Enerji");
             }
-            if (speed == null) speed = parseProfileValueAfterLabel(line, "Speed");
-            if (dexterity == null) dexterity = parseProfileValueAfterLabel(line, "Dexterity");
+            if (speed == null) speed = parseProfileValueAfterLabels(line, "Speed", "Vitesse", "Velocidad", "Geschwindigkeit", "Velocita", "Velocità", "Predkosc", "Prędkość", "Kecepatan", "Hiz", "Hız");
+            if (dexterity == null) dexterity = parseProfileValueAfterLabels(line, "Dexterity", "Dexterite", "Dextérité", "Destreza", "Geschicklichkeit", "Destrezza", "Zrecznosc", "Zręczność", "Ketangkasan", "Ceviklik");
             if (defense == null) {
-                defense = parseProfileValueAfterLabel(line, "Defense");
+                defense = parseProfileValueAfterLabels(line, "Defense", "Defence", "Defense", "Défense", "Defensa", "Verteidigung", "Difesa", "Obrona", "Pertahanan", "Savunma");
                 if (defense == null) {
                     defense = parseProfileValueAfterLabel(line, "Defence");
                 }
             }
-            if (regeneration == null) regeneration = parseProfileValueAfterLabel(line, "Regeneration");
+            if (regeneration == null) regeneration = parseProfileValueAfterLabels(line, "Regeneration", "Regeneration de vie", "Régénération de vie", "Regeneracion", "Regeneración", "Regenerierung", "Rigenerazione", "Regeneracja", "Regenerasi", "Yenilenme");
         }
 
         if (level == null
@@ -349,36 +385,84 @@ public final class TooltipParsers {
     private static Map<String, PetRange> createLegendaryPetRangeTable() {
         Map<String, PetRange> ranges = new LinkedHashMap<>();
         putPetRange(ranges, "Strength", 5.0D, 10.0D);
+        putPetRange(ranges, "Fuerza", 5.0D, 10.0D);
         putPetRange(ranges, "Power", 10.0D, 20.0D);
+        putPetRange(ranges, "Poder", 10.0D, 20.0D);
         putPetRange(ranges, "Critical Chance", 1.25D, 2.5D);
+        putPetRange(ranges, "Probabilidad Critica", 1.25D, 2.5D);
+        putPetRange(ranges, "Probabilidad Crítica", 1.25D, 2.5D);
+        putPetRange(ranges, "Prob. Critico", 1.25D, 2.5D);
+        putPetRange(ranges, "Prob. Crítico", 1.25D, 2.5D);
         putPetRange(ranges, "Critical Damage", 2.5D, 5.0D);
+        putPetRange(ranges, "Dano Critico", 2.5D, 5.0D);
+        putPetRange(ranges, "Daño Crítico", 2.5D, 5.0D);
+        putPetRange(ranges, "Damage", 2.5D, 5.0D);
+        putPetRange(ranges, "Dano", 2.5D, 5.0D);
+        putPetRange(ranges, "Daño", 2.5D, 5.0D);
         putPetRange(ranges, "Defense", 5.0D, 10.0D);
         putPetRange(ranges, "Defence", 5.0D, 10.0D);
+        putPetRange(ranges, "Defensa", 5.0D, 10.0D);
         putPetRange(ranges, "Speed", 2.5D, 5.0D);
+        putPetRange(ranges, "Velocidad", 2.5D, 5.0D);
         putPetRange(ranges, "Regeneration", 2.5D, 5.0D);
         putPetRange(ranges, "Life Regeneration", 2.5D, 5.0D);
+        putPetRange(ranges, "Regeneracion", 2.5D, 5.0D);
+        putPetRange(ranges, "Regeneración", 2.5D, 5.0D);
+        putPetRange(ranges, "HP", 50.0D, 100.0D);
         putPetRange(ranges, "Health", 50.0D, 100.0D);
+        putPetRange(ranges, "Vida", 50.0D, 100.0D);
         putPetRange(ranges, "Energy", 50.0D, 100.0D);
+        putPetRange(ranges, "Energia", 50.0D, 100.0D);
+        putPetRange(ranges, "Energía", 50.0D, 100.0D);
         putPetRange(ranges, "Energy Regeneration", 2.5D, 5.0D);
+        putPetRange(ranges, "Regeneracion de Energia", 2.5D, 5.0D);
+        putPetRange(ranges, "Regeneración de Energía", 2.5D, 5.0D);
+        putPetRange(ranges, "Regen. de Energia", 2.5D, 5.0D);
+        putPetRange(ranges, "Regen. de Energía", 2.5D, 5.0D);
         putPetRange(ranges, "Dexterity", 2.5D, 5.0D);
+        putPetRange(ranges, "Destreza", 2.5D, 5.0D);
         return ranges;
     }
 
     private static Map<String, PetRange> createMythicPetRangeTable() {
         Map<String, PetRange> ranges = new LinkedHashMap<>();
         putPetRange(ranges, "Strength", 7.5D, 12.5D);
+        putPetRange(ranges, "Fuerza", 7.5D, 12.5D);
         putPetRange(ranges, "Power", 15.0D, 25.0D);
+        putPetRange(ranges, "Poder", 15.0D, 25.0D);
         putPetRange(ranges, "Critical Chance", 1.875D, 3.125D);
+        putPetRange(ranges, "Probabilidad Critica", 1.875D, 3.125D);
+        putPetRange(ranges, "Probabilidad Crítica", 1.875D, 3.125D);
+        putPetRange(ranges, "Prob. Critico", 1.875D, 3.125D);
+        putPetRange(ranges, "Prob. Crítico", 1.875D, 3.125D);
         putPetRange(ranges, "Critical Damage", 3.75D, 6.25D);
+        putPetRange(ranges, "Dano Critico", 3.75D, 6.25D);
+        putPetRange(ranges, "Daño Crítico", 3.75D, 6.25D);
+        putPetRange(ranges, "Damage", 3.75D, 6.25D);
+        putPetRange(ranges, "Dano", 3.75D, 6.25D);
+        putPetRange(ranges, "Daño", 3.75D, 6.25D);
         putPetRange(ranges, "Energy", 75.0D, 150.0D);
+        putPetRange(ranges, "Energia", 75.0D, 150.0D);
+        putPetRange(ranges, "Energía", 75.0D, 150.0D);
         putPetRange(ranges, "Energy Regeneration", 3.75D, 6.25D);
+        putPetRange(ranges, "Regeneracion de Energia", 3.75D, 6.25D);
+        putPetRange(ranges, "Regeneración de Energía", 3.75D, 6.25D);
+        putPetRange(ranges, "Regen. de Energia", 3.75D, 6.25D);
+        putPetRange(ranges, "Regen. de Energía", 3.75D, 6.25D);
+        putPetRange(ranges, "HP", 75.0D, 150.0D);
         putPetRange(ranges, "Health", 75.0D, 150.0D);
+        putPetRange(ranges, "Vida", 75.0D, 150.0D);
         putPetRange(ranges, "Regeneration", 3.75D, 6.25D);
         putPetRange(ranges, "Life Regeneration", 3.75D, 6.25D);
+        putPetRange(ranges, "Regeneracion", 3.75D, 6.25D);
+        putPetRange(ranges, "Regeneración", 3.75D, 6.25D);
         putPetRange(ranges, "Dexterity", 3.75D, 6.25D);
+        putPetRange(ranges, "Destreza", 3.75D, 6.25D);
         putPetRange(ranges, "Speed", 3.75D, 6.25D);
+        putPetRange(ranges, "Velocidad", 3.75D, 6.25D);
         putPetRange(ranges, "Defense", 7.5D, 12.5D);
         putPetRange(ranges, "Defence", 7.5D, 12.5D);
+        putPetRange(ranges, "Defensa", 7.5D, 12.5D);
         return ranges;
     }
 
@@ -393,6 +477,128 @@ public final class TooltipParsers {
         return withoutAccents.toLowerCase(Locale.ROOT);
     }
 
+    public static String canonicalPetStatName(String rawStatName) {
+        String key = normalizePetStatKey(rawStatName)
+            .replaceAll("[^\\p{L}\\p{N}]+", " ")
+            .trim()
+            .replaceAll("\\s+", " ");
+        if (isPetEffectStatLabel(key)) {
+            return "";
+        }
+        String direct = switch (key) {
+            case "strength", "force", "fuerza", "starke", "forza", "sila", "kekuatan", "guc" -> "Strength";
+            case "power", "puissance", "poder", "kraft", "potere", "moc" -> "Power";
+            case "critical chance", "chance critique", "probabilidad critica", "prob critico", "kritische chance",
+                "probabilita critica", "szansa krytyczna", "peluang kritis", "kritik sans" -> "Critical Chance";
+            case "critical damage", "degats critiques", "dano critico", "kritischer schaden", "danno critico",
+                "obrazenia krytyczne", "kerusakan kritis", "kritik hasar" -> "Critical Damage";
+            case "damage", "degats", "dano", "schaden", "danno", "obrazenia", "kerusakan", "hasar" -> "Damage";
+            case "defense", "defence", "defensa", "verteidigung", "difesa", "obrona", "pertahanan", "savunma" -> "Defense";
+            case "speed", "vitesse", "velocidad", "geschwindigkeit", "velocita", "predkosc", "kecepatan", "hiz" -> "Speed";
+            case "regeneration", "life regeneration", "regeneracion", "regenerierung", "rigenerazione", "regeneracja",
+                "regenerasi", "yenilenme" -> "Regeneration";
+            case "hp", "health", "sante", "salud", "leben", "salute", "vida", "zdrowie", "kesehatan", "can" -> "Health";
+            case "energy", "energie", "energia", "enerji" -> "Energy";
+            case "energy regeneration", "regeneration d energie", "regeneracion de energia", "regen de energia",
+                "energieregeneration", "rigenerazione energia", "regeneracja energii", "regenerasi energi",
+                "enerji yenilenmesi" -> "Energy Regeneration";
+            case "dexterity", "dexterite", "destreza", "geschicklichkeit", "destrezza", "zrecznosc", "ketangkasan",
+                "ceviklik" -> "Dexterity";
+            default -> "";
+        };
+        if (!direct.isBlank()) {
+            return direct;
+        }
+
+        if (key.startsWith("critical chance") || key.startsWith("chance critique") || key.startsWith("probabilidad critica")
+            || key.startsWith("prob critico") || key.startsWith("kritische chance") || key.startsWith("probabilita critica")
+            || key.startsWith("szansa krytyczna") || key.startsWith("peluang kritis") || key.startsWith("kritik sans")) {
+            return "Critical Chance";
+        }
+        if (key.startsWith("critical damage") || key.startsWith("degats critiques") || key.startsWith("dano critico")
+            || key.startsWith("kritischer schaden") || key.startsWith("danno critico") || key.startsWith("obrazenia krytyczne")
+            || key.startsWith("kerusakan kritis") || key.startsWith("kritik hasar")) {
+            return "Critical Damage";
+        }
+        if (key.startsWith("energy regeneration") || key.startsWith("regeneration d energie")
+            || key.startsWith("regeneracion de energia") || key.startsWith("regen de energia")
+            || key.startsWith("energieregeneration") || key.startsWith("rigenerazione energia")
+            || key.startsWith("regeneracja energii") || key.startsWith("regenerasi energi")
+            || key.startsWith("enerji yenilenmesi")) {
+            return "Energy Regeneration";
+        }
+        if (key.startsWith("regeneration") || key.startsWith("life regeneration") || key.startsWith("regeneracion")
+            || key.startsWith("regenerierung") || key.startsWith("rigenerazione") || key.startsWith("regeneracja")
+            || key.startsWith("regenerasi") || key.startsWith("yenilenme")) {
+            return "Regeneration";
+        }
+        if (key.startsWith("strength") || key.startsWith("force") || key.startsWith("fuerza") || key.startsWith("starke")
+            || key.startsWith("forza") || key.startsWith("sila") || key.startsWith("kekuatan") || key.startsWith("guc")) {
+            return "Strength";
+        }
+        if (key.startsWith("power") || key.startsWith("puissance") || key.startsWith("poder") || key.startsWith("kraft")
+            || key.startsWith("potere") || key.startsWith("moc")) {
+            return "Power";
+        }
+        if (key.startsWith("damage") || key.startsWith("degats") || key.startsWith("dano") || key.startsWith("schaden")
+            || key.startsWith("danno") || key.startsWith("obrazenia") || key.startsWith("kerusakan") || key.startsWith("hasar")) {
+            return "Damage";
+        }
+        if (key.startsWith("defense") || key.startsWith("defence") || key.startsWith("defensa") || key.startsWith("verteidigung")
+            || key.startsWith("difesa") || key.startsWith("obrona") || key.startsWith("pertahanan") || key.startsWith("savunma")) {
+            return "Defense";
+        }
+        if (key.startsWith("speed") || key.startsWith("vitesse") || key.startsWith("velocidad") || key.startsWith("geschwindigkeit")
+            || key.startsWith("velocita") || key.startsWith("predkosc") || key.startsWith("kecepatan") || key.startsWith("hiz")) {
+            return "Speed";
+        }
+        if (key.startsWith("hp") || key.startsWith("health") || key.startsWith("sante") || key.startsWith("salud") || key.startsWith("leben")
+            || key.startsWith("salute") || key.startsWith("vida") || key.startsWith("zdrowie") || key.startsWith("kesehatan")
+            || key.startsWith("can")) {
+            return "Health";
+        }
+        if (key.startsWith("energy") || key.startsWith("energie") || key.startsWith("energia") || key.startsWith("enerji")) {
+            return "Energy";
+        }
+        if (key.startsWith("dexterity") || key.startsWith("dexterite") || key.startsWith("destreza")
+            || key.startsWith("geschicklichkeit") || key.startsWith("destrezza") || key.startsWith("zrecznosc")
+            || key.startsWith("ketangkasan") || key.startsWith("ceviklik")) {
+            return "Dexterity";
+        }
+        return "";
+    }
+
+    public static boolean isPetEffectStatLabel(String rawStatName) {
+        String key = normalizePetStatKey(rawStatName)
+            .replaceAll("[^\\p{L}\\p{N}]+", " ")
+            .trim()
+            .replaceAll("\\s+", " ");
+        return key.startsWith("dano de ")
+            || key.startsWith("damage of ")
+            || key.startsWith("degats de ")
+            || key.startsWith("degats du ")
+            || key.startsWith("danno di ")
+            || key.startsWith("schaden von ");
+    }
+
+    private static boolean isPetEffectsHeader(String line) {
+        return PET_EFFECTS_HEADER_PATTERN.matcher(line).matches()
+            || FAMILIAR_EFFECTS_HEADER_PATTERN.matcher(line).matches()
+            || LocalizedText.startsWithAny(line,
+                "pet effects", "familiar effects", "stats", "statistics", "estadisticas", "estadísticas",
+                "effets du familier", "efectos de mascota", "efectos de familiar", "efectos del familiar",
+                "haustier effekte", "vertrauten effekte", "effetti pet", "effetti famiglio", "efeitos do pet",
+                "efeitos do familiar", "efekty peta", "efekty towarzysza", "efek pet", "efek familiar",
+                "evcil hayvan etkileri", "yoldas etkileri", "yoldaş etkileri");
+    }
+
+    private static boolean isMinionEffectsHeader(String line) {
+        return MINION_EFFECTS_HEADER_PATTERN.matcher(line).matches()
+            || LocalizedText.startsWithAny(line,
+                "minion effects", "effets du serviteur", "efectos de esbirro", "efectos de minion", "efectos del minion", "diener effekte",
+                "effetti servitore", "efeitos do minion", "efekty miniona", "efek minion", "minyon etkileri");
+    }
+
     private static void appendPetStatLine(List<PetStatLine> matches, int lineIndex, String rarity, int unlockLevel,
                                           int petCurrentLevel, String rawStatName, String rawValue, String rawLine,
                                           Consumer<String> debugLogger) {
@@ -401,14 +607,15 @@ public final class TooltipParsers {
         }
 
         String cleanedStatName = rawStatName.trim();
-        String key = normalizePetStatKey(cleanedStatName);
+        String canonicalStatName = canonicalPetStatName(cleanedStatName);
+        String key = normalizePetStatKey(canonicalStatName.isBlank() ? cleanedStatName : canonicalStatName);
         Map<String, PetRange> ranges = "MYTHIC".equals(rarity) ? PET_RANGES_MYTHIC : PET_RANGES_LEGENDARY;
         PetRange baseRange = ranges.get(key);
         if (baseRange == null) {
             return;
         }
 
-        double value = Double.parseDouble(rawValue);
+        double value = NumberParser.parse(rawValue, null);
         int scalingLevel = resolvePetScalingLevel(unlockLevel, petCurrentLevel);
         double scale = scalingLevel / 10.0D;
         double minAtLevel = baseRange.min() * scale;
@@ -425,14 +632,14 @@ public final class TooltipParsers {
                 rarity,
                 unlockLevel,
                 scalingLevel,
-                cleanedStatName,
+                canonicalStatName.isBlank() ? cleanedStatName : canonicalStatName,
                 value,
                 minAtLevel,
                 maxAtLevel,
                 percent
             ));
         }
-        matches.add(new PetStatLine(lineIndex, cleanedStatName, value, percent, rawLine));
+        matches.add(new PetStatLine(lineIndex, canonicalStatName.isBlank() ? cleanedStatName : canonicalStatName, value, percent, rawLine));
     }
 
     private static int resolvePetScalingLevel(int unlockLevel, int petCurrentLevel) {
@@ -453,6 +660,33 @@ public final class TooltipParsers {
             return parsePetUnlockToken(null, encodedMatcher.group(1));
         }
         return null;
+    }
+
+    private static Double parseProfileValueAfterLabels(String line, String... labels) {
+        for (String label : labels) {
+            Double parsed = parseProfileValueAfterLabel(line, label);
+            if (parsed != null) {
+                return parsed;
+            }
+        }
+        return null;
+    }
+
+    private static boolean containsAnyLabel(String text, String... labels) {
+        return LocalizedText.containsAny(text, labels);
+    }
+
+    public static boolean isBossTimerLine(String line) {
+        return LocalizedText.containsAny(line,
+            "respawn", "spawn", "apparition", "reapparition", "réapparition", "aparicion", "aparición", "reaparicion", "reaparición",
+            "erscheint", "wiederbelebung", "rigenerazione", "ricomparsa", "renasce", "pojawia", "odrodzenie", "muncul", "respawn", "yeniden dogma", "yeniden doğma"
+        );
+    }
+
+    public static boolean isBossInfoLine(String line) {
+        return isBossTimerLine(line) || LocalizedText.containsAny(line,
+            "coord", "coordonnees", "coordonnées", "coordenadas", "koordinaten", "coordinate", "koordynaty", "koordinat"
+        );
     }
 
     private static String stripPetUnlockPrefix(String line) {

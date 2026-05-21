@@ -10,3 +10,8 @@ bin/
 .vscode/
 .idea/
 *.iml
+
+# Local assistant/session metadata
+.claude/
+files.txt
+handoff.json

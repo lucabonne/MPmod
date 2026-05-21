@@ -5,11 +5,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minepiece.qol.util.NumberParser;
 
 public final class ActionbarParser {
-    private static final Pattern GAIN_PATTERN = Pattern.compile("\\+([0-9.]+)");
-    private static final Pattern SYMBOL_GAIN_PATTERN = Pattern.compile("\\+([0-9.]+)\\s*([^\\s+])");
-    private static final Pattern XP_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*/\\s*(\\d+(?:\\.\\d+)?)");
+    private static final String NUMBER_TOKEN = "[0-9][0-9., \\u00a0]*";
+    private static final Pattern GAIN_PATTERN = Pattern.compile("\\+\\s*(" + NUMBER_TOKEN + ")");
+    private static final Pattern SYMBOL_GAIN_PATTERN = Pattern.compile("\\+\\s*(" + NUMBER_TOKEN + ")\\s*([^\\s+])");
+    private static final Pattern XP_PATTERN = Pattern.compile("(" + NUMBER_TOKEN + ")\\s*/\\s*(" + NUMBER_TOKEN + ")");
 
     private ActionbarParser() {
     }
@@ -20,10 +22,10 @@ public final class ActionbarParser {
         Double xpGain = null;
 
         if (gainMatcher.find()) {
-            moneyGain = Double.parseDouble(gainMatcher.group(1));
+            moneyGain = NumberParser.parse(gainMatcher.group(1), null);
         }
         if (gainMatcher.find()) {
-            xpGain = Double.parseDouble(gainMatcher.group(1));
+            xpGain = NumberParser.parse(gainMatcher.group(1), null);
         }
 
         Matcher xpMatcher = XP_PATTERN.matcher(actionbar);
@@ -31,8 +33,8 @@ public final class ActionbarParser {
             return Optional.empty();
         }
 
-        double currentXp = Double.parseDouble(xpMatcher.group(1));
-        double neededXp = Double.parseDouble(xpMatcher.group(2));
+        double currentXp = NumberParser.parse(xpMatcher.group(1), null);
+        double neededXp = NumberParser.parse(xpMatcher.group(2), null);
         return Optional.of(new ActionbarSnapshot(moneyGain == null ? 0.0D : moneyGain, xpGain == null ? 0.0D : xpGain, currentXp, neededXp));
     }
 
@@ -41,7 +43,7 @@ public final class ActionbarParser {
         List<SymbolGain> gains = new ArrayList<>();
         while (matcher.find()) {
             try {
-                gains.add(new SymbolGain(matcher.group(2), Double.parseDouble(matcher.group(1))));
+                gains.add(new SymbolGain(matcher.group(2), NumberParser.parse(matcher.group(1), null)));
             } catch (RuntimeException ignored) {
             }
         }

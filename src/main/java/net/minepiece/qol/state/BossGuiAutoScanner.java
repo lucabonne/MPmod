@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import net.minepiece.qol.parse.TooltipParsers;
+import net.minepiece.qol.util.LocalizedText;
 import net.minepiece.qol.util.TextUtil;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
@@ -60,6 +61,18 @@ public final class BossGuiAutoScanner {
         int changedSlotsScanned = 0;
         String screenTitle = TextUtil.normalize(currentScreen.getTitle());
         boolean likelyBossSelectionScreen = isLikelyBossSelectionScreen(screenTitle);
+        if (!likelyBossSelectionScreen) {
+            boolean hasBossCandidate = false;
+            for (Slot slot : handledScreen.getScreenHandler().slots) {
+                if (slot != null && slot.hasStack() && looksLikeBossCandidateName(TextUtil.normalize(slot.getStack().getName()))) {
+                    hasBossCandidate = true;
+                    break;
+                }
+            }
+            if (!hasBossCandidate) {
+                return;
+            }
+        }
 
         for (int slotIndex = 0; slotIndex < handledScreen.getScreenHandler().slots.size(); slotIndex++) {
             Slot slot = handledScreen.getScreenHandler().slots.get(slotIndex);
@@ -68,6 +81,10 @@ public final class BossGuiAutoScanner {
             }
 
             ItemStack stack = slot.getStack();
+            String stackName = TextUtil.normalize(stack.getName());
+            if (!likelyBossSelectionScreen && !looksLikeBossCandidateName(stackName)) {
+                continue;
+            }
             String signature = buildSignature(stack);
             String previous = this.slotSignatures.put(slotIndex, signature);
             if (signature.equals(previous)) {
@@ -79,7 +96,7 @@ public final class BossGuiAutoScanner {
             List<String> normalizedLines = TextUtil.normalizeLines(tooltip);
 
             Optional<TooltipParsers.BossTooltipData> parsed =
-                TooltipParsers.parseBossTooltip(normalizedLines, TextUtil.normalize(stack.getName()));
+                TooltipParsers.parseBossTooltip(normalizedLines, stackName);
             if (parsed.isPresent()) {
                 TooltipParsers.BossTooltipData data = parsed.get();
                 this.bossTracker.captureParsedTooltip(data);
@@ -151,11 +168,12 @@ public final class BossGuiAutoScanner {
             return false;
         }
         String lower = screenTitle.toLowerCase(Locale.ROOT);
-        return lower.contains("island")
-            || lower.contains("boss")
-            || lower.contains("raid")
-            || lower.contains("marines")
-            || lower.contains("pirates");
+        return LocalizedText.containsAny(lower,
+            "island", "ile", "île", "isla", "insel", "isola", "ilha", "wyspa", "pulau", "ada",
+            "boss",
+            "raid", "incursion", "razzia", "najazd", "serangan",
+            "marines", "marine", "marina", "marynarka", "denizci",
+            "pirates", "piratas", "piraten", "pirati", "piraci", "bajak laut", "korsan");
     }
 
     private static boolean containsBossKeywords(List<String> lines) {
@@ -166,15 +184,19 @@ public final class BossGuiAutoScanner {
             if (line == null || line.isBlank()) {
                 continue;
             }
-            String lower = line.toLowerCase(Locale.ROOT);
-            if (lower.contains("coord")
-                || lower.contains("respawn")
-                || lower.contains("apparition")
-                || lower.contains("spawn")) {
+            if (TooltipParsers.isBossInfoLine(line)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean looksLikeBossCandidateName(String name) {
+        return LocalizedText.containsAny(name,
+            "boss",
+            "raid", "incursion", "razzia", "najazd", "serangan",
+            "marine", "marines", "marina", "marynarka", "denizci",
+            "pirate", "pirates", "pirata", "piratas", "piraten", "pirati", "piraci", "bajak laut", "korsan");
     }
 
     private static String bossCandidateName(ItemStack stack, List<String> normalizedLines) {
@@ -193,17 +215,12 @@ public final class BossGuiAutoScanner {
             return true;
         }
         String lower = name.toLowerCase(Locale.ROOT);
-        return lower.equals("back")
-            || lower.equals("return")
-            || lower.equals("retour")
-            || lower.equals("close")
-            || lower.equals("fermer")
-            || lower.equals("next")
-            || lower.equals("suivant")
-            || lower.equals("previous")
-            || lower.equals("precedent")
-            || lower.equals("page")
-            || lower.equals("empty")
+        return LocalizedText.containsAny(lower,
+            "back", "return", "retour", "volver", "zuruck", "zurück", "indietro", "voltar", "wroc", "wróć", "kembali", "geri",
+            "close", "fermer", "cerrar", "schliessen", "schließen", "chiudi", "fechar", "zamknij", "tutup", "kapat",
+            "next", "suivant", "siguiente", "weiter", "prossimo", "próximo", "nastepny", "następny", "berikutnya", "sonraki",
+            "previous", "precedent", "précédent", "anterior", "vorherige", "precedente", "poprzedni", "sebelumnya", "onceki", "önceki",
+            "page", "empty", "vide", "vacio", "vacío", "leer", "vuoto", "pusty", "kosong", "bos", "boş")
             || lower.equals("???")
             || lower.equals("-");
     }

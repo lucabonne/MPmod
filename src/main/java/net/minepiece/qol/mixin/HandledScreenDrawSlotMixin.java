@@ -5,14 +5,13 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.tooltip.TooltipType;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.text.Text;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -28,6 +27,18 @@ public abstract class HandledScreenDrawSlotMixin extends Screen {
     @Shadow
     @Nullable
     protected Slot focusedSlot;
+
+    @Unique
+    private static final long MINEPIECE_BOSS_HOVER_CAPTURE_INTERVAL_MS = 500L;
+
+    @Unique
+    private Slot minepiece$lastBossHoverSlot;
+
+    @Unique
+    private ItemStack minepiece$lastBossHoverStack = ItemStack.EMPTY;
+
+    @Unique
+    private long minepiece$lastBossHoverCaptureMs;
 
     protected HandledScreenDrawSlotMixin(Text title) {
         super(title);
@@ -50,26 +61,27 @@ public abstract class HandledScreenDrawSlotMixin extends Screen {
             return;
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.player == null) {
+        if (!mod.isSlotIconRenderEnabled()) {
             return;
         }
-        ItemStack stack = slot.getStack();
-        java.util.List<Text> tooltip = stack.getTooltip(Item.TooltipContext.DEFAULT, client.player, TooltipType.BASIC);
+
         mod.renderRarityIcon(
             drawContext,
             slot.x,
             slot.y,
             slot,
-            tooltip
+            null
         );
-        mod.renderPetStatIcons(drawContext, slot.x, slot.y, slot, tooltip);
+        mod.renderPetStatIcons(drawContext, slot.x, slot.y, slot, null);
     }
 
     @Inject(method = "drawMouseoverTooltip", at = @At("HEAD"))
     private void minepiece$captureHoveredBoss(DrawContext drawContext, int mouseX, int mouseY, CallbackInfo ci) {
         MinepieceQolClient mod = MinepieceQolClient.get();
         if (mod == null || this.focusedSlot == null || !this.focusedSlot.hasStack()) {
+            return;
+        }
+        if (!mod.isBossTooltipCaptureEnabled()) {
             return;
         }
 
@@ -79,6 +91,15 @@ public abstract class HandledScreenDrawSlotMixin extends Screen {
         }
 
         ItemStack stack = this.focusedSlot.getStack();
+        long now = System.currentTimeMillis();
+        if (this.focusedSlot == this.minepiece$lastBossHoverSlot
+            && ItemStack.areEqual(stack, this.minepiece$lastBossHoverStack)
+            && now - this.minepiece$lastBossHoverCaptureMs < MINEPIECE_BOSS_HOVER_CAPTURE_INTERVAL_MS) {
+            return;
+        }
+        this.minepiece$lastBossHoverSlot = this.focusedSlot;
+        this.minepiece$lastBossHoverStack = stack.copy();
+        this.minepiece$lastBossHoverCaptureMs = now;
         mod.captureBossFromTooltipLines(stack, this.getTooltipFromItem(client, stack));
     }
 }

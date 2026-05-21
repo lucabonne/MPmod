@@ -28,6 +28,10 @@ public final class DebugLogManager {
         this.enabled = enabled;
     }
 
+    public boolean isEnabled() {
+        return this.enabled;
+    }
+
     public void logChat(String message) {
         log("CHAT", message);
     }

@@ -45,6 +45,7 @@ import net.minepiece.qol.ui.HudOverlay;
 import net.minepiece.qol.ui.HudLayoutScreen;
 import net.minepiece.qol.ui.MinepieceMenuScreen;
 import net.minepiece.qol.ui.MinibossWaypointWorldRenderer;
+import net.minepiece.qol.util.LocalizedText;
 import net.minepiece.qol.util.SafeExecutor;
 import net.minepiece.qol.util.TextUtil;
 import net.minecraft.client.MinecraftClient;
@@ -680,12 +681,16 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     public void renderAuctionTint(DrawContext drawContext, int slotX, int slotY, int screenX, int screenY, Slot slot) {
+        renderAuctionTint(drawContext, slotX, slotY, screenX, screenY, slot, null);
+    }
+
+    public void renderAuctionTint(DrawContext drawContext, int slotX, int slotY, int screenX, int screenY, Slot slot, List<Text> tooltipLines) {
         if (!this.config.modEnabled || !this.config.allFeaturesVisible || !this.config.auctionHighlightEnabled) {
             this.lastAuctionDebugLines.remove(slot.id);
             return;
         }
 
-        Optional<AuctionHighlighter.ActiveHighlight> highlight = getAuctionHighlightForSlot(slot);
+        Optional<AuctionHighlighter.ActiveHighlight> highlight = getAuctionHighlightForSlot(slot, tooltipLines);
         if (highlight.isEmpty()) {
             this.lastAuctionDebugLines.remove(slot.id);
             return;
@@ -698,6 +703,28 @@ public final class MinepieceQolClient implements ClientModInitializer {
 
     public void clearAuctionTint() {
         this.lastAuctionDebugLines.clear();
+        this.auctionHighlightRenderCache.clear();
+    }
+
+    public boolean isAuctionTintRenderEnabled() {
+        return this.config != null
+            && this.config.modEnabled
+            && this.config.allFeaturesVisible
+            && this.config.auctionHighlightEnabled;
+    }
+
+    public boolean isSlotIconRenderEnabled() {
+        return this.config != null
+            && this.config.modEnabled
+            && this.config.allFeaturesVisible
+            && (this.config.rarityIconsEnabled || this.config.petStatIconsEnabled);
+    }
+
+    public boolean isBossTooltipCaptureEnabled() {
+        return this.config != null
+            && this.config.modEnabled
+            && this.config.allFeaturesVisible
+            && isBossTrackingEnabled();
     }
 
     private static final Identifier RARITY_TEX_MYTHIC = Identifier.of("minepiece-qol", "textures/gui/rarity/mythic.png");
@@ -720,7 +747,11 @@ public final class MinepieceQolClient implements ClientModInitializer {
     private static final int PET_STAT_ICON_SIZE = 4;
     private static final int PET_STAT_MAX_ICONS = 4;
     private static final int PET_STAT_DEFAULT_TEXTURE_SIZE = 16;
+    private static final int SLOT_OVERLAY_CACHE_MAX = 512;
     private static final Map<Identifier, Integer> PET_STAT_TEXTURE_SIZES = new HashMap<>();
+    private final Map<String, Optional<AuctionHighlighter.ActiveHighlight>> auctionHighlightRenderCache = new HashMap<>();
+    private final Map<String, Optional<RarityDetector.Rarity>> rarityIconRenderCache = new HashMap<>();
+    private final Map<String, List<Identifier>> petStatIconRenderCache = new HashMap<>();
 
     public void renderRarityIcon(DrawContext drawContext, int slotX, int slotY, Slot slot) {
         renderRarityIcon(drawContext, slotX, slotY, slot, null);
@@ -735,8 +766,19 @@ public final class MinepieceQolClient implements ClientModInitializer {
         }
 
         ItemStack stack = slot.getStack();
-        Optional<RarityDetector.Rarity> rarity = RarityDetector.detect(stack, tooltipLines);
-        if (rarity.isEmpty()) {
+        String itemKey = buildAuctionItemKey(stack);
+        Optional<RarityDetector.Rarity> cachedRarity = this.rarityIconRenderCache.get(itemKey);
+        Optional<RarityDetector.Rarity> rarity;
+        if (cachedRarity != null) {
+            rarity = cachedRarity;
+        } else {
+            rarity = RarityDetector.detect(stack, tooltipLines);
+            if (rarity.isEmpty()) {
+                rarity = RarityDetector.detect(stack);
+            }
+        }
+
+        if (cachedRarity == null && rarity.isEmpty()) {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client != null && client.player != null) {
                 try {
@@ -746,6 +788,9 @@ public final class MinepieceQolClient implements ClientModInitializer {
                     // Keep rendering fail-safe if tooltip construction fails on a malformed stack.
                 }
             }
+        }
+        if (cachedRarity == null) {
+            putBounded(this.rarityIconRenderCache, itemKey, rarity);
         }
         if (rarity.isEmpty()) {
             return;
@@ -797,6 +842,13 @@ public final class MinepieceQolClient implements ClientModInitializer {
         }
 
         ItemStack stack = slot.getStack();
+        String itemKey = buildAuctionItemKey(stack);
+        List<Identifier> cachedTextures = this.petStatIconRenderCache.get(itemKey);
+        if (cachedTextures != null) {
+            drawPetStatTextures(drawContext, slotX, slotY, cachedTextures);
+            return;
+        }
+
         List<Text> tooltip = tooltipLines;
         if (tooltip == null || tooltip.isEmpty()) {
             MinecraftClient client = MinecraftClient.getInstance();
@@ -815,7 +867,11 @@ public final class MinepieceQolClient implements ClientModInitializer {
 
         List<String> normalizedLines = TextUtil.normalizeLines(tooltip);
         Set<Identifier> textures = new LinkedHashSet<>();
-        List<TooltipParsers.PetStatLine> petStats = TooltipParsers.parsePetRolls(normalizedLines);
+        List<TooltipParsers.PetStatLine> petStats = TooltipParsers.parsePetRolls(
+            normalizedLines,
+            null,
+            RarityDetector.detect(stack, tooltip).map(Enum::name).orElse("")
+        );
         for (TooltipParsers.PetStatLine statLine : petStats) {
             Identifier texture = textureForPetStat(statLine.statName());
             if (texture == null) {
@@ -832,9 +888,19 @@ public final class MinepieceQolClient implements ClientModInitializer {
         }
 
         if (textures.isEmpty()) {
+            putBounded(this.petStatIconRenderCache, itemKey, List.of());
             return;
         }
 
+        List<Identifier> textureList = List.copyOf(textures);
+        putBounded(this.petStatIconRenderCache, itemKey, textureList);
+        drawPetStatTextures(drawContext, slotX, slotY, textureList);
+    }
+
+    private static void drawPetStatTextures(DrawContext drawContext, int slotX, int slotY, List<Identifier> textures) {
+        if (textures == null || textures.isEmpty()) {
+            return;
+        }
         int index = 0;
         int baseX = slotX + 1;
         int baseY = slotY;
@@ -917,50 +983,25 @@ public final class MinepieceQolClient implements ClientModInitializer {
                 continue;
             }
             String lower = line.toLowerCase(Locale.ROOT);
-            if (lower.startsWith("pet effects") || lower.startsWith("familiar effects")) {
+            if (LocalizedText.startsWithAny(lower,
+                "pet effects", "familiar effects", "stats", "statistics", "estadisticas", "estadísticas",
+                "effets du familier", "efectos de mascota", "efectos de familiar", "efectos del familiar",
+                "haustier effekte", "vertrauten effekte", "effetti pet", "effetti famiglio", "efeitos do pet",
+                "efeitos do familiar", "efekty peta", "efekty towarzysza", "efek pet", "efek familiar",
+                "evcil hayvan etkileri", "yoldas etkileri", "yoldaş etkileri")) {
                 inPetEffects = true;
                 continue;
             }
-            if (lower.startsWith("minion effects")) {
+            if (LocalizedText.startsWithAny(lower, "minion effects", "effets du serviteur", "efectos de esbirro", "efectos de minion", "efectos del minion", "diener effekte", "effetti servitore", "efeitos do minion", "efekty miniona", "efek minion", "minyon etkileri")) {
                 break;
             }
             if (!inPetEffects) {
                 continue;
             }
 
-            if (lower.contains("critical chance")) {
-                textures.add(PET_STAT_TEX_CRIT_CHANCE);
-            }
-            if (lower.contains("critical damage")) {
-                textures.add(PET_STAT_TEX_CRIT_DAMAGE);
-            }
-            if (lower.contains("energy regeneration")) {
-                textures.add(PET_STAT_TEX_ENERGY_REGEN);
-            }
-            if (lower.contains("strength")) {
-                textures.add(PET_STAT_TEX_STRENGTH);
-            }
-            if (lower.contains("power")) {
-                textures.add(PET_STAT_TEX_POWER);
-            }
-            if (lower.contains("defense") || lower.contains("defence")) {
-                textures.add(PET_STAT_TEX_DEFENSE);
-            }
-            if (lower.contains("speed")) {
-                textures.add(PET_STAT_TEX_SPEED);
-            }
-            if (lower.contains("health")) {
-                textures.add(PET_STAT_TEX_HEALTH);
-            }
-            if (lower.contains("dexterity")) {
-                textures.add(PET_STAT_TEX_DEXTERITY);
-            }
-            if (lower.contains("life regeneration")
-                || (lower.contains("regeneration") && !lower.contains("energy regeneration"))) {
-                textures.add(PET_STAT_TEX_REGEN);
-            }
-            if (lower.contains("energy") && !lower.contains("energy regeneration")) {
-                textures.add(PET_STAT_TEX_ENERGY);
+            Identifier texture = textureForPetStat(extractPetStatLabel(line));
+            if (texture != null) {
+                textures.add(texture);
             }
 
             if (textures.size() >= maxToAdd) {
@@ -974,12 +1015,16 @@ public final class MinepieceQolClient implements ClientModInitializer {
         if (statName == null || statName.isBlank()) {
             return null;
         }
-        String normalized = statName.toLowerCase(Locale.ROOT).replaceAll("[^a-z]", "");
+        String canonical = TooltipParsers.canonicalPetStatName(statName);
+        if (canonical.isBlank()) {
+            canonical = statName;
+        }
+        String normalized = LocalizedText.normalized(canonical).replaceAll("[^\\p{L}]", "");
         return switch (normalized) {
             case "strength" -> PET_STAT_TEX_STRENGTH;
             case "power" -> PET_STAT_TEX_POWER;
             case "criticalchance" -> PET_STAT_TEX_CRIT_CHANCE;
-            case "criticaldamage" -> PET_STAT_TEX_CRIT_DAMAGE;
+            case "criticaldamage", "damage" -> PET_STAT_TEX_CRIT_DAMAGE;
             case "defense", "defence" -> PET_STAT_TEX_DEFENSE;
             case "speed" -> PET_STAT_TEX_SPEED;
             case "regeneration", "liferegeneration" -> PET_STAT_TEX_REGEN;
@@ -989,6 +1034,16 @@ public final class MinepieceQolClient implements ClientModInitializer {
             case "dexterity" -> PET_STAT_TEX_DEXTERITY;
             default -> null;
         };
+    }
+
+    private static String extractPetStatLabel(String line) {
+        if (line == null || line.isBlank()) {
+            return "";
+        }
+        String label = line.replaceFirst("\\s*\\+\\s*[0-9][0-9., \\u00a0]*\\s*%?\\s*$", "");
+        label = label.replaceFirst("^[^\\p{L}\\p{N}]*(?:\\(?\\s*(?:LVL|LV|LEVEL|NIVEL)\\s*\\d+\\s*\\)?|S\\.[0-9.]+\\.E)\\s*", "");
+        label = label.replaceFirst("^[^\\p{L}\\p{N}]+", "");
+        return label.trim();
     }
 
     public void captureBossFromTooltipLines(ItemStack stack, List<Text> tooltip) {
@@ -1175,14 +1230,19 @@ public final class MinepieceQolClient implements ClientModInitializer {
 
         Optional<TooltipParsers.AuctionParseResult> auctionResult =
             TooltipParsers.parseAuctionHighlight(normalizedLines, stack == null ? 1 : stack.getCount());
-        auctionResult.ifPresent(result -> this.auctionHighlighter.update(buildAuctionItemKey(stack), result));
+        auctionResult.ifPresent(result -> {
+            String itemKey = buildAuctionItemKey(stack);
+            this.auctionHighlighter.update(itemKey, result);
+            this.auctionHighlightRenderCache.remove(itemKey);
+        });
 
         this.tryUpdateStatsFromLines(normalizedLines);
         this.bossTracker.captureTooltip(TextUtil.normalize(stack == null ? null : stack.getName()), normalizedLines);
 
         List<TooltipParsers.PetStatLine> petLines = TooltipParsers.parsePetRolls(
             normalizedLines,
-            this.debugLogManager::logInternal
+            this.debugLogManager::logInternal,
+            RarityDetector.detect(stack, lines).map(Enum::name).orElse("")
         );
         if (!this.config.allFeaturesVisible) {
             return;
@@ -1214,7 +1274,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             if (line == null) {
                 continue;
             }
-            if (line.toLowerCase(Locale.ROOT).contains("selling price:")) {
+            if (TooltipParsers.isAuctionSellingPriceLine(line)) {
                 sellingLineIndex = i;
                 break;
             }
@@ -1250,6 +1310,15 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     private static Formatting auctionDeltaColor(long percent) {
+        if (percent <= -90L) {
+            return Formatting.YELLOW;
+        }
+        if (percent <= -74L) {
+            return Formatting.BLUE;
+        }
+        if (percent <= -50L) {
+            return Formatting.LIGHT_PURPLE;
+        }
         if (percent < 0L) {
             return Formatting.GREEN;
         }
@@ -1471,6 +1540,10 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     private Optional<AuctionHighlighter.ActiveHighlight> getAuctionHighlightForSlot(Slot slot) {
+        return getAuctionHighlightForSlot(slot, null);
+    }
+
+    private Optional<AuctionHighlighter.ActiveHighlight> getAuctionHighlightForSlot(Slot slot, List<Text> tooltipLines) {
         if (slot == null || !slot.hasStack()) {
             return Optional.empty();
         }
@@ -1483,7 +1556,15 @@ public final class MinepieceQolClient implements ClientModInitializer {
         try {
             ItemStack stack = slot.getStack();
             String itemKey = buildAuctionItemKey(stack);
-            List<Text> tooltip = stack.getTooltip(Item.TooltipContext.DEFAULT, client.player, TooltipType.BASIC);
+            Optional<AuctionHighlighter.ActiveHighlight> cached = this.auctionHighlightRenderCache.get(itemKey);
+            if (cached != null) {
+                return cached;
+            }
+
+            List<Text> tooltip = tooltipLines;
+            if (tooltip == null || tooltip.isEmpty()) {
+                tooltip = stack.getTooltip(Item.TooltipContext.DEFAULT, client.player, TooltipType.BASIC);
+            }
             List<String> normalizedLines = TextUtil.normalizeLines(tooltip);
             Optional<AuctionHighlighter.ActiveHighlight> parsed =
                 TooltipParsers.parseAuctionHighlight(normalizedLines, stack.getCount()).flatMap(this.auctionHighlighter::createHighlight);
@@ -1496,14 +1577,27 @@ public final class MinepieceQolClient implements ClientModInitializer {
                     parsed.get().delta(),
                     Math.min(1.0D, Math.max(0.0D, Math.abs(parsed.get().delta()) / 0.5D))
                 ));
+                putBounded(this.auctionHighlightRenderCache, itemKey, parsed);
                 return parsed;
             }
-            return this.auctionHighlighter.getCachedHighlight(itemKey);
+            Optional<AuctionHighlighter.ActiveHighlight> fallback = this.auctionHighlighter.getCachedHighlight(itemKey);
+            putBounded(this.auctionHighlightRenderCache, itemKey, fallback);
+            return fallback;
         } catch (Throwable throwable) {
             this.debugLogManager.logInternal("Parser failure in ah-slot: "
                 + throwable.getClass().getSimpleName() + " - " + throwable.getMessage());
             return this.auctionHighlighter.getCachedHighlight(buildAuctionItemKey(slot.getStack()));
         }
+    }
+
+    private static <T> void putBounded(Map<String, T> cache, String key, T value) {
+        if (key == null || key.isBlank()) {
+            return;
+        }
+        if (cache.size() >= SLOT_OVERLAY_CACHE_MAX) {
+            cache.clear();
+        }
+        cache.put(key, value);
     }
 
     private String buildAuctionItemKey(ItemStack stack) {
@@ -1517,6 +1611,9 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     private void logAuctionHighlight(AuctionHighlighter.ActiveHighlight highlight, Slot slot, int screenX, int screenY) {
+        if (this.debugLogManager == null || !this.debugLogManager.isEnabled()) {
+            return;
+        }
         int absX = screenX + slot.x;
         int absY = screenY + slot.y;
         String line = String.format(
@@ -1546,9 +1643,6 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     private static boolean looksLikeBossTooltip(List<String> lines) {
-        return lines.stream().anyMatch(line -> {
-            String lower = line.toLowerCase(Locale.ROOT);
-            return lower.contains("respawn") || lower.contains("spawn") || lower.contains("apparition") || lower.contains("coord");
-        });
+        return lines.stream().anyMatch(TooltipParsers::isBossInfoLine);
     }
 }

@@ -15,6 +15,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.minepiece.qol.parse.ChatParsers;
+import net.minepiece.qol.util.LocalizedText;
 import net.minepiece.qol.util.NumberParser;
 
 public final class MoneyTracker {
@@ -23,7 +24,8 @@ public final class MoneyTracker {
     private static final long CROSS_SOURCE_DEDUPE_MS = 2_000L;
     private static final int MAX_HISTORY = 2_000;
     private static final ZoneId MONEY_ZONE = ZoneId.of("Europe/Rome");
-    private static final Pattern MONEY_TOKEN_PATTERN = Pattern.compile("([0-9][0-9,]*(?:\\.[0-9]+)?)([KMB])?\\s*实", Pattern.CASE_INSENSITIVE);
+    private static final String NUMBER_TOKEN = "[0-9][0-9., \\u00a0]*";
+    private static final Pattern MONEY_TOKEN_PATTERN = Pattern.compile("(" + NUMBER_TOKEN + ")([KMB])?\\s*实", Pattern.CASE_INSENSITIVE);
     private static final Pattern POSITIVE_CHAT_PATTERN = Pattern.compile(
         "(?:increased by|received|gained|earned|won)\\s+([0-9][0-9,]*(?:\\.[0-9]+)?)([KMB])?\\s*实",
         Pattern.CASE_INSENSITIVE
@@ -44,6 +46,32 @@ public final class MoneyTracker {
         "(?:lost|withdrawn|withdrew|paid|sent|decreased by)\\s+([0-9][0-9,]*(?:\\.[0-9]+)?)([KMB])?\\s*实",
         Pattern.CASE_INSENSITIVE
     );
+    private static final String[] POSITIVE_MONEY_KEYWORDS = {
+        "increased", "received", "gained", "earned", "won", "brought you", "sold",
+        "augmente", "augmenté", "recu", "reçu", "gagne", "gagné", "remporte", "remporté", "vendu",
+        "aumentado", "recibido", "ganado", "vendido",
+        "erhoht", "erhöht", "erhalten", "gewonnen", "verdient", "verkauft",
+        "aumentato", "ricevuto", "guadagnato", "vinto", "venduto",
+        "recebido", "ganhou", "ganho", "vendido",
+        "zwiekszono", "zwiększono", "otrzymano", "zdobyto", "zarobiono", "wygrano", "sprzedano",
+        "meningkat", "menerima", "diterima", "mendapat", "diperoleh", "dijual",
+        "artti", "arttı", "alindi", "alındı", "kazandin", "kazandın", "kazandi", "kazandı", "satildi", "satıldı"
+    };
+    private static final String[] POSITIVE_WITHDRAW_CONTEXT = {
+        "from your island bank", "de votre banque d'ile", "de votre banque d'île", "del banco de tu isla", "von deiner inselbank",
+        "dalla banca della tua isola", "do banco da sua ilha", "z banku wyspy", "dari bank pulau", "ada bankandan", "ada bankasindan", "ada bankasından"
+    };
+    private static final String[] NEGATIVE_MONEY_KEYWORDS = {
+        "lost", "withdrawn", "withdrew", "paid", "sent", "decreased", "spent", "bought", "purchased",
+        "perdu", "retire", "retiré", "paye", "payé", "envoye", "envoyé", "diminue", "diminué", "achete", "acheté",
+        "perdido", "retirado", "pagado", "enviado", "disminuido", "gastado", "comprado",
+        "verloren", "abgehoben", "bezahlt", "gesendet", "verringert", "ausgegeben", "gekauft",
+        "perso", "prelevato", "pagato", "inviato", "diminuito", "speso", "comprato", "acquistato",
+        "perdeu", "retirado", "pago", "enviado", "diminuiu", "gasto", "comprado",
+        "stracono", "utracono", "wyplacono", "wypłacono", "zaplacono", "zapłacono", "wyslano", "wysłano", "zmniejszono", "wydano", "kupiono",
+        "kehilangan", "ditarik", "membayar", "dibayar", "dikirim", "berkurang", "dibelanjakan", "dibeli",
+        "kaybettin", "kaybettiniz", "cekildi", "çekildi", "odedin", "ödedin", "gonderildi", "gönderildi", "azaldi", "azaldı", "harcandi", "harcandı", "satin alindi", "satın alındı"
+    };
 
     private final PersistentState state;
     private final Consumer<PersistentState> stateSaver;
@@ -434,7 +462,22 @@ public final class MoneyTracker {
         if (positive.isPresent()) {
             return positive;
         }
-        return firstMatchAmount(line, NEGATIVE_CHAT_PATTERN).map(amount -> -amount);
+        Optional<Long> negative = firstMatchAmount(line, NEGATIVE_CHAT_PATTERN).map(amount -> -amount);
+        if (negative.isPresent()) {
+            return negative;
+        }
+
+        long amount = parseLargestMoneyToken(line);
+        if (amount <= 0L) {
+            return Optional.empty();
+        }
+        if (LocalizedText.containsAny(line, POSITIVE_WITHDRAW_CONTEXT) || LocalizedText.containsAny(line, POSITIVE_MONEY_KEYWORDS)) {
+            return Optional.of(amount);
+        }
+        if (LocalizedText.containsAny(line, NEGATIVE_MONEY_KEYWORDS)) {
+            return Optional.of(-amount);
+        }
+        return Optional.empty();
     }
 
     private static Optional<Long> firstMatchAmount(String line, Pattern... patterns) {

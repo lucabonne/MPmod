@@ -2,10 +2,17 @@ package net.minepiece.qol.state;
 
 import java.util.Locale;
 import java.util.function.Function;
+import net.minepiece.qol.util.LocalizedText;
 
 public final class CooldownTracker {
-    private static final String HAKI_USED = "You have activated haki.";
-    private static final String HAKI_READY = "You can use your haki.";
+    private static final String[] HAKI_USED_MESSAGES = {
+        "You have activated haki.",
+        "Has activado el haki."
+    };
+    private static final String[] HAKI_READY_MESSAGES = {
+        "You can use your haki.",
+        "Puedes usar tu haki."
+    };
     private static final long HAKI_COOLDOWN_MS = 30_000L;
     private static final long HAKI_READY_VISIBLE_MS = 30_000L;
 
@@ -14,13 +21,21 @@ public final class CooldownTracker {
 
     public void onChatMessage(String normalizedChat) {
         long now = System.currentTimeMillis();
-        if (normalizedChat.contains(HAKI_USED)) {
+        if (isHakiUsedMessage(normalizedChat)) {
             this.hakiCooldownEndMs = now + HAKI_COOLDOWN_MS;
             this.hakiVisibleUntilMs = this.hakiCooldownEndMs + HAKI_READY_VISIBLE_MS;
-        } else if (normalizedChat.contains(HAKI_READY)) {
+        } else if (isHakiReadyMessage(normalizedChat)) {
             this.hakiCooldownEndMs = now;
             this.hakiVisibleUntilMs = now + HAKI_READY_VISIBLE_MS;
         }
+    }
+
+    static boolean isHakiUsedMessage(String normalizedChat) {
+        return LocalizedText.containsAny(normalizedChat, HAKI_USED_MESSAGES);
+    }
+
+    static boolean isHakiReadyMessage(String normalizedChat) {
+        return LocalizedText.containsAny(normalizedChat, HAKI_READY_MESSAGES);
     }
 
     public String getHakiHudText() {

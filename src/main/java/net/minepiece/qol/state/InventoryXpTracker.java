@@ -1,42 +1,58 @@
 package net.minepiece.qol.state;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minepiece.qol.util.LocalizedText;
 import net.minepiece.qol.util.TextUtil;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.tooltip.TooltipType;
+import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 
 public final class InventoryXpTracker {
     private static final long SCAN_INTERVAL_MS = 350L;
+    private static final int PARSE_CACHE_MAX = 256;
+    private static final String NUMBER_TOKEN = "[0-9][0-9., \\u00a0]*";
 
     private static final Pattern LEVEL_PATTERN =
-        Pattern.compile("\\b(?:lvl|lv|level)\\s*[:.]?\\s*(\\d{1,4})\\b", Pattern.CASE_INSENSITIVE);
+        Pattern.compile("\\b(?:lvl|lv|level|niveau|nivel|stufe|livello|poziom|seviye)\\s*[:.]?\\s*(\\d{1,4})\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern NAME_LEVEL_SUFFIX_PATTERN =
-        Pattern.compile("^(.*?)\\s*\\((?:lvl|level)\\s*[:.]?\\s*(\\d{1,4})\\)\\s*$", Pattern.CASE_INSENSITIVE);
+        Pattern.compile("^(.*?)\\s*\\((?:lvl|lv|level|niveau|nivel|stufe|livello|poziom|seviye)\\s*[:.]?\\s*(\\d{1,4})\\)\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern XP_PROGRESS_PATTERN =
-        Pattern.compile("\\b(?:xp|experience)\\b[^0-9]{0,12}([0-9][0-9,]*)\\s*/\\s*([0-9][0-9,]*)", Pattern.CASE_INSENSITIVE);
+        Pattern.compile("\\b(?:xp|experience|exp|erfahrung|esperienza|experiencia|doswiadczenie|doświadczenie|pengalaman|deneyim)\\b[^0-9]{0,16}(" + NUMBER_TOKEN + ")\\s*/\\s*(" + NUMBER_TOKEN + ")", Pattern.CASE_INSENSITIVE);
     private static final Pattern XP_PAIR_PATTERN =
-        Pattern.compile("\\b([0-9][0-9,]{2,})\\b\\D+\\b([0-9][0-9,]{2,})\\b");
+        Pattern.compile("\\b(" + NUMBER_TOKEN + ")\\b\\D+\\b(" + NUMBER_TOKEN + ")\\b");
 
     private static final Pattern ASC_READY_PATTERN =
-        Pattern.compile("\\bascension\\b.*\\bavailable\\b|\\bavailable\\b.*\\bascension\\b", Pattern.CASE_INSENSITIVE);
+        Pattern.compile("\\b(?:ascension|ascension|ascenso|aufstieg|ascesa|wzniesienie|awans|kenaikan|yukselis|yükseliş)\\b.*\\b(?:available|disponible|verfugbar|verfügbar|disponibile|dostepne|dostępne|tersedia|hazir|hazır)\\b|\\b(?:available|disponible|verfugbar|verfügbar|disponibile|dostepne|dostępne|tersedia|hazir|hazır)\\b.*\\b(?:ascension|ascenso|aufstieg|ascesa|wzniesienie|awans|kenaikan|yukselis|yükseliş)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern MAXED_PATTERN =
-        Pattern.compile("\\b(?:max(?:ed|imum)?(?:\\s*level)?|level\\s*max|lvl\\s*max)\\b", Pattern.CASE_INSENSITIVE);
+        Pattern.compile("\\b(?:max(?:ed|imum)?(?:\\s*level)?|level\\s*max|lvl\\s*max|niveau\\s*max|nivel\\s*max|stufe\\s*max|livello\\s*max|poziom\\s*max|seviye\\s*max|maksymalny|maksimum|massimo)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern SECTION_HEADER_PATTERN =
-        Pattern.compile("^(?:obtain|use|information|effect)\\b", Pattern.CASE_INSENSITIVE);
+        Pattern.compile("^(?:obtain|use|information|effect|obtenir|utiliser|informations|effet|obtener|usar|informacion|información|efecto|erhalten|benutzen|information|effekt|ottenere|usa|informazioni|effetto|obter|usar|informacao|informação|efeito|zdobadz|zdobądź|uzyj|użyj|informacje|efekt|dapatkan|gunakan|informasi|efek|elde et|kullan|bilgi|etki)\\b", Pattern.CASE_INSENSITIVE);
 
     private static final List<String> FRUIT_KEYWORDS = List.of(
         "fruit",
         "devil fruit",
-        "/fruit"
+        "/fruit",
+        "fruit du demon",
+        "fruit du démon",
+        "fruta del diablo",
+        "teufelsfrucht",
+        "frutto del diavolo",
+        "fruta do diabo",
+        "diabelski owoc",
+        "buah iblis",
+        "seytan meyvesi",
+        "şeytan meyvesi"
     );
     private static final List<String> WEAPON_KEYWORDS = List.of(
         "weapon",
@@ -47,13 +63,26 @@ public final class InventoryXpTracker {
         "bow",
         "gun",
         "staff",
-        "spear"
+        "spear",
+        "arme",
+        "epee",
+        "épée",
+        "espada",
+        "waffe",
+        "arma",
+        "bron",
+        "broń",
+        "senjata",
+        "silah",
+        "kilic",
+        "kılıç"
     );
 
     private final DebugLogManager debugLogManager;
     private List<TrackedItem> items = List.of();
     private String lastFingerprint = "";
     private long nextScanAtMs = 0L;
+    private final Map<String, Optional<TrackedItem>> parseCache = new HashMap<>();
 
     public InventoryXpTracker(DebugLogManager debugLogManager) {
         this.debugLogManager = debugLogManager;
@@ -66,6 +95,7 @@ public final class InventoryXpTracker {
         this.items = List.of();
         this.lastFingerprint = "";
         this.nextScanAtMs = 0L;
+        this.parseCache.clear();
     }
 
     public void scanInventory(PlayerEntity player) {
@@ -86,7 +116,13 @@ public final class InventoryXpTracker {
             if (stack == null || stack.isEmpty()) {
                 continue;
             }
-            parseTrackableItem(player, stack).ifPresent(parsed::add);
+            String cacheKey = buildStackCacheKey(stack);
+            Optional<TrackedItem> cached = this.parseCache.get(cacheKey);
+            if (cached == null) {
+                cached = parseTrackableItem(player, stack);
+                putBounded(this.parseCache, cacheKey, cached);
+            }
+            cached.ifPresent(parsed::add);
         }
 
         String fingerprint = buildFingerprint(parsed);
@@ -165,6 +201,26 @@ public final class InventoryXpTracker {
         ));
     }
 
+    private static String buildStackCacheKey(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "";
+        }
+        return Registries.ITEM.getId(stack.getItem()) + "|"
+            + stack.getCount() + "|"
+            + TextUtil.normalize(stack.getName()) + "|"
+            + stack.getComponents().hashCode();
+    }
+
+    private static void putBounded(Map<String, Optional<TrackedItem>> cache, String key, Optional<TrackedItem> value) {
+        if (key == null || key.isBlank()) {
+            return;
+        }
+        if (cache.size() >= PARSE_CACHE_MAX) {
+            cache.clear();
+        }
+        cache.put(key, value);
+    }
+
     private static ItemCategory detectCategory(String normalizedName, List<String> lines) {
         String lowerName = normalizedName.toLowerCase(Locale.ROOT);
         boolean fruit = containsAnyKeyword(lowerName, FRUIT_KEYWORDS);
@@ -188,12 +244,7 @@ public final class InventoryXpTracker {
     }
 
     private static boolean containsAnyKeyword(String text, List<String> keywords) {
-        for (String keyword : keywords) {
-            if (text.contains(keyword)) {
-                return true;
-            }
-        }
-        return false;
+        return LocalizedText.containsAny(text, keywords.toArray(String[]::new));
     }
 
     private static int extractLevel(String normalizedName, List<String> lines) {
@@ -273,7 +324,7 @@ public final class InventoryXpTracker {
         int start = -1;
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
-            if (line != null && line.toLowerCase(Locale.ROOT).contains("progression")) {
+            if (line != null && LocalizedText.containsAny(line, "progression", "progres", "progrès", "progreso", "fortschritt", "progressione", "postep", "postęp", "kemajuan", "ilerleme")) {
                 start = i;
                 break;
             }
