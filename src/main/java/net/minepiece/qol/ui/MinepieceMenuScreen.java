@@ -15,6 +15,7 @@ import net.minepiece.qol.state.BossTracker;
 import net.minepiece.qol.state.ChatTranslationManager;
 import net.minepiece.qol.state.JobsTracker;
 import net.minepiece.qol.state.PersistentState;
+import net.minepiece.qol.telemetry.TelemetryConfig;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -203,6 +204,7 @@ public final class MinepieceMenuScreen extends Screen {
     private int bossRegistryOffset;
     private final List<RemoveAction> removeActions = new ArrayList<>();
     private boolean resetHudLayoutConfirmOpen;
+    private TextFieldWidget telemetryWebhookField;
 
     public MinepieceMenuScreen(MinepieceQolClient mod) {
         super(Text.literal(mod == null ? "Minepiece QoL" : mod.tr("menu.title")));
@@ -254,7 +256,60 @@ public final class MinepieceMenuScreen extends Screen {
             case PROFILE -> buildProfileTab();
             case LANGUAGE -> buildLanguageTab();
             case AUCTION_HOUSE -> buildOtherTab();
+            case TELEMETRY -> buildTelemetryTab();
         }
+    }
+
+    private void buildTelemetryTab() {
+        TelemetryConfig cfg = this.mod.getTelemetryManager().config();
+        int x = this.contentX;
+        int y = this.contentY;
+        int right = x + 178;
+
+        addDrawableChild(CheckboxWidget.builder(Text.literal("Enable telemetry"), this.textRenderer)
+            .pos(x, y).checked(cfg.enabled).callback((box, checked) -> this.mod.getTelemetryManager().setEnabled(checked, MinecraftClient.getInstance())).build());
+        addDrawableChild(CheckboxWidget.builder(Text.literal("Discord output"), this.textRenderer)
+            .pos(right, y).checked(cfg.discordEnabled).callback((box, checked) -> { cfg.discordEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
+        addDrawableChild(CheckboxWidget.builder(Text.literal("Inventory"), this.textRenderer)
+            .pos(x, y + 22).checked(cfg.inventoryEnabled).callback((box, checked) -> { cfg.inventoryEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
+        addDrawableChild(CheckboxWidget.builder(Text.literal("Economy"), this.textRenderer)
+            .pos(right, y + 22).checked(cfg.economyEnabled).callback((box, checked) -> { cfg.economyEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
+        addDrawableChild(CheckboxWidget.builder(Text.literal("Combat"), this.textRenderer)
+            .pos(x, y + 44).checked(cfg.combatEnabled).callback((box, checked) -> { cfg.combatEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
+        addDrawableChild(CheckboxWidget.builder(Text.literal("Chat & commands"), this.textRenderer)
+            .pos(right, y + 44).checked(cfg.chatCommandsEnabled).callback((box, checked) -> { cfg.chatCommandsEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
+        addDrawableChild(CheckboxWidget.builder(Text.literal("Interactions"), this.textRenderer)
+            .pos(x, y + 66).checked(cfg.interactionsEnabled).callback((box, checked) -> { cfg.interactionsEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
+
+        addDrawableChild(CheckboxWidget.builder(Text.literal("Session alerts"), this.textRenderer)
+            .pos(x, y + 94).checked(cfg.sessionAlerts).callback((box, checked) -> { cfg.sessionAlerts = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
+        addDrawableChild(CheckboxWidget.builder(Text.literal("Death alerts"), this.textRenderer)
+            .pos(right, y + 94).checked(cfg.deathAlerts).callback((box, checked) -> { cfg.deathAlerts = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
+        addDrawableChild(CheckboxWidget.builder(Text.literal("Failure alerts"), this.textRenderer)
+            .pos(x, y + 116).checked(cfg.failureAlerts).callback((box, checked) -> { cfg.failureAlerts = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
+        addDrawableChild(CheckboxWidget.builder(Text.literal("Overflow alerts"), this.textRenderer)
+            .pos(right, y + 116).checked(cfg.overflowAlerts).callback((box, checked) -> { cfg.overflowAlerts = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
+
+        this.telemetryWebhookField = new TextFieldWidget(this.textRenderer, x, y + 152, 230, 18, Text.literal("Discord webhook"));
+        this.telemetryWebhookField.setMaxLength(2_048);
+        this.telemetryWebhookField.setPlaceholder(Text.literal(cfg.webhookUrl == null || cfg.webhookUrl.isBlank()
+            ? "Paste Discord webhook" : "•••••••• (configured; paste to replace)"));
+        addDrawableChild(this.telemetryWebhookField);
+        addDrawableChild(ButtonWidget.builder(Text.literal("Save"), button -> {
+            String replacement = this.telemetryWebhookField.getText().trim();
+            if (!replacement.isBlank()) {
+                cfg.webhookUrl = replacement;
+                this.telemetryWebhookField.setText("");
+                this.telemetryWebhookField.setPlaceholder(Text.literal("•••••••• (configured; paste to replace)"));
+            }
+            this.mod.getTelemetryManager().saveConfig();
+        }).dimensions(x + 236, y + 152, 48, 18).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Test"), button -> this.mod.getTelemetryManager().testDiscord())
+            .dimensions(x + 290, y + 152, 48, 18).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Export session"), button -> this.mod.getTelemetryManager().exportCurrentSession())
+            .dimensions(x, y + 180, 106, 18).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Export all history"), button -> this.mod.getTelemetryManager().exportAllHistory())
+            .dimensions(x + 112, y + 180, 126, 18).build());
     }
 
     private void buildMainTab() {
@@ -1091,6 +1146,12 @@ public final class MinepieceMenuScreen extends Screen {
                 drawFittedText(drawContext, this.tr("other.desc2"), x + LIST_TEXT_INSET, boxY + LIST_ROW_STEP + LIST_TEXT_BASELINE_OFFSET, this.contentWidth - 10, COLOR_TEXT_DIM);
                 drawFittedText(drawContext, this.tr("other.desc3"), x + LIST_TEXT_INSET, boxY + LIST_ROW_STEP * 2 + LIST_TEXT_BASELINE_OFFSET, this.contentWidth - 10, COLOR_TEXT_DIM);
             }
+            case TELEMETRY -> {
+                drawContext.drawTextWithShadow(renderer, "Alerts", x, this.contentY + 82, COLOR_HEADER);
+                drawContext.drawTextWithShadow(renderer, "Discord webhook (stored locally, value hidden)", x, this.contentY + 162, COLOR_HEADER);
+                drawFittedText(drawContext, this.mod.getTelemetryManager().status(), x, this.contentY + 230, this.contentWidth - 6, COLOR_TEXT_DIM);
+                drawFittedText(drawContext, "Position and location tracking are disabled.", x, this.contentY + 246, this.contentWidth - 6, COLOR_TEXT_DIM);
+            }
         }
     }
 
@@ -1872,7 +1933,8 @@ public final class MinepieceMenuScreen extends Screen {
         EVENTS("tab.events"),
         PROFILE("tab.profile"),
         LANGUAGE("tab.language"),
-        AUCTION_HOUSE("tab.other");
+        AUCTION_HOUSE("tab.other"),
+        TELEMETRY("tab.telemetry");
 
         final String key;
 

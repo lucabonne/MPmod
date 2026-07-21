@@ -180,4 +180,62 @@ class TooltipParsersTest {
         assertEquals("", TooltipParsers.canonicalPetStatName("Daño de Fruta de Pesadilla"));
         assertEquals("Energy Regeneration", TooltipParsers.canonicalPetStatName("Regen. de Energía"));
     }
+
+    @Test
+    void calculatesUpdatedLegendaryPetRollPercentages() {
+        assertPetPercent("LEGENDARY", 10, "Power", 5.0D, 0.0D);
+        assertPetPercent("LEGENDARY", 10, "Power", 7.5D, 50.0D);
+        assertPetPercent("LEGENDARY", 10, "Power", 10.0D, 100.0D);
+        assertPetPercent("LEGENDARY", 10, "Regeneration", 5.0D, 0.0D);
+        assertPetPercent("LEGENDARY", 10, "Regeneration", 7.5D, 50.0D);
+        assertPetPercent("LEGENDARY", 10, "Regeneration", 10.0D, 100.0D);
+        assertPetPercent("LEGENDARY", 10, "Energy Regeneration", 5.0D, 0.0D);
+        assertPetPercent("LEGENDARY", 10, "Energy Regeneration", 7.5D, 50.0D);
+        assertPetPercent("LEGENDARY", 10, "Energy Regeneration", 10.0D, 100.0D);
+        assertPetPercent("LEGENDARY", 10, "Critical Damage", 7.5D, 0.0D);
+        assertPetPercent("LEGENDARY", 10, "Critical Damage", 11.25D, 50.0D);
+        assertPetPercent("LEGENDARY", 10, "Critical Damage", 15.0D, 100.0D);
+    }
+
+    @Test
+    void calculatesUpdatedMythicPetRollPercentages() {
+        assertPetPercent("MYTHIC", 10, "Power", 7.5D, 0.0D);
+        assertPetPercent("MYTHIC", 10, "Power", 10.0D, 50.0D);
+        assertPetPercent("MYTHIC", 10, "Power", 12.5D, 100.0D);
+        assertPetPercent("MYTHIC", 10, "Regeneration", 7.5D, 0.0D);
+        assertPetPercent("MYTHIC", 10, "Regeneration", 10.0D, 50.0D);
+        assertPetPercent("MYTHIC", 10, "Regeneration", 12.5D, 100.0D);
+        assertPetPercent("MYTHIC", 10, "Energy Regeneration", 7.5D, 0.0D);
+        assertPetPercent("MYTHIC", 10, "Energy Regeneration", 10.0D, 50.0D);
+        assertPetPercent("MYTHIC", 10, "Energy Regeneration", 12.5D, 100.0D);
+        assertPetPercent("MYTHIC", 10, "Critical Damage", 11.25D, 0.0D);
+        assertPetPercent("MYTHIC", 10, "Critical Damage", 15.0D, 50.0D);
+        assertPetPercent("MYTHIC", 10, "Critical Damage", 18.75D, 100.0D);
+    }
+
+    @Test
+    void scalesUpdatedCriticalDamageRangeToCurrentPetLevel() {
+        List<TooltipParsers.PetStatLine> lines = TooltipParsers.parsePetRolls(List.of(
+            "LEGENDARY",
+            "Level: 20",
+            "Pet Effects:",
+            "LVL 10 Critical Damage +21.41"
+        ));
+
+        assertEquals(1, lines.size());
+        assertEquals(42.733333D, lines.getFirst().percent(), 0.0001D);
+        assertEquals(43L, Math.round(lines.getFirst().percent()));
+    }
+
+    private static void assertPetPercent(String rarity, int level, String stat, double value, double expectedPercent) {
+        List<TooltipParsers.PetStatLine> lines = TooltipParsers.parsePetRolls(List.of(
+            rarity,
+            "Level: " + level,
+            "Pet Effects:",
+            "LVL " + level + " " + stat + " +" + value
+        ));
+
+        assertEquals(1, lines.size());
+        assertEquals(expectedPercent, lines.getFirst().percent(), 0.0001D);
+    }
 }
