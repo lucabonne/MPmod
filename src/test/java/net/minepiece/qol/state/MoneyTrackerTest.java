@@ -65,4 +65,58 @@ class MoneyTrackerTest {
         assertEquals(3_750L, tracker.getCurrentBalance());
         assertEquals(-1_250L, tracker.getNonAhToday());
     }
+
+    @Test
+    void playerChatNeverChangesMoney() {
+        PersistentState state = new PersistentState();
+        MoneyTracker tracker = new MoneyTracker(state, ignored -> { }, Path.of("."));
+        tracker.setCurrentBalance(5_000_000L);
+
+        tracker.onPlayerChatMessage("武 | 要登在 Lukee › ill spent 2000000 on it");
+
+        assertEquals(5_000_000L, tracker.getCurrentBalance());
+        assertEquals(0L, tracker.getNonAhToday());
+    }
+
+    @Test
+    void islandBankDepositLeavesPlayerBalanceAndEmitsOneEvent() {
+        PersistentState state = new PersistentState();
+        MoneyTracker tracker = new MoneyTracker(state, ignored -> { }, Path.of("."));
+        tracker.setCurrentBalance(5_000_000L);
+        java.util.List<MoneyTracker.EconomyEvent> events = new java.util.ArrayList<>();
+        tracker.setEconomyObserver(events::add);
+
+        tracker.onGameMessage("莱 You have deposited 2M 实 in your island bank.");
+
+        assertEquals(3_000_000L, tracker.getCurrentBalance());
+        assertEquals(-2_000_000L, tracker.getNonAhToday());
+        assertEquals(1, events.size());
+        assertEquals(-2_000_000L, events.getFirst().signedAmount());
+    }
+
+    @Test
+    void deduplicatesEquivalentServerChatAndActionbarEvents() {
+        PersistentState state = new PersistentState();
+        MoneyTracker tracker = new MoneyTracker(state, ignored -> { }, Path.of("."));
+        tracker.setCurrentBalance(1_000L);
+        java.util.List<MoneyTracker.EconomyEvent> events = new java.util.ArrayList<>();
+        tracker.setEconomyObserver(events::add);
+
+        tracker.onGameMessage("You earned 100 实");
+        tracker.onActionbarMessage("100 实");
+
+        assertEquals(1_100L, tracker.getCurrentBalance());
+        assertEquals(1, events.size());
+    }
+
+    @Test
+    void ignoresMalformedMoneyAmount() {
+        PersistentState state = new PersistentState();
+        MoneyTracker tracker = new MoneyTracker(state, ignored -> { }, Path.of("."));
+        tracker.setCurrentBalance(1_000L);
+
+        tracker.onGameMessage("You earned many 实");
+
+        assertEquals(1_000L, tracker.getCurrentBalance());
+    }
 }

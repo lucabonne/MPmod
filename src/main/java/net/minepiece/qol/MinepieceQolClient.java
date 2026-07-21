@@ -16,15 +16,23 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
+import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
+import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
+import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.client.option.KeyBinding;
 import net.minepiece.qol.commands.ModCommands;
 import net.minepiece.qol.config.ConfigManager;
 import net.minepiece.qol.i18n.UiLocalization;
 import net.minepiece.qol.mixin.PlayerListHudAccessor;
 import net.minepiece.qol.parse.ChatParsers;
+import net.minepiece.qol.parse.MoneyMessageClassifier;
 import net.minepiece.qol.parse.TooltipParsers;
 import net.minepiece.qol.state.AuctionHighlighter;
 import net.minepiece.qol.state.BossGuiAutoScanner;
@@ -41,6 +49,7 @@ import net.minepiece.qol.state.ProfileStatsTracker;
 import net.minepiece.qol.state.RarityDetector;
 import net.minepiece.qol.state.ScrollTracker;
 import net.minepiece.qol.state.StatsRefreshController;
+import net.minepiece.qol.telemetry.TelemetryManager;
 import net.minepiece.qol.ui.HudOverlay;
 import net.minepiece.qol.ui.HudLayoutScreen;
 import net.minepiece.qol.ui.MinepieceMenuScreen;
@@ -59,6 +68,7 @@ import net.minecraft.registry.Registries;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.ActionResult;
 import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
@@ -113,6 +123,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
     private HudOverlay hudOverlay;
     private MinibossWaypointWorldRenderer minibossWaypointWorldRenderer;
     private ChatTranslationManager chatTranslationManager;
+    private TelemetryManager telemetryManager;
     private KeyBinding openMenuKeyBinding;
 
     private final Map<Integer, String> lastAuctionDebugLines = new HashMap<>();
@@ -158,6 +169,10 @@ public final class MinepieceQolClient implements ClientModInitializer {
         );
         this.jobsTracker = new JobsTracker(this.persistentState, this::savePersistentState, this.debugLogManager);
         this.moneyTracker = new MoneyTracker(this.persistentState, this::savePersistentState, this.configManager.getBaseDir());
+        this.telemetryManager = new TelemetryManager(this.configManager.getBaseDir());
+        this.moneyTracker.setEconomyObserver(event -> this.telemetryManager.onEconomyEvent(
+            event.kind(), event.signedAmount(), event.source(), event.rawMessage()
+        ));
         this.eventCountdownTracker = new EventCountdownTracker(this.persistentState, this::savePersistentState);
         this.scrollTracker = new ScrollTracker(this.debugLogManager);
         this.inventoryXpTracker = new InventoryXpTracker(this.debugLogManager);
@@ -178,10 +193,51 @@ public final class MinepieceQolClient implements ClientModInitializer {
         ClientSendMessageEvents.COMMAND.register(command -> {
             this.moneyTracker.onCommandSent(command);
             this.onCommandSent(command);
+            this.telemetryManager.onOutgoingCommand(command);
+        });
+        ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, timestamp) -> {
+            String normalized = TextUtil.normalize(message);
+            this.moneyTracker.onPlayerChatMessage(normalized);
+            this.telemetryManager.onIncomingPlayerChat(normalized, sender == null ? "" : sender.name());
+        });
+        ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
+            String normalized = TextUtil.normalize(message);
+            if (MoneyMessageClassifier.isEligibleServerMessage(normalized, overlay)) {
+                this.moneyTracker.onGameMessage(normalized);
+            }
+            this.telemetryManager.onIncomingGameMessage(normalized, overlay);
+        });
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            String address = client.getCurrentServerEntry() == null ? "" : client.getCurrentServerEntry().address;
+            this.telemetryManager.onJoin(client, address);
+        });
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> this.telemetryManager.onDisconnect(client));
+        AttackEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
+            this.telemetryManager.onAttackEntity(entity);
+            return ActionResult.PASS;
+        });
+        AttackBlockCallback.EVENT.register((player, world, hand, pos, direction) -> {
+            this.telemetryManager.onAttackBlock(MinecraftClient.getInstance(), pos);
+            return ActionResult.PASS;
+        });
+        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
+            this.telemetryManager.onUseBlock(MinecraftClient.getInstance(), hand, hitResult);
+            return ActionResult.PASS;
+        });
+        UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
+            this.telemetryManager.onUseEntity(entity, hand);
+            return ActionResult.PASS;
+        });
+        UseItemCallback.EVENT.register((player, world, hand) -> {
+            this.telemetryManager.onUseItem(player.getStackInHand(hand), hand);
+            return ActionResult.PASS;
         });
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             savePersistentState(this.persistentState);
+            if (this.telemetryManager != null) {
+                this.telemetryManager.onClientStopping(client);
+            }
             if (this.chatTranslationManager != null) {
                 this.chatTranslationManager.shutdown();
             }
@@ -220,6 +276,10 @@ public final class MinepieceQolClient implements ClientModInitializer {
 
     public MoneyTracker getMoneyTracker() {
         return this.moneyTracker;
+    }
+
+    public TelemetryManager getTelemetryManager() {
+        return this.telemetryManager;
     }
 
     public EventCountdownTracker getEventCountdownTracker() {
@@ -624,7 +684,6 @@ public final class MinepieceQolClient implements ClientModInitializer {
             }
             this.jobsTracker.captureChatMessage(normalized);
             this.cooldownTracker.onChatMessage(normalized);
-            this.moneyTracker.onChatMessage(normalized);
             ChatParsers.parseBossKill(normalized).ifPresent(name -> {
                 MinecraftClient client = MinecraftClient.getInstance();
                 if (client != null && client.player != null) {
@@ -1349,6 +1408,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
         syncMenuKeybindConfig();
         handleMenuKeyBinding(client);
         showMenuOpenHintOnce(client);
+        this.telemetryManager.tick(client);
 
         SafeExecutor.run(this.debugLogManager, "tab-footer", () -> {
             PlayerListHudAccessor accessor = (PlayerListHudAccessor) client.inGameHud.getPlayerListHud();
@@ -1520,6 +1580,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     private boolean handleOutgoingChatMessage(String message) {
+        this.telemetryManager.onOutgoingChat(message);
         if (message == null || message.isBlank() || this.talkTarget.isBlank()) {
             return true;
         }
