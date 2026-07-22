@@ -34,6 +34,10 @@ public final class MoneyTracker {
         "you have withdrawn\\s+([0-9][0-9,]*(?:\\.[0-9]+)?)([KMB])?\\s*实\\s+from your island bank",
         Pattern.CASE_INSENSITIVE
     );
+    private static final Pattern ISLAND_BANK_DEPOSIT_PATTERN = Pattern.compile(
+        "you have deposited\\s+([0-9][0-9,]*(?:\\.[0-9]+)?)([KMB])?\\s*实\\s+in(?:to)? your island bank",
+        Pattern.CASE_INSENSITIVE
+    );
     private static final Pattern PET_BROUGHT_YOU_PATTERN = Pattern.compile(
         "your pet\\s+.+?\\s+brought you\\s+([0-9][0-9,]*(?:\\.[0-9]+)?)([KMB])?\\s*实",
         Pattern.CASE_INSENSITIVE
@@ -85,6 +89,7 @@ public final class MoneyTracker {
     private long lastNonAhAppliedDelta;
     private String lastNonAhAppliedSource = "";
     private long pendingNonAhDeltaBeforeInit;
+    private Consumer<EconomyEvent> economyObserver = ignored -> { };
 
     public MoneyTracker(PersistentState state, Consumer<PersistentState> stateSaver, Path baseDir) {
         this.state = state;
@@ -100,6 +105,14 @@ public final class MoneyTracker {
     }
 
     public void onChatMessage(String chatLine) {
+        onGameMessage(chatLine);
+    }
+
+    public void onPlayerChatMessage(String chatLine) {
+        // Player-authored chat is deliberately never interpreted as an economy event.
+    }
+
+    public void onGameMessage(String chatLine) {
         if (chatLine == null || chatLine.isBlank()) {
             return;
         }
@@ -112,11 +125,11 @@ public final class MoneyTracker {
 
         Optional<ChatParsers.MoneyEvent> maybeMoneyEvent = ChatParsers.parseMoneyEvent(chatLine);
         if (maybeMoneyEvent.isPresent()) {
-            handleAhTransaction(maybeMoneyEvent.get());
+            handleAhTransaction(maybeMoneyEvent.get(), chatLine);
             return;
         }
 
-        parseChatMoneyDelta(chatLine).ifPresent(delta -> applyNonAhDelta(delta, "chat"));
+        parseChatMoneyDelta(chatLine).ifPresent(delta -> applyNonAhDelta(delta, "server_chat", chatLine));
     }
 
     public void onActionbarMessage(String actionbarLine) {
@@ -135,8 +148,12 @@ public final class MoneyTracker {
         this.lastActionbarMoneyDisplay = displayValue;
         this.lastActionbarDisplayMs = now;
         if (delta > 0L) {
-            applyNonAhDelta(delta, "actionbar");
+            applyNonAhDelta(delta, "actionbar", actionbarLine);
         }
+    }
+
+    public void setEconomyObserver(Consumer<EconomyEvent> observer) {
+        this.economyObserver = observer == null ? ignored -> { } : observer;
     }
 
     public List<String> commandSummaryLines() {
@@ -401,7 +418,7 @@ public final class MoneyTracker {
         this.stateSaver.accept(this.state);
     }
 
-    private void handleAhTransaction(ChatParsers.MoneyEvent event) {
+    private void handleAhTransaction(ChatParsers.MoneyEvent event, String rawMessage) {
         long now = System.currentTimeMillis();
         long rounded = Math.max(0L, Math.round(event.amount()));
 
@@ -429,9 +446,11 @@ public final class MoneyTracker {
             }
         }
         this.stateSaver.accept(this.state);
+        long signedAmount = "BUY".equalsIgnoreCase(event.type()) ? -rounded : rounded;
+        this.economyObserver.accept(new EconomyEvent(event.type().toLowerCase(Locale.ROOT), signedAmount, "server_chat", rawMessage));
     }
 
-    private void applyNonAhDelta(long signedDelta, String source) {
+    private void applyNonAhDelta(long signedDelta, String source, String rawMessage) {
         if (signedDelta == 0L) {
             return;
         }
@@ -445,6 +464,7 @@ public final class MoneyTracker {
         this.lastNonAhAppliedMs = now;
         this.lastNonAhAppliedDelta = signedDelta;
         this.lastNonAhAppliedSource = source;
+        this.economyObserver.accept(new EconomyEvent(signedDelta > 0L ? "income" : "expense", signedDelta, source, rawMessage));
         if (!this.balanceInitializedThisSession) {
             this.pendingNonAhDeltaBeforeInit += signedDelta;
             return;
@@ -462,7 +482,7 @@ public final class MoneyTracker {
         if (positive.isPresent()) {
             return positive;
         }
-        Optional<Long> negative = firstMatchAmount(line, NEGATIVE_CHAT_PATTERN).map(amount -> -amount);
+        Optional<Long> negative = firstMatchAmount(line, ISLAND_BANK_DEPOSIT_PATTERN, NEGATIVE_CHAT_PATTERN).map(amount -> -amount);
         if (negative.isPresent()) {
             return negative;
         }
@@ -532,6 +552,9 @@ public final class MoneyTracker {
         }
         int firstSpace = normalized.indexOf(' ');
         return firstSpace >= 0 ? normalized.substring(0, firstSpace) : normalized;
+    }
+
+    public record EconomyEvent(String kind, long signedAmount, String source, String rawMessage) {
     }
 
     private static long parseLargestMoneyToken(String text) {
