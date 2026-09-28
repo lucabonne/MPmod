@@ -89,7 +89,6 @@ public final class MoneyTracker {
     private long lastNonAhAppliedDelta;
     private String lastNonAhAppliedSource = "";
     private long pendingNonAhDeltaBeforeInit;
-    private Consumer<EconomyEvent> economyObserver = ignored -> { };
 
     public MoneyTracker(PersistentState state, Consumer<PersistentState> stateSaver, Path baseDir) {
         this.state = state;
@@ -125,11 +124,11 @@ public final class MoneyTracker {
 
         Optional<ChatParsers.MoneyEvent> maybeMoneyEvent = ChatParsers.parseMoneyEvent(chatLine);
         if (maybeMoneyEvent.isPresent()) {
-            handleAhTransaction(maybeMoneyEvent.get(), chatLine);
+            handleAhTransaction(maybeMoneyEvent.get());
             return;
         }
 
-        parseChatMoneyDelta(chatLine).ifPresent(delta -> applyNonAhDelta(delta, "server_chat", chatLine));
+        parseChatMoneyDelta(chatLine).ifPresent(delta -> applyNonAhDelta(delta, "server_chat"));
     }
 
     public void onActionbarMessage(String actionbarLine) {
@@ -148,12 +147,8 @@ public final class MoneyTracker {
         this.lastActionbarMoneyDisplay = displayValue;
         this.lastActionbarDisplayMs = now;
         if (delta > 0L) {
-            applyNonAhDelta(delta, "actionbar", actionbarLine);
+            applyNonAhDelta(delta, "actionbar");
         }
-    }
-
-    public void setEconomyObserver(Consumer<EconomyEvent> observer) {
-        this.economyObserver = observer == null ? ignored -> { } : observer;
     }
 
     public List<String> commandSummaryLines() {
@@ -418,7 +413,7 @@ public final class MoneyTracker {
         this.stateSaver.accept(this.state);
     }
 
-    private void handleAhTransaction(ChatParsers.MoneyEvent event, String rawMessage) {
+    private void handleAhTransaction(ChatParsers.MoneyEvent event) {
         long now = System.currentTimeMillis();
         long rounded = Math.max(0L, Math.round(event.amount()));
 
@@ -446,11 +441,9 @@ public final class MoneyTracker {
             }
         }
         this.stateSaver.accept(this.state);
-        long signedAmount = "BUY".equalsIgnoreCase(event.type()) ? -rounded : rounded;
-        this.economyObserver.accept(new EconomyEvent(event.type().toLowerCase(Locale.ROOT), signedAmount, "server_chat", rawMessage));
     }
 
-    private void applyNonAhDelta(long signedDelta, String source, String rawMessage) {
+    private void applyNonAhDelta(long signedDelta, String source) {
         if (signedDelta == 0L) {
             return;
         }
@@ -464,7 +457,6 @@ public final class MoneyTracker {
         this.lastNonAhAppliedMs = now;
         this.lastNonAhAppliedDelta = signedDelta;
         this.lastNonAhAppliedSource = source;
-        this.economyObserver.accept(new EconomyEvent(signedDelta > 0L ? "income" : "expense", signedDelta, source, rawMessage));
         if (!this.balanceInitializedThisSession) {
             this.pendingNonAhDeltaBeforeInit += signedDelta;
             return;
@@ -552,9 +544,6 @@ public final class MoneyTracker {
         }
         int firstSpace = normalized.indexOf(' ');
         return firstSpace >= 0 ? normalized.substring(0, firstSpace) : normalized;
-    }
-
-    public record EconomyEvent(String kind, long signedAmount, String source, String rawMessage) {
     }
 
     private static long parseLargestMoneyToken(String text) {

@@ -22,33 +22,6 @@ public final class ModCommands {
     }
 
     public static void register(CommandDispatcher<FabricClientCommandSource> dispatcher, MinepieceQolClient mod) {
-        dispatcher.register(ClientCommandManager.literal("mptelemetry")
-            .executes(context -> {
-                reply(context.getSource(), mod.getTelemetryManager().status());
-                return 1;
-            })
-            .then(ClientCommandManager.literal("status")
-                .executes(context -> {
-                    reply(context.getSource(), mod.getTelemetryManager().status());
-                    return 1;
-                }))
-            .then(ClientCommandManager.literal("export")
-                .then(ClientCommandManager.literal("session")
-                    .executes(context -> {
-                        reply(context.getSource(), mod.getTelemetryManager().exportCurrentSession());
-                        return 1;
-                    }))
-                .then(ClientCommandManager.literal("all")
-                    .executes(context -> {
-                        reply(context.getSource(), mod.getTelemetryManager().exportAllHistory());
-                        return 1;
-                    })))
-            .then(ClientCommandManager.literal("test")
-                .executes(context -> {
-                    reply(context.getSource(), mod.getTelemetryManager().testDiscord());
-                    return 1;
-                })));
-
         dispatcher.register(ClientCommandManager.literal("mpdebug")
             .then(ClientCommandManager.literal("copylast")
                 .executes(context -> {

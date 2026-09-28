@@ -11,6 +11,7 @@ import org.jetbrains.annotations.Nullable;
 
 public final class RarityDetector {
     public enum Rarity {
+        PRIMORDIAL,
         MYTHIC,
         LEGENDARY,
         EPIC,
@@ -49,6 +50,11 @@ public final class RarityDetector {
             return Optional.ofNullable(findSingleRarity(lore.lines()));
         }
         return Optional.empty();
+    }
+
+    public static boolean isBadgeLine(String line) {
+        LineRarity rarity = extractLineRarity(line);
+        return rarity != null && (rarity.isStandalone() || rarity.hasCaret());
     }
 
     private static Rarity findSingleRarity(List<Text> lines) {
@@ -176,6 +182,7 @@ public final class RarityDetector {
 
     private static Rarity mapToken(String token) {
         return switch (token) {
+            case "PRIMORDIAL", "PRIMORDIALE" -> Rarity.PRIMORDIAL;
             case "MYTHIC", "MYTHICAL" -> Rarity.MYTHIC;
             case "LEGENDARY" -> Rarity.LEGENDARY;
             case "EPIC" -> Rarity.EPIC;
@@ -187,6 +194,7 @@ public final class RarityDetector {
 
     private static boolean isStandaloneCollapsed(String collapsed, Rarity rarity) {
         return switch (rarity) {
+            case PRIMORDIAL -> "PRIMORDIAL".equals(collapsed) || "PRIMORDIALE".equals(collapsed);
             case MYTHIC -> "MYTHIC".equals(collapsed) || "MYTHICAL".equals(collapsed);
             case LEGENDARY -> "LEGENDARY".equals(collapsed);
             case EPIC -> "EPIC".equals(collapsed);

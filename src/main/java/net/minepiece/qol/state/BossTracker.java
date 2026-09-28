@@ -262,9 +262,8 @@ public final class BossTracker {
         progress.lastSeenMs = now;
 
         boolean hasLargeRewardChunk = largeOtherDelta >= 100 || largeOtherValue >= 100;
-        boolean explicitPlusTenBounty = actionbar.contains("+10 军");
-        boolean minibossBountyChunk = bountyDelta == 10 || (explicitPlusTenBounty && hasLargeRewardChunk);
-        boolean bossBountyValue = bountyValue >= 50 || bountyDelta >= 50;
+        boolean minibossBountyChunk = bountyDelta == 10;
+        boolean bossBountyValue = bountyDelta >= 50;
         boolean minibossDetected = hasLargeRewardChunk && minibossBountyChunk && !bossBountyValue;
         this.debugLogManager.logInternal(String.format(
             Locale.ROOT,

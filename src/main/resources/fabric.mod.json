@@ -5,7 +5,7 @@
   "name": "Minepiece QoL",
   "description": "Client-side QoL overlays and parsers for play.minepiece.net.",
   "authors": [
-    "Codex"
+    "SiickLukee"
   ],
   "environment": "client",
   "entrypoints": {

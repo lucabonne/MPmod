@@ -84,6 +84,12 @@ public final class ConfigManager {
     }
 
     private static void normalizeConfig(ModConfig config) {
+        if (config.appearance == null) config.appearance = new UiSettings();
+        config.appearance.normalize();
+        if (config.uiLoadouts == null) config.uiLoadouts = new ArrayList<>();
+        config.uiLoadouts.removeIf(layout -> layout == null || layout.name == null || layout.name.isBlank()
+            || layout.panels == null || layout.appearance == null);
+        for (UiSettings.Loadout layout : config.uiLoadouts) layout.appearance.normalize();
         if (config.bossTrackingEnabled == null) {
             config.bossTrackingEnabled = true;
         }
@@ -147,6 +153,19 @@ public final class ConfigManager {
         if (config.inventoryXpHudScale <= 0.0F) {
             config.inventoryXpHudScale = 1.0F;
         }
+        if (config.grindingHudColor == null || config.grindingHudColor.isBlank()) {
+            config.grindingHudColor = "default";
+        }
+        if (config.grindingHudScale <= 0.0F) {
+            config.grindingHudScale = 1.0F;
+        }
+        config.cookingQuantity = Math.max(1, Math.min(64, config.cookingQuantity));
+        if (config.cookingHudScale <= 0.0F) {
+            config.cookingHudScale = 1.0F;
+        }
+        if (config.cookingHudColor == null || config.cookingHudColor.isBlank()) {
+            config.cookingHudColor = "default";
+        }
         if (config.chatTranslationRules == null) {
             config.chatTranslationRules = new ArrayList<>();
         }
@@ -200,6 +219,9 @@ public final class ConfigManager {
     }
 
     public static final class ModConfig {
+        public UiSettings appearance = new UiSettings();
+        public List<UiSettings.Loadout> uiLoadouts = new ArrayList<>();
+        public String activeUiLoadout = "";
         public boolean modEnabled = true;
         public boolean allFeaturesVisible = true;
         public boolean debugEnabled = false;
@@ -214,6 +236,14 @@ public final class ConfigManager {
         public boolean hakiEnabled = true;
         public Boolean scrollsEnabled = true;
         public boolean inventoryXpHudEnabled = true;
+        public boolean profileXpHudEnabled = true;
+        public boolean grindingHudEnabled = true;
+        public boolean cookingHudEnabled = true;
+        public int cookingQuantity = 1;
+        public int cookingHudX = 440;
+        public int cookingHudY = 120;
+        public float cookingHudScale = 1.0F;
+        public String cookingHudColor = "default";
         public boolean chatTranslationEnabled = false;
         public boolean chatTranslationAggressiveEnabled = false;
         public boolean chatTranslationPublicEnabled = true;
@@ -261,6 +291,10 @@ public final class ConfigManager {
         public int inventoryXpHudY = 224;
         public float inventoryXpHudScale = 1.0F;
         public String inventoryXpHudColor = "default";
+        public int grindingHudX = 220;
+        public int grindingHudY = 190;
+        public float grindingHudScale = 1.0F;
+        public String grindingHudColor = "default";
         public int cooldownHudOffsetY = 54;
 
         public static final class ChatTranslationRule {

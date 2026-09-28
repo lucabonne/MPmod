@@ -15,7 +15,6 @@ import net.minepiece.qol.state.BossTracker;
 import net.minepiece.qol.state.ChatTranslationManager;
 import net.minepiece.qol.state.JobsTracker;
 import net.minepiece.qol.state.PersistentState;
-import net.minepiece.qol.telemetry.TelemetryConfig;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -26,12 +25,12 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 
 public final class MinepieceMenuScreen extends Screen {
-    private static final int PANEL_WIDTH = 480;
+    private static final int PANEL_WIDTH = 468;
     private static final int PANEL_HEIGHT = 320;
-    private static final int SIDEBAR_WIDTH = 110;
+    private static final int SIDEBAR_WIDTH = 100;
     private static final int TAB_HEIGHT = 26;
     private static final int TAB_SPACING = 4;
-    private static final int CONTENT_PADDING = 12;
+    private static final int CONTENT_PADDING = 10;
     private static final int LIST_ROW_HEIGHT = 18;
     private static final int LIST_ROW_GAP = 4;
     private static final int LIST_ROW_STEP = LIST_ROW_HEIGHT + LIST_ROW_GAP;
@@ -96,7 +95,9 @@ public final class MinepieceMenuScreen extends Screen {
     private static final int LANGUAGE_RULE_ROW_STEP = 18;
     private static final int LANGUAGE_RULE_TOGGLE_WIDTH = 32;
     private static final int LANGUAGE_RULE_TOGGLE_HEIGHT = 14;
-    private static final int[] HUD_COLOR_PANEL_IDS = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    private static final int[] HUD_COLOR_PANEL_IDS = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0};
+    private static final int HUD_COLOR_PAGE_SIZE = 6;
+    private int hudColorPage;
     private static final int MAIN_COLOR_ROW_HEIGHT = 14;
     private static final int MAIN_COLOR_ROW_STEP = 14;
     private static final int MAIN_COLOR_LEFT_BUTTON_X_OFFSET = 132;
@@ -136,25 +137,24 @@ public final class MinepieceMenuScreen extends Screen {
     };
 
     // Sapphire palette
-    private static final int COLOR_BG_OVERLAY = 0xC0050818;
-    private static final int COLOR_PANEL_BG = 0xEE0B1838;
-    private static final int COLOR_PANEL_BORDER = 0xFF3D78E0;
-    private static final int COLOR_PANEL_BORDER_DARK = 0xFF0E2A6E;
-    private static final int COLOR_SIDEBAR_BG = 0xEE091434;
-    private static final int COLOR_TAB_NORMAL = 0xCC0E2150;
-    private static final int COLOR_TAB_HOVER = 0xDD13347A;
-    private static final int COLOR_TAB_ACTIVE = 0xFF1F4FB8;
-    private static final int COLOR_TAB_ACCENT = 0xFF6FA8FF;
-    private static final int COLOR_TEXT = 0xFFEAF1FF;
-    private static final int COLOR_TEXT_DIM = 0xFF89A8DA;
-    private static final int COLOR_HEADER = 0xFFAFD0FF;
-    private static final int COLOR_DIVIDER = 0x553D78E0;
-    private static final int COLOR_ACTION_BUTTON = 0xFF16396E;
-    private static final int COLOR_ACTION_BUTTON_HOVER = 0xFF1F4A8C;
-    private static final int COLOR_ACTION_BUTTON_DISABLED = 0xFF1A2B49;
-    private static final int COLOR_ACTION_BORDER = 0xFFDDBA6A;
-    private static final int COLOR_ROW_BOX = 0x66112A52;
-    private static final int COLOR_ROW_BOX_BORDER = 0x88649CE4;
+    private int COLOR_BG_OVERLAY = 0xC0050818;
+    private int COLOR_PANEL_BG = 0xEE0B1838;
+    private int COLOR_PANEL_BORDER = 0xFF3D78E0;
+    private int COLOR_SIDEBAR_BG = 0xEE091434;
+    private int COLOR_TAB_NORMAL = 0xCC0E2150;
+    private int COLOR_TAB_HOVER = 0xDD13347A;
+    private int COLOR_TAB_ACTIVE = 0xFF1F4FB8;
+    private int COLOR_TAB_ACCENT = 0xFF6FA8FF;
+    private int COLOR_TEXT = 0xFFEAF1FF;
+    private int COLOR_TEXT_DIM = 0xFF89A8DA;
+    private int COLOR_HEADER = 0xFFAFD0FF;
+    private int COLOR_DIVIDER = 0x553D78E0;
+    private int COLOR_ACTION_BUTTON = 0xFF16396E;
+    private int COLOR_ACTION_BUTTON_HOVER = 0xFF1F4A8C;
+    private int COLOR_ACTION_BUTTON_DISABLED = 0xFF1A2B49;
+    private int COLOR_ACTION_BORDER = 0xFFDDBA6A;
+    private int COLOR_ROW_BOX = 0x66112A52;
+    private int COLOR_ROW_BOX_BORDER = 0x88649CE4;
     private static final int CLOSE_BUTTON_SIZE = 16;
     private static final int CLOSE_BUTTON_INSET = 4;
     private static final int RESET_CONFIRM_WIDTH = 260;
@@ -204,7 +204,6 @@ public final class MinepieceMenuScreen extends Screen {
     private int bossRegistryOffset;
     private final List<RemoveAction> removeActions = new ArrayList<>();
     private boolean resetHudLayoutConfirmOpen;
-    private TextFieldWidget telemetryWebhookField;
 
     public MinepieceMenuScreen(MinepieceQolClient mod) {
         super(Text.literal(mod == null ? "Minepiece QoL" : mod.tr("menu.title")));
@@ -219,6 +218,7 @@ public final class MinepieceMenuScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+        refreshPalette();
         this.panelX = (this.width - PANEL_WIDTH) / 2;
         this.panelY = (this.height - PANEL_HEIGHT) / 2;
         this.contentX = this.panelX + SIDEBAR_WIDTH + CONTENT_PADDING;
@@ -237,8 +237,9 @@ public final class MinepieceMenuScreen extends Screen {
         Tab[] tabs = Tab.values();
         for (int i = 0; i < tabs.length; i++) {
             Tab tab = tabs[i];
-            int by = sidebarY + i * (TAB_HEIGHT + TAB_SPACING);
-            TabButton button = new TabButton(sidebarX, by, SIDEBAR_WIDTH - 12, TAB_HEIGHT, tab);
+            int tabStep = Math.min(TAB_HEIGHT + TAB_SPACING, (PANEL_HEIGHT - 42) / tabs.length);
+            int by = sidebarY + i * tabStep;
+            TabButton button = new TabButton(sidebarX, by, SIDEBAR_WIDTH - 12, Math.min(TAB_HEIGHT, tabStep - 2), tab);
             this.tabButtons.add(button);
         }
     }
@@ -256,60 +257,26 @@ public final class MinepieceMenuScreen extends Screen {
             case PROFILE -> buildProfileTab();
             case LANGUAGE -> buildLanguageTab();
             case AUCTION_HOUSE -> buildOtherTab();
-            case TELEMETRY -> buildTelemetryTab();
-        }
-    }
-
-    private void buildTelemetryTab() {
-        TelemetryConfig cfg = this.mod.getTelemetryManager().config();
-        int x = this.contentX;
-        int y = this.contentY;
-        int right = x + 178;
-
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Enable telemetry"), this.textRenderer)
-            .pos(x, y).checked(cfg.enabled).callback((box, checked) -> this.mod.getTelemetryManager().setEnabled(checked, MinecraftClient.getInstance())).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Discord output"), this.textRenderer)
-            .pos(right, y).checked(cfg.discordEnabled).callback((box, checked) -> { cfg.discordEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Inventory"), this.textRenderer)
-            .pos(x, y + 22).checked(cfg.inventoryEnabled).callback((box, checked) -> { cfg.inventoryEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Economy"), this.textRenderer)
-            .pos(right, y + 22).checked(cfg.economyEnabled).callback((box, checked) -> { cfg.economyEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Combat"), this.textRenderer)
-            .pos(x, y + 44).checked(cfg.combatEnabled).callback((box, checked) -> { cfg.combatEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Chat & commands"), this.textRenderer)
-            .pos(right, y + 44).checked(cfg.chatCommandsEnabled).callback((box, checked) -> { cfg.chatCommandsEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Interactions"), this.textRenderer)
-            .pos(x, y + 66).checked(cfg.interactionsEnabled).callback((box, checked) -> { cfg.interactionsEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Session alerts"), this.textRenderer)
-            .pos(x, y + 94).checked(cfg.sessionAlerts).callback((box, checked) -> { cfg.sessionAlerts = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Death alerts"), this.textRenderer)
-            .pos(right, y + 94).checked(cfg.deathAlerts).callback((box, checked) -> { cfg.deathAlerts = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Failure alerts"), this.textRenderer)
-            .pos(x, y + 116).checked(cfg.failureAlerts).callback((box, checked) -> { cfg.failureAlerts = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Overflow alerts"), this.textRenderer)
-            .pos(right, y + 116).checked(cfg.overflowAlerts).callback((box, checked) -> { cfg.overflowAlerts = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-
-        this.telemetryWebhookField = new TextFieldWidget(this.textRenderer, x, y + 152, 230, 18, Text.literal("Discord webhook"));
-        this.telemetryWebhookField.setMaxLength(2_048);
-        this.telemetryWebhookField.setPlaceholder(Text.literal(cfg.webhookUrl == null || cfg.webhookUrl.isBlank()
-            ? "Paste Discord webhook" : "•••••••• (configured; paste to replace)"));
-        addDrawableChild(this.telemetryWebhookField);
-        addDrawableChild(ButtonWidget.builder(Text.literal("Save"), button -> {
-            String replacement = this.telemetryWebhookField.getText().trim();
-            if (!replacement.isBlank()) {
-                cfg.webhookUrl = replacement;
-                this.telemetryWebhookField.setText("");
-                this.telemetryWebhookField.setPlaceholder(Text.literal("•••••••• (configured; paste to replace)"));
+            case PROGRESS -> buildProgressTab();
+            case COOKING -> buildCookingTab();
+            case APPEARANCE -> {
+                addDrawableChild(ButtonWidget.builder(trText("ui.appearance"), button ->
+                    this.client.setScreen(new AppearanceScreen(this.mod, this, 0)))
+                    .dimensions(this.contentX, this.contentY + 12, 220, 20).build());
+                addDrawableChild(ButtonWidget.builder(trText("ui.loadouts"), button ->
+                    this.client.setScreen(new AppearanceScreen(this.mod, this, 1)))
+                    .dimensions(this.contentX, this.contentY + 40, 220, 20).build());
+                addDrawableChild(ButtonWidget.builder(trText("ui.pictures"), button ->
+                    this.client.setScreen(new AppearanceScreen(this.mod, this, 2)))
+                    .dimensions(this.contentX, this.contentY + 68, 220, 20).build());
             }
-            this.mod.getTelemetryManager().saveConfig();
-        }).dimensions(x + 236, y + 152, 48, 18).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Test"), button -> this.mod.getTelemetryManager().testDiscord())
-            .dimensions(x + 290, y + 152, 48, 18).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Export session"), button -> this.mod.getTelemetryManager().exportCurrentSession())
-            .dimensions(x, y + 180, 106, 18).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Export all history"), button -> this.mod.getTelemetryManager().exportAllHistory())
-            .dimensions(x + 112, y + 180, 126, 18).build());
+        }
+        for (var child : List.copyOf(children())) {
+            if (child instanceof ButtonWidget button) {
+                remove(button);
+                addDrawableChild(new ThemedButton(this.mod, button));
+            }
+        }
     }
 
     private void buildMainTab() {
@@ -372,23 +339,47 @@ public final class MinepieceMenuScreen extends Screen {
                 .build());
         }
 
-        for (int i = 0; i < HUD_COLOR_PANEL_IDS.length; i++) {
-            int panelId = HUD_COLOR_PANEL_IDS[i];
+        addDrawableChild(ButtonWidget.builder(Text.literal("<"), b -> {
+                this.hudColorPage = 1 - this.hudColorPage;
+                rebuild();
+            }).dimensions(x + 240, panelSectionY, 16, 14).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal(">"), b -> {
+                this.hudColorPage = 1 - this.hudColorPage;
+                rebuild();
+            }).dimensions(x + 302, panelSectionY, 16, 14).build());
+        addDrawableChild(ButtonWidget.builder(trText("ui.hud_style"), b ->
+                this.client.setScreen(new AppearanceScreen(this.mod, this, 0)))
+            .dimensions(x, panelSectionY + 20 + HUD_COLOR_PAGE_SIZE * MAIN_COLOR_ROW_STEP, this.contentWidth - 4, 18).build());
+
+        for (int i = 0; i < HUD_COLOR_PAGE_SIZE; i++) {
+            int panelId = HUD_COLOR_PANEL_IDS[this.hudColorPage * HUD_COLOR_PAGE_SIZE + i];
             int rowY = panelSectionY + 16 + i * MAIN_COLOR_ROW_STEP;
-            int buttonY = rowY + (MAIN_COLOR_ROW_HEIGHT - MAIN_COLOR_BUTTON_HEIGHT) / 2;
-            addDrawableChild(ButtonWidget.builder(Text.literal("<"), b -> {
-                    this.mod.cycleHudPanelColor(panelId, -1);
-                    this.mod.saveConfig();
-                })
-                .dimensions(x + MAIN_COLOR_LEFT_BUTTON_X_OFFSET, buttonY, MAIN_COLOR_BUTTON_WIDTH, MAIN_COLOR_BUTTON_HEIGHT)
-                .build());
-            addDrawableChild(ButtonWidget.builder(Text.literal(">"), b -> {
-                    this.mod.cycleHudPanelColor(panelId, 1);
-                    this.mod.saveConfig();
-                })
-                .dimensions(x + MAIN_COLOR_RIGHT_BUTTON_X_OFFSET, buttonY, MAIN_COLOR_BUTTON_WIDTH, MAIN_COLOR_BUTTON_HEIGHT)
-                .build());
+            addPanelColorControls(panelId, x, rowY, MAIN_COLOR_ROW_HEIGHT);
         }
+    }
+
+    private void addPanelColorControls(int panelId, int x, int y, int height) {
+        TextFieldWidget field = new TextFieldWidget(this.textRenderer, x + 132, y, 82, height, Text.literal("HEX"));
+        field.setMaxLength(7);
+        field.setText(String.format(Locale.ROOT, "#%06X", HudOverlay.panelBackground(
+            this.mod.getHudPanelColor(panelId), this.mod.getConfig().appearance) & 0xFFFFFF));
+        field.setTextPredicate(value -> value.matches("#?[0-9a-fA-F]{0,6}"));
+        field.setChangedListener(value -> {
+            if (value.matches("#?[0-9a-fA-F]{6}")) {
+                this.mod.setHudPanelColor(panelId, value);
+                this.mod.saveConfig();
+            }
+        });
+        addDrawableChild(field);
+        addDrawableChild(ButtonWidget.builder(trText("ui.random"), button -> field.setText(
+            String.format(Locale.ROOT, "#%06X", java.util.concurrent.ThreadLocalRandom.current().nextInt(0x1000000))))
+            .dimensions(x + 220, y, 80, height).build());
+    }
+
+    private void drawPanelColorSwatch(DrawContext context, int panelId, int x, int y, int height) {
+        context.fill(x + 307, y + 1, x + 323, y + height - 1, COLOR_TEXT);
+        int color = HudOverlay.panelBackground(this.mod.getHudPanelColor(panelId), this.mod.getConfig().appearance);
+        context.fill(x + 308, y + 2, x + 322, y + height - 2, color | 0xFF000000);
     }
 
     private void buildBossesTab() {
@@ -978,12 +969,72 @@ public final class MinepieceMenuScreen extends Screen {
             .build());
     }
 
+    private void buildCookingTab() {
+        ConfigManager.ModConfig cfg = this.mod.getConfig();
+        int x = this.contentX;
+        int y = this.contentY + 8;
+        addDrawableChild(CheckboxWidget.builder(trText("hud.panel.cooking"), this.textRenderer)
+            .pos(x, y).checked(cfg.cookingHudEnabled)
+            .callback((box, checked) -> { cfg.cookingHudEnabled = checked; this.mod.saveConfig(); }).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("−"), button -> {
+            cfg.cookingQuantity = Math.max(1, cfg.cookingQuantity - 1);
+            this.mod.saveConfig();
+            rebuild();
+        }).dimensions(x, y + 30, 24, 20).build());
+        TextFieldWidget quantity = new TextFieldWidget(this.textRenderer, x + 32, y + 30, 48, 20, trText("cooking.quantity"));
+        quantity.setMaxLength(2);
+        quantity.setText(Integer.toString(cfg.cookingQuantity));
+        quantity.setTextPredicate(value -> value.isEmpty() || value.matches("[0-9]{1,2}") && Integer.parseInt(value) >= 1 && Integer.parseInt(value) <= 64);
+        quantity.setChangedListener(value -> {
+            if (!value.isEmpty()) {
+                cfg.cookingQuantity = Integer.parseInt(value);
+                this.mod.saveConfig();
+            }
+        });
+        addDrawableChild(quantity);
+        addDrawableChild(ButtonWidget.builder(Text.literal("+"), button -> {
+            cfg.cookingQuantity = Math.min(64, cfg.cookingQuantity + 1);
+            this.mod.saveConfig();
+            rebuild();
+        }).dimensions(x + 88, y + 30, 24, 20).build());
+        addDrawableChild(ButtonWidget.builder(trText("cooking.clear"), button -> this.mod.getCookingTracker().clear())
+            .dimensions(x, y + 60, 158, 20).build());
+        addDrawableChild(ButtonWidget.builder(trText("button.edit_hud_layout"), button -> this.mod.openHudLayoutEditor())
+            .dimensions(x + 166, y + 60, 162, 20).build());
+    }
+
+    private void buildProgressTab() {
+        ConfigManager.ModConfig cfg = this.mod.getConfig();
+        int x = this.contentX;
+        int y = this.contentY + 8;
+        addDrawableChild(CheckboxWidget.builder(trText("hud.panel.profile_xp"), this.textRenderer)
+            .pos(x, y).checked(cfg.profileXpHudEnabled)
+            .callback((box, checked) -> { cfg.profileXpHudEnabled = checked; this.mod.saveConfig(); }).build());
+        addDrawableChild(CheckboxWidget.builder(trText("hud.panel.grinding"), this.textRenderer)
+            .pos(x, y + 24).checked(cfg.grindingHudEnabled)
+            .callback((box, checked) -> { cfg.grindingHudEnabled = checked; this.mod.saveConfig(); }).build());
+        addDrawableChild(ButtonWidget.builder(trText("button.sync_profile"), button -> this.mod.runProfileCommand())
+            .dimensions(x, y + 54, 150, 20).build());
+        addDrawableChild(ButtonWidget.builder(trText("grinding.reset"), button -> {
+                this.mod.getProgressHudController().grinding().reset();
+                this.mod.getProgressHudController().grinding().observeProfileXp(
+                    this.mod.getProgressHudController().profile().getGainedXp(), System.currentTimeMillis());
+            }).dimensions(x + 158, y + 54, 170, 20).build());
+        for (int panelId = 9; panelId <= 10; panelId++) {
+            int rowY = y + 94 + (panelId - 9) * 24;
+            addPanelColorControls(panelId, x, rowY, 18);
+        }
+        addDrawableChild(ButtonWidget.builder(trText("button.edit_hud_layout"), button -> this.mod.openHudLayoutEditor())
+            .dimensions(x, y + 158, 328, 20).build());
+    }
+
     private void rebuild() {
         buildTabContent();
     }
 
     @Override
     public void render(DrawContext drawContext, int mouseX, int mouseY, float deltaTicks) {
+        refreshPalette();
         // Dark transparent overlay
         drawContext.fill(0, 0, this.width, this.height, COLOR_BG_OVERLAY);
 
@@ -1014,7 +1065,6 @@ public final class MinepieceMenuScreen extends Screen {
         super.render(drawContext, mouseX, mouseY, deltaTicks);
 
         // Restyle default buttons and then custom remove buttons
-        drawStyledVanillaButtons(drawContext, mouseX, mouseY);
         drawRemoveButtons(drawContext, mouseX, mouseY);
 
         // Credits bottom right
@@ -1137,6 +1187,23 @@ public final class MinepieceMenuScreen extends Screen {
                     drawTranslationRuleLabels(drawContext, x, this.contentY + LANGUAGE_RULES_LIST_Y_OFFSET);
                 }
             }
+            case COOKING -> {
+                drawFittedText(drawContext, tr("cooking.quantity"), x + 124, this.contentY + 44, 204, COLOR_TEXT);
+                List<String> lines = this.mod.getCookingTracker().getHudLines(this.mod::tr, this.mod.getConfig().cookingQuantity);
+                for (int i = 0; i < Math.min(10, lines.size()); i++) {
+                    drawFittedText(drawContext, lines.get(i), x, this.contentY + 108 + i * 14, this.contentWidth - 4, COLOR_TEXT);
+                }
+            }
+            case PROGRESS -> {
+                for (int panelId = 9; panelId <= 10; panelId++) {
+                    int rowY = this.contentY + 102 + (panelId - 9) * 24;
+                    drawFittedText(drawContext, this.mod.getHudPanelName(panelId), x, rowY + 5, 124, COLOR_TEXT);
+                    drawPanelColorSwatch(drawContext, panelId, x, rowY, 18);
+                }
+                drawFittedText(drawContext, tr("progress.sync_hint"), x, this.contentY + 204, this.contentWidth - 4, COLOR_TEXT_DIM);
+                drawFittedText(drawContext, tr("grinding.pause_hint"), x, this.contentY + 222, this.contentWidth - 4, COLOR_TEXT_DIM);
+                drawFittedText(drawContext, tr("progress.estimate_hint"), x, this.contentY + 240, this.contentWidth - 4, COLOR_TEXT_DIM);
+            }
             case AUCTION_HOUSE -> {
                 int boxY = this.contentY + 154;
                 drawRowBox(drawContext, x, boxY, this.contentWidth - 4, LIST_ROW_HEIGHT);
@@ -1145,12 +1212,6 @@ public final class MinepieceMenuScreen extends Screen {
                 drawFittedText(drawContext, this.tr("other.desc1"), x + LIST_TEXT_INSET, boxY + LIST_TEXT_BASELINE_OFFSET, this.contentWidth - 10, COLOR_TEXT_DIM);
                 drawFittedText(drawContext, this.tr("other.desc2"), x + LIST_TEXT_INSET, boxY + LIST_ROW_STEP + LIST_TEXT_BASELINE_OFFSET, this.contentWidth - 10, COLOR_TEXT_DIM);
                 drawFittedText(drawContext, this.tr("other.desc3"), x + LIST_TEXT_INSET, boxY + LIST_ROW_STEP * 2 + LIST_TEXT_BASELINE_OFFSET, this.contentWidth - 10, COLOR_TEXT_DIM);
-            }
-            case TELEMETRY -> {
-                drawContext.drawTextWithShadow(renderer, "Alerts", x, this.contentY + 82, COLOR_HEADER);
-                drawContext.drawTextWithShadow(renderer, "Discord webhook (stored locally, value hidden)", x, this.contentY + 162, COLOR_HEADER);
-                drawFittedText(drawContext, this.mod.getTelemetryManager().status(), x, this.contentY + 230, this.contentWidth - 6, COLOR_TEXT_DIM);
-                drawFittedText(drawContext, "Position and location tracking are disabled.", x, this.contentY + 246, this.contentWidth - 6, COLOR_TEXT_DIM);
             }
         }
     }
@@ -1330,18 +1391,16 @@ public final class MinepieceMenuScreen extends Screen {
     }
 
     private void drawHudColorSection(DrawContext drawContext, int x, int y) {
-        drawContext.drawTextWithShadow(this.textRenderer, tr("main.panel_colors"), x, y, COLOR_HEADER);
+        drawFittedText(drawContext, tr("main.panel_colors"), x, y, 230, COLOR_HEADER);
+        drawFittedCenteredText(drawContext, (this.hudColorPage + 1) + "/2", x + 258, y, 42, 14, COLOR_TEXT);
         int labelBoxWidth = MAIN_COLOR_LEFT_BUTTON_X_OFFSET - 8;
-        int valueBoxX = x + MAIN_COLOR_LEFT_BUTTON_X_OFFSET + MAIN_COLOR_BUTTON_WIDTH + 4;
-        int valueBoxWidth = MAIN_COLOR_RIGHT_BUTTON_X_OFFSET - (MAIN_COLOR_LEFT_BUTTON_X_OFFSET + MAIN_COLOR_BUTTON_WIDTH) - 8;
-        for (int i = 0; i < HUD_COLOR_PANEL_IDS.length; i++) {
-            int panelId = HUD_COLOR_PANEL_IDS[i];
+        for (int i = 0; i < HUD_COLOR_PAGE_SIZE; i++) {
+            int panelId = HUD_COLOR_PANEL_IDS[this.hudColorPage * HUD_COLOR_PAGE_SIZE + i];
             int rowY = y + 16 + i * MAIN_COLOR_ROW_STEP;
             drawRowBox(drawContext, x, rowY, this.contentWidth - 4, MAIN_COLOR_ROW_HEIGHT);
             String panelName = this.mod.getHudPanelName(panelId);
-            String color = prettyColorName(this.mod.getHudPanelColor(panelId));
             drawFittedCenteredText(drawContext, panelName, x + 2, rowY, labelBoxWidth, MAIN_COLOR_ROW_HEIGHT, COLOR_TEXT);
-            drawFittedCenteredText(drawContext, color, valueBoxX, rowY, valueBoxWidth, MAIN_COLOR_ROW_HEIGHT, COLOR_HEADER);
+            drawPanelColorSwatch(drawContext, panelId, x, rowY, MAIN_COLOR_ROW_HEIGHT);
         }
     }
 
@@ -1451,25 +1510,44 @@ public final class MinepieceMenuScreen extends Screen {
         drawContext.drawTextWithShadow(this.textRenderer, "X", textX, textY, 0xFFFFFFFF);
     }
 
+    private void refreshPalette() {
+        var a = this.mod.getConfig().appearance;
+        COLOR_BG_OVERLAY = net.minepiece.qol.config.UiSettings.color(a.background, a.menuOpacity / 2);
+        COLOR_PANEL_BG = net.minepiece.qol.config.UiSettings.color(a.background, a.menuOpacity);
+        COLOR_PANEL_BORDER = net.minepiece.qol.config.UiSettings.color(a.border, a.menuOpacity);
+        COLOR_SIDEBAR_BG = COLOR_PANEL_BG;
+        COLOR_TAB_NORMAL = net.minepiece.qol.config.UiSettings.color(a.accent, a.menuOpacity / 5);
+        COLOR_TAB_HOVER = net.minepiece.qol.config.UiSettings.color(a.accent, a.menuOpacity / 3);
+        COLOR_TAB_ACTIVE = net.minepiece.qol.config.UiSettings.color(a.accent, a.menuOpacity / 2);
+        COLOR_TAB_ACCENT = net.minepiece.qol.config.UiSettings.color(a.accent, 100);
+        COLOR_TEXT = net.minepiece.qol.config.UiSettings.color(a.text, 100);
+        COLOR_TEXT_DIM = net.minepiece.qol.config.UiSettings.color(a.text, 75);
+        COLOR_HEADER = COLOR_TAB_ACCENT;
+        COLOR_DIVIDER = net.minepiece.qol.config.UiSettings.color(a.border, a.menuOpacity / 2);
+        COLOR_ACTION_BUTTON = COLOR_TAB_NORMAL;
+        COLOR_ACTION_BUTTON_HOVER = COLOR_TAB_HOVER;
+        COLOR_ACTION_BUTTON_DISABLED = COLOR_PANEL_BG;
+        COLOR_ACTION_BORDER = COLOR_PANEL_BORDER;
+        COLOR_ROW_BOX = COLOR_TAB_NORMAL;
+        COLOR_ROW_BOX_BORDER = COLOR_DIVIDER;
+    }
+
     private void drawSapphirePanel(DrawContext drawContext) {
-        // Outer border
-        drawContext.fill(this.panelX - 1, this.panelY - 1, this.panelX + PANEL_WIDTH + 1, this.panelY + PANEL_HEIGHT + 1, COLOR_PANEL_BORDER);
         drawContext.fill(this.panelX, this.panelY, this.panelX + PANEL_WIDTH, this.panelY + PANEL_HEIGHT, COLOR_PANEL_BG);
-        // Header strip
-        drawContext.fill(this.panelX, this.panelY, this.panelX + PANEL_WIDTH, this.panelY + 24, 0xFF132E66);
-        drawContext.fill(this.panelX, this.panelY + 24, this.panelX + PANEL_WIDTH, this.panelY + 25, COLOR_PANEL_BORDER_DARK);
-        // Inner border
-        drawOutline(drawContext, this.panelX + 2, this.panelY + 2, PANEL_WIDTH - 4, PANEL_HEIGHT - 4, 0x6638629E);
+        drawContext.fill(this.panelX, this.panelY, this.panelX + PANEL_WIDTH, this.panelY + 24, COLOR_TAB_NORMAL);
+        drawOutline(drawContext, this.panelX, this.panelY, PANEL_WIDTH, PANEL_HEIGHT, COLOR_PANEL_BORDER);
     }
 
-    private static void drawOutline(DrawContext drawContext, int x, int y, int width, int height, int color) {
-        drawContext.fill(x, y, x + width, y + 1, color);
-        drawContext.fill(x, y + height - 1, x + width, y + height, color);
-        drawContext.fill(x, y, x + 1, y + height, color);
-        drawContext.fill(x + width - 1, y, x + width, y + height, color);
+    private void drawOutline(DrawContext drawContext, int x, int y, int width, int height, int color) {
+        for (int i = 0; i < this.mod.getConfig().appearance.borderWidth; i++) {
+            drawContext.fill(x + i, y + i, x + width - i, y + i + 1, color);
+            drawContext.fill(x + i, y + height - i - 1, x + width - i, y + height - i, color);
+            drawContext.fill(x + i, y + i, x + i + 1, y + height - i, color);
+            drawContext.fill(x + width - i - 1, y + i, x + width - i, y + height - i, color);
+        }
     }
 
-    private static void drawDivider(DrawContext drawContext, int x1, int y1, int x2, int y2) {
+    private void drawDivider(DrawContext drawContext, int x1, int y1, int x2, int y2) {
         drawContext.fill(x1, y1, x2, y2, COLOR_DIVIDER);
     }
 
@@ -1777,28 +1855,6 @@ public final class MinepieceMenuScreen extends Screen {
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
-    private static String prettyColorName(String raw) {
-        String normalized = MinepieceQolClient.normalizeHudColorName(raw);
-        if ("default".equals(normalized)) {
-            return "Default";
-        }
-        String[] words = normalized.split(" ");
-        StringBuilder result = new StringBuilder();
-        for (String word : words) {
-            if (word.isBlank()) {
-                continue;
-            }
-            if (!result.isEmpty()) {
-                result.append(' ');
-            }
-            result.append(Character.toUpperCase(word.charAt(0)));
-            if (word.length() > 1) {
-                result.append(word.substring(1));
-            }
-        }
-        return result.toString();
-    }
-
     private static String formatTimer(long ms) {
         long seconds = ms / 1000L;
         long h = seconds / 3600L;
@@ -1866,9 +1922,9 @@ public final class MinepieceMenuScreen extends Screen {
             if (active) {
                 drawContext.fill(this.x, this.y, this.x + 2, this.y + this.height, COLOR_TAB_ACCENT);
             }
-            drawOutline(drawContext, this.x, this.y, this.width, this.height, 0x553D78E0);
+            drawOutline(drawContext, this.x, this.y, this.width, this.height, COLOR_DIVIDER);
             int textY = this.y + (this.height - 8) / 2;
-            drawContext.drawTextWithShadow(MinepieceMenuScreen.this.textRenderer, this.tab.label(MinepieceMenuScreen.this), this.x + 8, textY, COLOR_TEXT);
+            drawFittedText(drawContext, this.tab.label(MinepieceMenuScreen.this), this.x + 8, textY, this.width - 12, COLOR_TEXT);
         }
     }
 
@@ -1884,25 +1940,6 @@ public final class MinepieceMenuScreen extends Screen {
             int textX = x + (REMOVE_BUTTON_SIZE - this.textRenderer.getWidth("X")) / 2;
             int textY = y + (REMOVE_BUTTON_SIZE - 8) / 2;
             drawContext.drawTextWithShadow(this.textRenderer, "X", textX, textY, 0xFFFFFFFF);
-        }
-    }
-
-    private void drawStyledVanillaButtons(DrawContext drawContext, int mouseX, int mouseY) {
-        for (var child : this.children()) {
-            if (!(child instanceof ButtonWidget button)) {
-                continue;
-            }
-            int x = button.getX();
-            int y = button.getY();
-            int width = button.getWidth();
-            int height = button.getHeight();
-            boolean hovered = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
-            int bg = button.active
-                ? (hovered ? COLOR_ACTION_BUTTON_HOVER : COLOR_ACTION_BUTTON)
-                : COLOR_ACTION_BUTTON_DISABLED;
-            drawContext.fill(x, y, x + width, y + height, bg);
-            drawOutline(drawContext, x, y, width, height, COLOR_ACTION_BORDER);
-            drawFittedCenteredText(drawContext, button.getMessage().getString(), x, y, width, height, 0xFFFFFFFF);
         }
     }
 
@@ -1934,7 +1971,9 @@ public final class MinepieceMenuScreen extends Screen {
         PROFILE("tab.profile"),
         LANGUAGE("tab.language"),
         AUCTION_HOUSE("tab.other"),
-        TELEMETRY("tab.telemetry");
+        PROGRESS("tab.progress"),
+        COOKING("hud.panel.cooking"),
+        APPEARANCE("ui.appearance");
 
         final String key;
 

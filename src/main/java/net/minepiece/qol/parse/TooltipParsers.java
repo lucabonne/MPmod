@@ -27,9 +27,13 @@ public final class TooltipParsers {
         "Satis fiyati",
         "Satış fiyatı"
     };
+    private static final String[] AUCTION_AVERAGE_LABELS = {
+        "Average price", "Prix moyen", "Precio medio", "Durchschnittspreis", "Prezzo medio",
+        "Preço médio", "Srednia cena", "Średnia cena", "Harga rata-rata", "Ortalama fiyat"
+    };
     private static final String AUCTION_SELLING_LABEL_PATTERN = String.join("|", AUCTION_SELLING_LABELS);
     private static final Pattern SELLING_PATTERN = Pattern.compile("(?:" + AUCTION_SELLING_LABEL_PATTERN + ")\\s*:?\\s*(" + NUMBER_TOKEN + ")\\s*([KMB])?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern AVERAGE_PATTERN = Pattern.compile("(?:Average price|Prix moyen|Precio medio|Durchschnittspreis|Prezzo medio|Preço médio|Srednia cena|Średnia cena|Harga rata-rata|Ortalama fiyat)\\s*:?\\s*(" + NUMBER_TOKEN + ")\\s*([KMB])?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern AVERAGE_PATTERN = Pattern.compile("(?:" + String.join("|", AUCTION_AVERAGE_LABELS) + ")\\s*:?\\s*(" + NUMBER_TOKEN + ")\\s*([KMB])?", Pattern.CASE_INSENSITIVE);
     private static final Pattern COORDS_PATTERN =
         Pattern.compile("(?:Coord|Coordonnees|Coordonnées|Coordenadas|Koordinaten|Coordinate|Koordynaty|Koordinat)[^0-9-]*(-?\\d+)\\D+(-?\\d+)\\D+(-?\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern CYCLE_MINUTES_PATTERN =
@@ -92,13 +96,17 @@ public final class TooltipParsers {
         }
 
         double unitPrice = selling / quantity;
-        double delta = (unitPrice - average) / average;
+        double delta = (selling - average) / average;
         double intensity = Math.min(1.0D, Math.max(0.0D, Math.abs(delta) / 0.5D));
         return Optional.of(new AuctionParseResult(selling, average, quantity, unitPrice, delta, intensity));
     }
 
     public static boolean isAuctionSellingPriceLine(String line) {
         return LocalizedText.startsWithAny(line, AUCTION_SELLING_LABELS);
+    }
+
+    public static boolean isAuctionAveragePriceLine(String line) {
+        return LocalizedText.startsWithAny(line, AUCTION_AVERAGE_LABELS);
     }
 
     public static Optional<BossTooltipData> parseBossTooltip(List<String> lines, String fallbackName) {
@@ -717,6 +725,9 @@ public final class TooltipParsers {
 
     public record AuctionParseResult(double sellingPrice, double averagePrice, int quantity, double unitPrice, double delta,
                                      double intensity) {
+        public double averageUnitPrice() {
+            return this.averagePrice / this.quantity;
+        }
     }
 
     public record BossTooltipData(String bossName, int x, int y, int z, int remainingSeconds, int cycleSeconds) {

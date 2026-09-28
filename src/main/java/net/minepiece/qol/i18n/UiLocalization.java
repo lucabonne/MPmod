@@ -23,6 +23,77 @@ public final class UiLocalization {
     private static final Map<String, String[]> STRINGS = new HashMap<>();
 
     static {
+        add("ui.icon_rows", "Item icon grids", "Grilles avec icônes", "Cuadrículas con iconos", "Item-Symbolraster", "Griglie con icone", "Grades com ícones", "Siatki z ikonami", "Kisi ikon item", "Eşya simge ızgarası");
+        add("progress.level_sync_hint", "Level changed — open /profile to sync", "Niveau modifié — ouvrez /profile", "Nivel cambiado — abre /profile", "Level geändert — /profile öffnen", "Livello cambiato — apri /profile", "Nível mudou — abra /profile", "Poziom zmieniony — otwórz /profile", "Level berubah — buka /profile", "Seviye değişti — /profile aç");
+        add("progress.cached_hint", "Saved XP • waiting for live level", "XP sauvegardée • attente du niveau", "XP guardada • esperando nivel", "Gespeicherte XP • warte auf Level", "XP salvata • attendo livello attuale", "XP salvo • aguardando nível", "Zapisane XP • czekam na poziom", "XP tersimpan • menunggu level", "Kayıtlı XP • seviye bekleniyor");
+        add("ui.text", "Text", "Texte", "Texto", "Text", "Testo", "Texto", "Tekst", "Teks", "Yazı");
+        add("ui.appearance", "Appearance", "Apparence", "Apariencia", "Aussehen", "Aspetto", "Aparência", "Wygląd", "Tampilan", "Görünüm");
+        add("ui.loadouts", "Loadouts", "Configurations", "Perfiles", "Layouts", "Layout", "Layouts", "Układy", "Tata letak", "Düzenler");
+        add("ui.pictures", "Pictures", "Images", "Imágenes", "Bilder", "Immagini", "Imagens", "Obrazy", "Gambar", "Resimler");
+        add("ui.done", "Done", "Terminé", "Listo", "Fertig", "Fatto", "Pronto", "Gotowe", "Selesai", "Bitti");
+        add("ui.accent", "Accent", "Accent", "Acento", "Akzent", "Accento", "Destaque", "Akcent", "Aksen", "Vurgu");
+        add("ui.background", "Background", "Fond", "Fondo", "Hintergrund", "Sfondo", "Fundo", "Tło", "Latar", "Arka plan");
+        add("ui.borders", "Border", "Bordure", "Borde", "Rahmen", "Bordo", "Borda", "Obramowanie", "Bingkai", "Kenarlık");
+        add("ui.hex", "Hex color", "Couleur hex", "Color hex", "Hex-Farbe", "Colore hex", "Cor hex", "Kolor hex", "Warna hex", "Hex renk");
+        add("ui.menu_opacity", "Menu opacity", "Opacité menu", "Opacidad menú", "Menüdeckkraft", "Opacità menu", "Opacidade menu", "Krycie menu", "Opasitas menu", "Menü opaklığı");
+        add("ui.random", "Random", "Aléatoire", "Aleatorio", "Zufällig", "Casuale", "Aleatório", "Losowy", "Acak", "Rastgele");
+        add("ui.hud_style", "HUD opacity & text colors", "Opacité HUD et couleurs du texte", "Opacidad HUD y colores del texto", "HUD-Deckkraft und Textfarben", "Opacità HUD e colori del testo", "Opacidade HUD e cores do texto", "Krycie HUD i kolory tekstu", "Opasitas HUD dan warna teks", "HUD opaklığı ve metin renkleri");
+        add("hud.panel.chat", "Chat indicator", "Indicateur de chat", "Indicador de chat", "Chat-Anzeige", "Indicatore chat", "Indicador de chat", "Wskaźnik czatu", "Indikator chat", "Sohbet göstergesi");
+        add("ui.hud_opacity", "HUD opacity", "Opacité HUD", "Opacidad HUD", "HUD-Deckkraft", "Opacità HUD", "Opacidade HUD", "Krycie HUD", "Opasitas HUD", "HUD opaklığı");
+        add("ui.compact", "Compact HUD", "HUD compact", "HUD compacto", "Kompaktes HUD", "HUD compatto", "HUD compacto", "Kompaktowy HUD", "HUD ringkas", "Kompakt HUD");
+        add("ui.headers", "HUD headings", "Titres HUD", "Títulos HUD", "HUD-Titel", "Titoli HUD", "Títulos HUD", "Nagłówki HUD", "Judul HUD", "HUD başlıkları");
+        add("ui.decorations", "Decorations", "Décorations", "Decoraciones", "Dekorationen", "Decorazioni", "Decorações", "Ozdoby", "Dekorasi", "Süslemeler");
+        add("ui.shadows", "HUD text shadow", "Ombre texte HUD", "Sombra texto HUD", "HUD-Textschatten", "Ombra testo HUD", "Sombra texto HUD", "Cień tekstu HUD", "Bayangan teks HUD", "HUD yazı gölgesi");
+        add("ui.rarities", "Rarity badges", "Icônes de rareté", "Iconos de rareza", "Seltenheitssymbole", "Icone rarità", "Ícones de raridade", "Ikony rzadkości", "Ikon kelangkaan", "Nadirlik simgeleri");
+        add("ui.reset_style", "Reset appearance", "Réinitialiser le style", "Restablecer estilo", "Stil zurücksetzen", "Reimposta stile", "Redefinir estilo", "Resetuj wygląd", "Reset tampilan", "Görünümü sıfırla");
+        add("ui.farming", "Farming", "Récolte", "Cultivo", "Farmen", "Farming", "Coleta", "Zbieranie", "Farming", "Toplama");
+        add("ui.fighting", "Fighting", "Combat", "Combate", "Kampf", "Combattimento", "Combate", "Walka", "Pertarungan", "Savaş");
+        add("ui.grinding", "Grinding", "Farm intensif", "Farmeo", "Grinden", "Grinding", "Farm", "Farmienie", "Grinding", "Farm");
+        add("ui.original", "Original layout", "Disposition initiale", "Diseño original", "Originales Layout", "Layout originale", "Layout original", "Oryginalny układ", "Tata letak awal", "İlk düzen");
+        add("ui.applied", "Applied", "Appliqué", "Aplicado", "Angewendet", "Applicato", "Aplicado", "Zastosowano", "Diterapkan", "Uygulandı");
+        add("ui.apply", "Apply", "Appliquer", "Aplicar", "Anwenden", "Applica", "Aplicar", "Zastosuj", "Terapkan", "Uygula");
+        add("ui.no_loadouts", "No saved loadouts", "Aucune configuration", "Sin perfiles guardados", "Keine gespeicherten Layouts", "Nessun layout salvato", "Nenhum layout salvo", "Brak zapisanych układów", "Belum ada tata letak", "Kayıtlı düzen yok");
+        add("ui.name", "Name", "Nom", "Nombre", "Name", "Nome", "Nome", "Nazwa", "Nama", "Ad");
+        add("ui.my_setup", "My setup", "Ma configuration", "Mi diseño", "Mein Layout", "Il mio layout", "Meu layout", "Mój układ", "Tata letak saya", "Düzenim");
+        add("ui.save_new", "Save new", "Créer", "Guardar", "Neu speichern", "Salva nuovo", "Salvar novo", "Zapisz nowy", "Simpan baru", "Yeni kaydet");
+        add("ui.update", "Update", "Actualiser", "Actualizar", "Aktualisieren", "Aggiorna", "Atualizar", "Aktualizuj", "Perbarui", "Güncelle");
+        add("ui.delete", "Remove", "Retirer", "Eliminar", "Entfernen", "Rimuovi", "Remover", "Usuń", "Hapus", "Kaldır");
+        add("ui.name_required", "Enter a name", "Entrez un nom", "Escribe un nombre", "Namen eingeben", "Inserisci un nome", "Digite um nome", "Wpisz nazwę", "Masukkan nama", "Ad girin");
+        add("ui.name_exists", "This name is already used", "Ce nom existe déjà", "Este nombre ya existe", "Name bereits vergeben", "Nome già utilizzato", "Nome já utilizado", "Nazwa już istnieje", "Nama sudah dipakai", "Bu ad kullanılıyor");
+        add("ui.saved", "Saved", "Enregistré", "Guardado", "Gespeichert", "Salvato", "Salvo", "Zapisano", "Disimpan", "Kaydedildi");
+        add("ui.path", "Image file path", "Chemin de l’image", "Ruta de imagen", "Bilddateipfad", "Percorso immagine", "Caminho da imagem", "Ścieżka obrazu", "Lokasi gambar", "Resim dosyası yolu");
+        add("ui.import", "Import", "Importer", "Importar", "Importieren", "Importa", "Importar", "Importuj", "Impor", "İçe aktar");
+        add("ui.bad_path", "Cannot open this image", "Impossible d’ouvrir l’image", "No se puede abrir la imagen", "Bild kann nicht geöffnet werden", "Impossibile aprire immagine", "Não foi possível abrir a imagem", "Nie można otworzyć obrazu", "Gambar tidak dapat dibuka", "Resim açılamadı");
+        add("ui.visible", "Visible", "Visible", "Visible", "Sichtbar", "Visibile", "Visível", "Widoczny", "Terlihat", "Görünür");
+        add("ui.opacity", "Opacity", "Opacité", "Opacidad", "Deckkraft", "Opacità", "Opacidade", "Krycie", "Opasitas", "Opaklık");
+        add("ui.image_limit", "Up to 8 pictures per layout", "8 images par configuration", "Hasta 8 imágenes por perfil", "Bis zu 8 Bilder pro Layout", "Fino a 8 immagini per layout", "Até 8 imagens por layout", "Do 8 obrazów na układ", "Hingga 8 gambar per tata letak", "Düzen başına en fazla 8 resim");
+        add("ui.imported", "Image imported", "Image importée", "Imagen importada", "Bild importiert", "Immagine importata", "Imagem importada", "Obraz zaimportowany", "Gambar diimpor", "Resim içe aktarıldı");
+        add("ui.visible_panels", "Visible panels • tracking keeps running", "Panneaux visibles • suivi maintenu", "Paneles visibles • seguimiento activo", "Sichtbare Panels • Tracking läuft weiter", "Pannelli visibili • tracking sempre attivo", "Painéis visíveis • rastreamento ativo", "Widoczne panele • śledzenie nadal działa", "Panel terlihat • pelacakan tetap aktif", "Görünür paneller • takip sürer");
+        add("ui.image_hint", "Drop a PNG/JPG here, or paste its file path", "Glissez un PNG/JPG ici ou collez son chemin", "Suelta un PNG/JPG o pega su ruta", "PNG/JPG hier ablegen oder Pfad einfügen", "Trascina un PNG/JPG qui o incolla il percorso", "Arraste um PNG/JPG ou cole seu caminho", "Upuść PNG/JPG lub wklej ścieżkę", "Seret PNG/JPG atau tempel lokasinya", "PNG/JPG sürükleyin veya yolunu yapıştırın");
+        add("ui.image_edit_hint", "HUD editor: drag to move • scroll to resize • H to hide", "Éditeur HUD : glisser • molette • H pour masquer", "Editor HUD: arrastrar • rueda • H para ocultar", "HUD-Editor: ziehen • scrollen • H ausblenden", "Editor HUD: trascina • rotella • H per nascondere", "Editor HUD: arraste • role • H para ocultar", "Edytor HUD: przeciągnij • przewijaj • H ukrywa", "Editor HUD: seret • gulir • H sembunyikan", "HUD: sürükle • kaydırarak boyutlandır • H gizle");
+        add("hud.panel.cooking", "Cooking", "Cuisine", "Cocina", "Kochen", "Cucina", "Culinária", "Gotowanie", "Memasak", "Yemek pişirme");
+        add("cooking.quantity", "Dishes (1–64)", "Plats (1–64)", "Platos (1–64)", "Gerichte (1–64)", "Piatti (1–64)", "Pratos (1–64)", "Dania (1–64)", "Hidangan (1–64)", "Yemek sayısı (1–64)");
+        add("cooking.clear", "Clear recipe", "Effacer la recette", "Borrar receta", "Rezept löschen", "Rimuovi ricetta", "Limpar receita", "Wyczyść przepis", "Hapus resep", "Tarifi temizle");
+        add("cooking.hover_hint", "Hover over a recipe to track ingredients", "Survolez une recette pour suivre les ingrédients", "Pasa sobre una receta para seguir ingredientes", "Rezept ansehen, um Zutaten zu verfolgen", "Passa su una ricetta per seguirne gli ingredienti", "Passe sobre uma receita para acompanhar ingredientes", "Najedź na przepis, aby śledzić składniki", "Arahkan kursor ke resep untuk melacak bahan", "Malzemeleri takip etmek için tarifin üzerine gel");
+        add("tab.progress", "Progress", "Progression", "Progreso", "Fortschritt", "Progressi", "Progresso", "Postęp", "Progres", "İlerleme");
+        add("hud.panel.profile_xp", "Profile XP", "XP du profil", "XP del perfil", "Profil-XP", "XP profilo", "XP do perfil", "XP profilu", "XP profil", "Profil XP");
+        add("hud.panel.grinding", "Grinding", "Farm", "Farmeo", "Grinden", "Grinding", "Farm", "Farmienie", "Grinding", "Farm");
+        add("progress.level", "Player level", "Niveau du joueur", "Nivel del jugador", "Spielerlevel", "Livello giocatore", "Nível do jogador", "Poziom gracza", "Level pemain", "Oyuncu seviyesi");
+        add("chat_channel.public", "Public", "Public", "Público", "Öffentlich", "Pubblica", "Público", "Publiczny", "Publik", "Genel");
+        add("chat_channel.party", "Party", "Groupe", "Grupo", "Gruppe", "Gruppo", "Grupo", "Grupa", "Grup", "Grup");
+        add("chat_channel.island", "Island", "Île", "Isla", "Insel", "Isola", "Ilha", "Wyspa", "Pulau", "Ada");
+        add("chat_channel.unknown", "Chat ?", "Chat ?", "Chat ?", "Chat ?", "Chat ?", "Chat ?", "Czat ?", "Chat ?", "Sohbet ?");
+        add("progress.gained", "XP gained", "XP gagnée", "XP ganada", "XP erhalten", "XP guadagnata", "XP ganho", "Zdobyte XP", "XP diperoleh", "Kazanılan XP");
+        add("progress.sync_hint", "Open /profile to sync level and XP", "Ouvrez /profile pour synchroniser les XP", "Abre /profile para sincronizar XP", "/profile öffnen, um XP abzugleichen", "Apri /profile per sincronizzare gli XP", "Abra /profile para sincronizar XP", "Otwórz /profile, aby zsynchronizować XP", "Buka /profile untuk sinkronisasi XP", "XP eşitlemek için /profile aç");
+        add("progress.estimate_hint", "~ Player XP estimated from shared item XP or the XP bar", "~ XP joueur estimée depuis les objets ou la barre XP", "~ XP del jugador estimada de objetos o barra XP", "~ Spieler-XP aus Item-XP oder XP-Leiste geschätzt", "~ XP giocatore stimata dagli oggetti o dalla barra XP", "~ XP do jogador estimado de itens ou barra XP", "~ XP gracza szacowane z przedmiotów lub paska XP", "~ XP pemain diperkirakan dari item atau bilah XP", "~ Oyuncu XP eşya XP veya XP çubuğundan tahmin edilir");
+        add("grinding.active", "Grinding: active", "Farm : actif", "Farmeo: activo", "Grinden: aktiv", "Grinding: attivo", "Farm: ativo", "Farmienie: aktywne", "Grinding: aktif", "Farm: aktif");
+        add("grinding.paused", "Grinding: paused", "Farm : en pause", "Farmeo: pausado", "Grinden: pausiert", "Grinding: in pausa", "Farm: pausado", "Farmienie: pauza", "Grinding: dijeda", "Farm: duraklatıldı");
+        add("grinding.money", "Money earned", "Argent gagné", "Dinero ganado", "Geld verdient", "Denaro guadagnato", "Dinheiro ganho", "Zarobione pieniądze", "Uang diperoleh", "Kazanılan para");
+        add("grinding.money_hour", "Money/h", "Argent/h", "Dinero/h", "Geld/h", "Denaro/h", "Dinheiro/h", "Pieniądze/h", "Uang/jam", "Para/saat");
+        add("grinding.time", "Active time", "Temps actif", "Tiempo activo", "Aktive Zeit", "Tempo attivo", "Tempo ativo", "Czas aktywności", "Waktu aktif", "Aktif süre");
+        add("grinding.reset", "Reset grinding session", "Réinitialiser le farm", "Reiniciar farmeo", "Grind zurücksetzen", "Azzera sessione grinding", "Reiniciar farm", "Zresetuj farmienie", "Reset sesi grinding", "Farm oturumunu sıfırla");
+        add("grinding.pause_hint", "Pauses after 1 minute without XP • resets at local midnight", "Pause après 1 min sans XP • remise à zéro à minuit local", "Pausa tras 1 min sin XP • reinicio a medianoche local", "Pause nach 1 Min. ohne XP • Reset um lokale Mitternacht", "Pausa dopo 1 min senza XP • reset a mezzanotte locale", "Pausa após 1 min sem XP • reinicia à meia-noite local", "Pauza po 1 min bez XP • reset o lokalnej północy", "Jeda setelah 1 menit tanpa XP • reset tengah malam lokal", "1 dk XP yoksa durur • yerel gece yarısı sıfırlanır");
+
         add("menu.title", "Minepiece QoL", "Minepiece QoL", "Minepiece QoL", "Minepiece QoL", "Minepiece QoL", "Minepiece QoL", "Minepiece QoL", "Minepiece QoL", "Minepiece QoL");
         add("menu.credits", "Made by SiickLukee", "Fait par SiickLukee", "Hecho por SiickLukee", "Erstellt von SiickLukee", "Creato da SiickLukee", "Feito por SiickLukee", "Stworzone przez SiickLukee", "Dibuat oleh SiickLukee", "SiickLukee tarafından yapıldı");
 
@@ -34,7 +105,6 @@ public final class UiLocalization {
         add("tab.profile", "Profile", "Profil", "Perfil", "Profil", "Profilo", "Perfil", "Profil", "Profil", "Profil");
         add("tab.language", "Language", "Langue", "Idioma", "Sprache", "Lingua", "Idioma", "Język", "Bahasa", "Dil");
         add("tab.other", "Other", "Autres", "Otros", "Andere", "Altro", "Outros", "Inne", "Lainnya", "Diğer");
-        add("tab.telemetry", "Telemetry", "Télémétrie", "Telemetría", "Telemetrie", "Telemetria", "Telemetria", "Telemetria", "Telemetri", "Telemetri");
 
         add("setting.mod_enabled", "Mod Enabled", "Mod activé", "Mod activado", "Mod aktiviert", "Mod attivo", "Mod ativado", "Mod włączony", "Mod aktif", "Mod etkin");
         add("setting.show_all_features", "Show All HUD Features", "Afficher toutes les fonctionnalités HUD", "Mostrar todas las funciones del HUD", "Alle HUD-Funktionen anzeigen", "Mostra tutte le funzioni HUD", "Mostrar todos os recursos da HUD", "Pokaż wszystkie funkcje HUD", "Tampilkan semua fitur HUD", "Tüm HUD özelliklerini göster");
@@ -199,6 +269,7 @@ public final class UiLocalization {
         add("cmd.talk.status_off", "Talk mode is OFF. Use /talkto <name> to enable it.", "Talk mode is OFF. Use /talkto <name> to enable it.", "Talk mode is OFF. Use /talkto <name> to enable it.", "Talk mode is OFF. Use /talkto <name> to enable it.", "Talk mode is OFF. Use /talkto <name> to enable it.", "Talk mode is OFF. Use /talkto <name> to enable it.", "Talk mode is OFF. Use /talkto <name> to enable it.", "Talk mode is OFF. Use /talkto <name> to enable it.", "Talk mode is OFF. Use /talkto <name> to enable it.");
         add("cmd.talk.status_on", "Talk mode is ON for %s. Use /talkoff to disable.", "Talk mode is ON for %s. Use /talkoff to disable.", "Talk mode is ON for %s. Use /talkoff to disable.", "Talk mode is ON for %s. Use /talkoff to disable.", "Talk mode is ON for %s. Use /talkoff to disable.", "Talk mode is ON for %s. Use /talkoff to disable.", "Talk mode is ON for %s. Use /talkoff to disable.", "Talk mode is ON for %s. Use /talkoff to disable.", "Talk mode is ON for %s. Use /talkoff to disable.");
 
+        add("auction.per_item", "/item", "/objet", "/objeto", "/Stück", "/oggetto", "/item", "/szt.", "/item", "/adet");
         add("setting.auction_highlight", "Auction House Highlight", "Surlignage Hôtel des ventes", "Resaltado de Casa de Subastas", "Auktionshaus-Highlight", "Evidenziazione Casa d'Aste", "Destaque da Casa de Leilões", "Podświetlanie domu aukcyjnego", "Sorotan rumah lelang", "Müzayede evi vurgusu");
         add("setting.haki_cooldown", "Haki Cooldown", "Recharge Haki", "Enfriamiento de Haki", "Haki-Abklingzeit", "Cooldown Haki", "Recarga de Haki", "Czas odnowienia Haki", "Cooldown Haki", "Haki bekleme süresi");
         add("setting.rarity_icons", "Item Rarity Icons", "Icônes de rareté", "Iconos de rareza", "Seltenheits-Icons", "Icone rarità", "Ícones de raridade", "Ikony rzadkości", "Ikon kelangkaan", "Nadirlik simgeleri");

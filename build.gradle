@@ -22,9 +22,6 @@ dependencies {
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-    implementation include("org.xerial:sqlite-jdbc:3.53.2.0")
-    implementation include("org.dhatim:fastexcel:0.20.2")
-    implementation include("com.github.rzymek:opczip:1.2.0")
     testImplementation "org.junit.jupiter:junit-jupiter:5.12.2"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.12.2"
 }

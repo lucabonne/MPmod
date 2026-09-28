@@ -310,6 +310,7 @@ public final class ScrollTracker {
             case EPIC -> COLOR_EPIC;
             case LEGENDARY -> COLOR_LEGENDARY;
             case MYTHIC -> COLOR_MYTHIC;
+            case PRIMORDIAL -> 0xFFFFBB66;
         };
     }
 

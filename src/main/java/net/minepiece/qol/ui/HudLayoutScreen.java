@@ -19,6 +19,7 @@ public final class HudLayoutScreen extends Screen {
     private static final float SCALE_STEP = 0.05F;
 
     private final MinepieceQolClient mod;
+    private final Screen parent;
     private int draggingPanelId = -1;
     private int draggingOffsetX;
     private int draggingOffsetY;
@@ -26,6 +27,7 @@ public final class HudLayoutScreen extends Screen {
     public HudLayoutScreen(MinepieceQolClient mod) {
         super(Text.literal(mod == null ? "Minepiece HUD Layout" : mod.tr("hud.layout.title")));
         this.mod = mod;
+        this.parent = MinecraftClient.getInstance().currentScreen;
     }
 
     @Override
@@ -43,6 +45,15 @@ public final class HudLayoutScreen extends Screen {
         int keyCode = keyInput.key();
         if (keyCode == GLFW.GLFW_KEY_ESCAPE || keyCode == GLFW.GLFW_KEY_PERIOD) {
             close();
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_H) {
+            int id = this.mod.getHudEditSelectedPanel();
+            var picture = this.mod.getHudPicture(id);
+            if (picture != null) picture.visible = !picture.visible;
+            else if (!this.mod.getConfig().appearance.hiddenPanels.remove(Integer.valueOf(id)))
+                this.mod.getConfig().appearance.hiddenPanels.add(id);
+            this.mod.saveConfig();
             return true;
         }
         if (keyCode >= GLFW.GLFW_KEY_1 && keyCode <= GLFW.GLFW_KEY_9) {
@@ -140,23 +151,15 @@ public final class HudLayoutScreen extends Screen {
     public void close() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client != null) {
-            client.setScreen(new MinepieceMenuScreen(this.mod));
+            client.setScreen(this.parent == null ? new MinepieceMenuScreen(this.mod) : this.parent);
         }
     }
 
     private void drawEditorHelp(DrawContext drawContext) {
         String line1 = this.mod.tr("hud.layout.line1");
-        String line2 = this.mod.tr("hud.layout.panels") + ": 1 " + this.mod.getHudPanelName(1)
-            + " 2 " + this.mod.getHudPanelName(2)
-            + " 3 " + this.mod.getHudPanelName(3)
-            + " 4 " + this.mod.getHudPanelName(4)
-            + " 5 " + this.mod.getHudPanelName(5)
-            + " 6 " + this.mod.getHudPanelName(6)
-            + " 7 " + this.mod.getHudPanelName(7)
-            + " 8 " + this.mod.getHudPanelName(8)
-            + " 9 " + this.mod.getHudPanelName(9);
+        String line2 = this.mod.tr("common.selected") + ": " + this.mod.getHudPanelName(this.mod.getHudEditSelectedPanel());
         String line3 = this.mod.tr("hud.layout.line3");
-        String line4 = this.mod.tr("hud.layout.line4");
+        String line4 = this.mod.tr("ui.image_edit_hint");
         int width = Math.max(
             Math.max(this.textRenderer.getWidth(line1), this.textRenderer.getWidth(line2)),
             Math.max(this.textRenderer.getWidth(line3), this.textRenderer.getWidth(line4))
@@ -201,11 +204,14 @@ public final class HudLayoutScreen extends Screen {
     }
 
     private PanelRect getPanelRectWith(int panelId, int x, int y, float scale) {
+        var picture = this.mod.getHudPicture(panelId);
+        if (picture != null) return new PanelRect(x, y, Math.round(picture.width * scale), Math.round(picture.height * scale));
         float s = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
-        int lineStep = Math.max(8, Math.round(10 * s));
-        int headerHeight = 12;
-        int paddingX = 6;
-        int paddingY = 4;
+        int rowHeight = this.mod.getConfig().appearance.iconRows ? IconGridTooltipComponent.rowHeight(this.mod.getConfig().appearance.compact) : 10;
+        int lineStep = Math.max(8, Math.round(rowHeight * s));
+        int headerHeight = this.mod.getConfig().appearance.headers ? 12 : 0;
+        int paddingX = this.mod.getConfig().appearance.compact ? 4 : 6;
+        int paddingY = this.mod.getConfig().appearance.compact ? 2 : 4;
 
         List<String> lines = switch (panelId) {
             case 1 -> {
@@ -271,12 +277,16 @@ public final class HudLayoutScreen extends Screen {
             }
             case 9 -> {
                 ConfigManager.ModConfig cfg = this.mod.getConfig();
-                if (!cfg.inventoryXpHudEnabled) {
+                if (!cfg.inventoryXpHudEnabled && !cfg.profileXpHudEnabled) {
                     yield List.of(this.mod.tr("common.hidden"));
                 }
-                List<String> invXp = this.mod.getInventoryXpTracker().getHudLines(this.mod::tr);
+                List<String> invXp = this.mod.getXpHudLines();
                 yield invXp.isEmpty() ? List.of(this.mod.tr("common.no_data")) : invXp;
             }
+            case 11 -> this.mod.getConfig().cookingHudEnabled
+                ? this.mod.getCookingTracker().getHudLines(this.mod::tr, this.mod.getConfig().cookingQuantity) : List.of(this.mod.tr("common.hidden"));
+            case 10 -> this.mod.getConfig().grindingHudEnabled
+                ? this.mod.getProgressHudController().grinding().getHudLines(this.mod::tr, System.currentTimeMillis()) : List.of(this.mod.tr("common.hidden"));
             default -> List.of();
         };
         if (lines.isEmpty()) {
@@ -286,13 +296,13 @@ public final class HudLayoutScreen extends Screen {
         String title = this.mod.getHudPanelName(panelId);
         int textWidth = this.textRenderer.getWidth(title);
         for (String line : lines) {
-            int width = (int) Math.ceil(this.textRenderer.getWidth(line) * s);
+            int width = (int) Math.ceil((this.textRenderer.getWidth(line) + (this.mod.getConfig().appearance.iconRows ? IconGridTooltipComponent.iconColumn(this.mod.getConfig().appearance.compact) : 0)) * s);
             if (width > textWidth) {
                 textWidth = width;
             }
         }
         int panelWidth = textWidth + (paddingX * 2);
-        int panelHeight = headerHeight + (paddingY * 2) + (lineStep * lines.size());
+        int panelHeight = headerHeight + (paddingY * 2) + (this.mod.getConfig().appearance.iconRows ? (int) Math.ceil(rowHeight * lines.size() * s) : lineStep * lines.size());
         return new PanelRect(x, y, panelWidth, panelHeight);
     }
 

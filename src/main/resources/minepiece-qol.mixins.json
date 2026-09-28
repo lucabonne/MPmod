@@ -4,10 +4,13 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "ChatHudMixin",
-    "ClientPlayerInteractionManagerMixin",
+    "ChatScreenMixin",
+    "BossBarHudAccessor",
     "HandledScreenDrawSlotMixin",
     "InGameHudMixin",
-    "PlayerListHudAccessor"
+    "PlayerListHudAccessor",
+    "ItemStackTooltipMixin",
+    "DrawContextTooltipMixin"
   ],
   "injectors": {
     "defaultRequire": 1

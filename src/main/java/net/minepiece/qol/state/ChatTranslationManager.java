@@ -30,7 +30,6 @@ import net.minecraft.text.Text;
 
 public final class ChatTranslationManager {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(4L);
-    private static final Duration AGGRESSIVE_REQUEST_TIMEOUT = Duration.ofMillis(2_500L);
     private static final long CACHE_TTL_MS = 10L * 60L * 1000L;
     private static final long ERROR_LOG_THROTTLE_MS = 30_000L;
     private static final int MAX_TRANSLATION_CHARS = 220;
@@ -215,7 +214,7 @@ public final class ChatTranslationManager {
 
             CompletableFuture.runAsync(() -> {
                 try {
-                    TranslationResult translated = translateAuto(finalMessageBody, target, aggressiveMode);
+                    TranslationResult translated = translateAuto(finalMessageBody, target);
                     if (translated == null || translated.text().isBlank()) {
                         return;
                     }
@@ -253,7 +252,7 @@ public final class ChatTranslationManager {
         return output;
     }
 
-    private TranslationResult translateAuto(String text, String targetLanguage, boolean aggressiveMode) {
+    private TranslationResult translateAuto(String text, String targetLanguage) {
         String normalizedTarget = normalizeLanguageCode(targetLanguage);
         if (text == null || text.isBlank() || !isSupportedLanguageCode(normalizedTarget)) {
             return null;
@@ -265,7 +264,7 @@ public final class ChatTranslationManager {
             return cached;
         }
 
-        TranslationResult fetched = fetchGoogleFreeTranslation(text, normalizedTarget, aggressiveMode);
+        TranslationResult fetched = fetchGoogleFreeTranslation(text, normalizedTarget);
         if (fetched != null) {
             synchronized (this.cache) {
                 this.cache.put(cacheKey(text, normalizedTarget), new CachedTranslation(fetched, now));
@@ -310,34 +309,43 @@ public final class ChatTranslationManager {
         TranslationResult translated,
         boolean aggressiveMode
     ) {
+        Rule rule = selectMatchingRule(original, targetRules, translated, aggressiveMode);
+        if (rule != null) {
+            postTranslatedLine(authorPrefix, rule, translated.text());
+        }
+    }
+
+    static Rule selectMatchingRule(String original, List<Rule> targetRules,
+                                   TranslationResult translated, boolean aggressiveMode) {
         if (targetRules == null || targetRules.isEmpty() || translated == null || translated.text().isBlank()) {
-            return;
+            return null;
         }
         String detectedLanguage = normalizeLanguageCode(translated.detectedLanguage());
-        boolean posted = false;
+        String targetLanguage = targetRules.getFirst().targetLanguage();
+        if (!isSupportedLanguageCode(detectedLanguage) || detectedLanguage.equals(targetLanguage)
+            || Objects.equals(normalizeWhitespace(original).toLowerCase(Locale.ROOT),
+                normalizeWhitespace(translated.text()).toLowerCase(Locale.ROOT))) {
+            return null;
+        }
         for (Rule rule : targetRules) {
-            if (!rule.sourceLanguage().equals(detectedLanguage)) {
-                continue;
+            if (rule.sourceLanguage().equals(detectedLanguage)) {
+                return rule;
             }
-            postTranslatedLine(authorPrefix, original, rule, translated.text(), aggressiveMode);
-            posted = true;
         }
-        if (!posted && aggressiveMode) {
-            postTranslatedLine(authorPrefix, original, targetRules.getFirst(), translated.text(), true);
-        }
+        return aggressiveMode ? new Rule(detectedLanguage, targetLanguage) : null;
     }
 
     private void pruneExpiredCacheEntriesLocked(long now) {
         this.cache.entrySet().removeIf(entry -> now - entry.getValue().timestamp() > CACHE_TTL_MS);
     }
 
-    private TranslationResult fetchGoogleFreeTranslation(String text, String targetLanguage, boolean aggressiveMode) {
+    private TranslationResult fetchGoogleFreeTranslation(String text, String targetLanguage) {
         String encodedText = URLEncoder.encode(text, StandardCharsets.UTF_8);
         String url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl="
             + targetLanguage + "&dt=t&q=" + encodedText;
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-            .timeout(aggressiveMode ? AGGRESSIVE_REQUEST_TIMEOUT : REQUEST_TIMEOUT)
+            .timeout(REQUEST_TIMEOUT)
             .header("Accept", "application/json")
             .header("User-Agent", "MinepieceQoL/1.0")
             .GET()
@@ -414,16 +422,11 @@ public final class ChatTranslationManager {
         return new TranslationResult(translatedText, detectedLanguage);
     }
 
-    private void postTranslatedLine(String authorPrefix, String original, Rule rule, String translatedText, boolean aggressiveMode) {
+    private void postTranslatedLine(String authorPrefix, Rule rule, String translatedText) {
         String normalizedTranslated = normalizeWhitespace(translatedText);
         if (normalizedTranslated.isBlank()) {
             return;
         }
-        if (!aggressiveMode
-            && Objects.equals(normalizeWhitespace(original).toLowerCase(Locale.ROOT), normalizedTranslated.toLowerCase(Locale.ROOT))) {
-            return;
-        }
-
         String sourceCode = rule.sourceLanguage().toUpperCase(Locale.ROOT);
         String targetCode = rule.targetLanguage().toUpperCase(Locale.ROOT);
         String clipped = clip(normalizedTranslated, MAX_TRANSLATION_CHARS);
@@ -472,13 +475,13 @@ public final class ChatTranslationManager {
     public record LanguageOption(String code, String label) {
     }
 
-    private record TranslationResult(String text, String detectedLanguage) {
+    record TranslationResult(String text, String detectedLanguage) {
     }
 
     private record CachedTranslation(TranslationResult result, long timestamp) {
     }
 
-    private record Rule(String sourceLanguage, String targetLanguage) {
+    record Rule(String sourceLanguage, String targetLanguage) {
     }
 
     public enum ChatLineType {

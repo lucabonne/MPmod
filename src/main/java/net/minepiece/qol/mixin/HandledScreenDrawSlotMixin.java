@@ -81,7 +81,8 @@ public abstract class HandledScreenDrawSlotMixin extends Screen {
         if (mod == null || this.focusedSlot == null || !this.focusedSlot.hasStack()) {
             return;
         }
-        if (!mod.isBossTooltipCaptureEnabled()) {
+        boolean cookingEnabled = mod.getConfig().modEnabled && mod.getConfig().cookingHudEnabled;
+        if (!mod.isBossTooltipCaptureEnabled() && !cookingEnabled) {
             return;
         }
 
@@ -100,6 +101,13 @@ public abstract class HandledScreenDrawSlotMixin extends Screen {
         this.minepiece$lastBossHoverSlot = this.focusedSlot;
         this.minepiece$lastBossHoverStack = stack.copy();
         this.minepiece$lastBossHoverCaptureMs = now;
-        mod.captureBossFromTooltipLines(stack, this.getTooltipFromItem(client, stack));
+        var tooltip = this.getTooltipFromItem(client, stack);
+        if (mod.isBossTooltipCaptureEnabled()) {
+            mod.captureBossFromTooltipLines(stack, tooltip);
+        }
+        if (cookingEnabled) {
+            mod.getCookingTracker().captureRecipe(stack.getName().getString(),
+                net.minepiece.qol.util.TextUtil.normalizeLines(tooltip));
+        }
     }
 }

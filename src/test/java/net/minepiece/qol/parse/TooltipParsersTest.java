@@ -23,11 +23,14 @@ class TooltipParsersTest {
 
         for (String[] pair : labels) {
             TooltipParsers.AuctionParseResult result = TooltipParsers.parseAuctionHighlight(List.of(
-                pair[0] + ": 40",
-                pair[1] + ": 100"
-            ), 1).orElseThrow();
+                pair[0] + ": 400",
+                pair[1] + ": 1000"
+            ), 10).orElseThrow();
 
             assertEquals(-0.60D, result.delta(), 0.0001D);
+            assertEquals(40.0D, result.unitPrice());
+            assertEquals(100.0D, result.averageUnitPrice());
+            assertEquals(true, TooltipParsers.isAuctionAveragePriceLine("· " + pair[1] + ": 1000"));
         }
     }
 
@@ -62,7 +65,47 @@ class TooltipParsersTest {
 
         assertEquals(750_000.0D, result.sellingPrice(), 0.0001D);
         assertEquals(196_640.0D, result.averagePrice(), 0.0001D);
-        assertEquals(-0.0465D, result.delta(), 0.0001D);
+        assertEquals(187_500.0D, result.unitPrice(), 0.0001D);
+        assertEquals(49_160.0D, result.averageUnitPrice(), 0.0001D);
+        assertEquals((750_000.0D - 196_640.0D) / 196_640.0D, result.delta(), 0.0001D);
+    }
+
+    @Test
+    void comparesStackTotalsIndependentlyOfQuantity() {
+        for (int quantity : new int[] {1, 10, 64}) {
+            TooltipParsers.AuctionParseResult result = TooltipParsers.parseAuctionHighlight(List.of(
+                "Selling price: 400", "Average price: 380"
+            ), quantity).orElseThrow();
+            assertEquals(20.0D / 380.0D, result.delta(), 0.0000001D);
+            assertEquals(400.0D / quantity, result.unitPrice());
+            assertEquals(380.0D / quantity, result.averageUnitPrice());
+        }
+    }
+
+    @Test
+    void equalTotalsHaveNoDifferenceAndQuantityDefaultsToOne() {
+        TooltipParsers.AuctionParseResult result = TooltipParsers.parseAuctionHighlight(List.of(
+            "Selling price: 400", "Average price: 400"
+        ), 0).orElseThrow();
+        assertEquals(0.0D, result.delta());
+        assertEquals(0.0D, result.intensity());
+        assertEquals(1, result.quantity());
+        assertEquals(400.0D, result.unitPrice());
+        assertEquals(400.0D, result.averageUnitPrice());
+    }
+
+    @Test
+    void ignoresMissingOrInvalidAuctionPrices() {
+        for (List<String> lines : List.of(
+            List.of("Selling price: 400"),
+            List.of("Average price: 380"),
+            List.of("Selling price: 0", "Average price: 380"),
+            List.of("Selling price: 400", "Average price: 0"),
+            List.of("Selling price: unknown", "Average price: 380"),
+            List.of("Selling price: 400", "Average price: unknown")
+        )) {
+            assertEquals(true, TooltipParsers.parseAuctionHighlight(lines, 10).isEmpty());
+        }
     }
 
     @Test

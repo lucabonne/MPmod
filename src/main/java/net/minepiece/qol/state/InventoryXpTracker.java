@@ -19,7 +19,7 @@ import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 
 public final class InventoryXpTracker {
-    private static final long SCAN_INTERVAL_MS = 350L;
+    private static final long SCAN_INTERVAL_MS = 100L;
     private static final int PARSE_CACHE_MAX = 256;
     private static final String NUMBER_TOKEN = "[0-9][0-9., \\u00a0]*";
 
@@ -79,6 +79,10 @@ public final class InventoryXpTracker {
     );
 
     private final DebugLogManager debugLogManager;
+    private final SharedItemXpTracker sharedXp = new SharedItemXpTracker();
+    private double pendingGain;
+    private boolean xpSourceAvailable;
+    private final List<ItemStack> icons = new ArrayList<>();
     private List<TrackedItem> items = List.of();
     private String lastFingerprint = "";
     private long nextScanAtMs = 0L;
@@ -88,7 +92,23 @@ public final class InventoryXpTracker {
         this.debugLogManager = debugLogManager;
     }
 
+    public void alignSharedXpSources() { this.sharedXp.alignSources(); }
+
+    public boolean hasXpSource() { return this.xpSourceAvailable; }
+
+    public double takeSharedXpGain() {
+        double gain = this.pendingGain;
+        this.pendingGain = 0;
+        return gain;
+    }
+
+    public List<ItemStack> getIcons() { return List.copyOf(this.icons); }
+
     public void clear() {
+        this.sharedXp.reset();
+        this.xpSourceAvailable = false;
+        this.pendingGain = 0;
+        this.icons.clear();
         if (this.items.isEmpty() && this.lastFingerprint.isBlank()) {
             return;
         }
@@ -111,6 +131,7 @@ public final class InventoryXpTracker {
         this.nextScanAtMs = now + SCAN_INTERVAL_MS;
 
         List<TrackedItem> parsed = new ArrayList<>();
+        this.icons.clear();
         for (int slot = 0; slot < player.getInventory().size(); slot++) {
             ItemStack stack = player.getInventory().getStack(slot);
             if (stack == null || stack.isEmpty()) {
@@ -122,9 +143,22 @@ public final class InventoryXpTracker {
                 cached = parseTrackableItem(player, stack);
                 putBounded(this.parseCache, cacheKey, cached);
             }
-            cached.ifPresent(parsed::add);
+            cached.ifPresent(item -> {
+                parsed.add(item);
+                this.icons.add(stack.copy());
+            });
         }
 
+        Map<String, SharedItemXpTracker.Progress> progress = new HashMap<>();
+        java.util.Set<String> ambiguous = new java.util.HashSet<>();
+        for (TrackedItem item : parsed) {
+            if (item.currentXp() < 0 || item.neededXp() <= 0 || item.level() <= 0) continue;
+            String key = item.category() + ":" + item.name();
+            if (progress.putIfAbsent(key, new SharedItemXpTracker.Progress(item.level(), item.currentXp(), item.neededXp())) != null) ambiguous.add(key);
+        }
+        ambiguous.forEach(progress::remove);
+        this.xpSourceAvailable = !progress.isEmpty();
+        this.pendingGain += this.sharedXp.observe(progress);
         String fingerprint = buildFingerprint(parsed);
         if (!fingerprint.equals(this.lastFingerprint)) {
             this.lastFingerprint = fingerprint;

@@ -17,6 +17,13 @@ public final class PersistentState {
     public MoneyLedger money = new MoneyLedger();
     public Set<String> bossRegistry = new LinkedHashSet<>();
     public Set<String> ignoredBosses = new LinkedHashSet<>();
+    public Map<String, ProgressRecord> playerProgress = new LinkedHashMap<>();
+
+    public static final class ProgressRecord {
+        public ProfileXpTracker.SavedProfile profile;
+        public GrindingTracker.SavedDay grinding;
+    }
+
     public ProfileStats profileStats = new ProfileStats();
 
     public static final class ProfileStats {
