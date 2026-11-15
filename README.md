@@ -1,6 +1,8 @@
-# Minepiece QoL 2.0.6
+# Minepiece QoL 2.1.0
 
-This release adds a **Marineford safes** HUD panel: the lock countdown of all six safes (purple, green, orange, red, yellow, blue), each in its own color, read from the text above each safe and grouped under a **Spawn** header per server spawn, like the bosses panel. Timers keep counting after you walk away; a safe shows **Ready** when it awaits lockpicking and **Picked** after `Lock picking successful!` until its new timer is seen. `/mpsafes` shows what the mod reads above each safe. Toggle it under Extras, move it in the HUD editor (panel 15; custom pictures now start at 16).
+Pictures now **zoom with the mouse wheel** in the HUD editor (10% per notch, around the picture's center) with no fixed size limit: from small up to the size that covers the whole screen, where they snap to center. The **Full screen** toggle still pins a picture to cover the screen.
+
+2.0.6 added a **Marineford safes** HUD panel: the lock countdown of all six safes (purple, green, orange, red, yellow, blue), each in its own color, read from the text above each safe and grouped under a **Spawn** header per server spawn, like the bosses panel. Timers keep counting after you walk away; a safe shows **Ready** when it awaits lockpicking and **Picked** after `Lock picking successful!` until its new timer is seen. `/mpsafes` shows what the mod reads above each safe. Toggle it under Extras, move it in the HUD editor (panel 15; custom pictures now start at 16).
 
 Pictures can now cover the **full screen** (cropped to fit, never stretched) and **fade** to transparent toward the top, bottom, left or right edge over 5–100% of the image.
 
@@ -10,7 +12,7 @@ The 2.0.2 menus, HUD panels, trackers, translation, AH highlights, pet stats, ap
 
 ## Install
 
-Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.0.6+mc26.2.jar`; install only one version of this mod at a time.
+Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.1.0+mc26.2.jar`; install only one version of this mod at a time.
 
 ## Random picture rotation
 
@@ -27,7 +29,7 @@ Use JDK 25, Loom 1.17, and the included Gradle 9.5.1 wrapper:
 ./gradlew --no-daemon runClientGameTest
 ```
 
-The installable artifact is `build/libs/minepieceqol-2.0.6+mc26.2.jar`. The sources JAR is for developers.
+The installable artifact is `build/libs/minepieceqol-2.1.0+mc26.2.jar`. The sources JAR is for developers.
 
 Production source and assets were restored from `minepieceqol-2.0.2+mc26.2-sources.jar`. The client smoke test checks full-mod initialization, restored keybindings, menu rendering, and inventory rendering. Screenshots are saved under `build/run/clientGameTest/screenshots`.
 

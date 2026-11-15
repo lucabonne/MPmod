@@ -118,13 +118,23 @@ public final class UiSettings {
             p.rotationFiles = new ArrayList<>(p.rotationFiles.stream()
                 .filter(file -> file != null && file.matches("[a-zA-Z0-9-]+\\.png")).distinct().toList());
             p.intervalSeconds = Math.clamp(p.intervalSeconds, 1, 3600);
-            p.scale = Float.isFinite(p.scale) ? Math.clamp(p.scale, 0.6F, 1.8F) : 1;
+            p.scale = Float.isFinite(p.scale) ? Math.clamp(p.scale, PICTURE_MIN_SCALE, PICTURE_MAX_SCALE) : 1;
             p.opacity = Math.clamp(p.opacity, 0, 100);
             if (!FADES.contains(p.fade)) p.fade = "none";
             p.fadePercent = Math.clamp(p.fadePercent, 5, 100);
             p.width = Math.clamp(p.width, 8, 512);
             p.height = Math.clamp(p.height, 8, 512);
         }
+    }
+
+    public static final float PICTURE_MIN_SCALE = 0.2F;
+    /** Saved-value bound only; the editor stops zooming once the picture covers the screen. */
+    public static final float PICTURE_MAX_SCALE = 64F;
+
+    /** Smallest scale at which the picture covers a screenW×screenH screen. */
+    public static float coverScale(Picture picture, int screenW, int screenH) {
+        float cover = Math.max(screenW / (float) Math.max(1, picture.width), screenH / (float) Math.max(1, picture.height));
+        return Math.clamp(cover, PICTURE_MIN_SCALE, PICTURE_MAX_SCALE);
     }
 
     public int hudTextColor(int originalColor) {

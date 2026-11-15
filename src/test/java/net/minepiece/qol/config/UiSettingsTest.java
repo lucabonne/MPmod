@@ -143,4 +143,16 @@ class UiSettingsTest {
         assertTrue(picture.rotationFiles.isEmpty());
         assertEquals(3600, picture.intervalSeconds);
     }
+
+    @Test void pictureZoomGoesPastOldLimitUpToScreenCover() {
+        var picture = new UiSettings.Picture();
+        picture.width = 80; picture.height = 40;
+        assertEquals(10F, UiSettings.coverScale(picture, 800, 300)); // width decides
+        assertEquals(15F, UiSettings.coverScale(picture, 400, 600)); // height decides
+        var settings = new UiSettings();
+        picture.file = "cat.png"; picture.scale = 12F;
+        settings.pictures.add(picture);
+        settings.normalize();
+        assertEquals(12F, picture.scale); // no longer clamped to 1.8
+    }
 }

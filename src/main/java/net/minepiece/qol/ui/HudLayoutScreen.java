@@ -116,6 +116,11 @@ public final class HudLayoutScreen extends Screen {
             return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
         }
         this.mod.setHudEditSelectedPanel(panelId);
+        var picture = this.mod.getHudPicture(panelId);
+        if (picture != null) {
+            if (!picture.fullscreen) zoomPicture(panelId, picture, verticalAmount > 0.0D);
+            return true;
+        }
         float currentScale = this.mod.getHudPanelScale(panelId);
         float nextScale = (float) (currentScale + (verticalAmount > 0.0D ? SCALE_STEP : -SCALE_STEP));
         nextScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, nextScale));
@@ -185,13 +190,30 @@ public final class HudLayoutScreen extends Screen {
         return -1;
     }
 
+    /** Pictures zoom by 10% per notch around their center, up to the size that covers the whole screen. */
+    private void zoomPicture(int panelId, net.minepiece.qol.config.UiSettings.Picture picture, boolean in) {
+        float cover = net.minepiece.qol.config.UiSettings.coverScale(picture, this.width, this.height);
+        float scale = Math.clamp(picture.scale * (in ? 1.1F : 1 / 1.1F),
+            net.minepiece.qol.config.UiSettings.PICTURE_MIN_SCALE, cover);
+        float centerX = picture.x + picture.width * picture.scale / 2, centerY = picture.y + picture.height * picture.scale / 2;
+        int x = Math.round(centerX - picture.width * scale / 2), y = Math.round(centerY - picture.height * scale / 2);
+        if (scale >= cover) { // covering the screen: center it so the crop is even
+            x = Math.round((this.width - picture.width * scale) / 2);
+            y = Math.round((this.height - picture.height * scale) / 2);
+        }
+        applyPanelLayout(panelId, x, y, scale);
+        this.mod.saveConfig();
+    }
+
     private void applyPanelLayout(int panelId, int x, int y, float scale) {
         PanelRect rect = getPanelRectWith(panelId, x, y, scale);
         if (rect == null) {
             return;
         }
-        int clampedX = Math.max(-300, Math.min(this.width - 8, rect.x()));
-        int clampedY = Math.max(2, Math.min(this.height - 8, rect.y()));
+        // A zoomed picture may be bigger than the screen, so it can hang off the top/left edge.
+        boolean picture = this.mod.getHudPicture(panelId) != null;
+        int clampedX = Math.max(picture ? Math.min(0, this.width - rect.width()) : -300, Math.min(this.width - 8, rect.x()));
+        int clampedY = Math.max(picture ? Math.min(2, this.height - rect.height()) : 2, Math.min(this.height - 8, rect.y()));
         this.mod.setHudPanelLayout(panelId, clampedX, clampedY, scale);
     }
 

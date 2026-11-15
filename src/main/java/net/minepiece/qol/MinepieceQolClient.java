@@ -463,9 +463,13 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     public void setHudPanelLayout(int panelId, int x, int y, float scale) {
-        float clampedScale = Float.isFinite(scale) ? Math.max(0.6F, Math.min(1.8F, scale)) : 1.0F;
         var picture = getHudPicture(panelId);
-        if (picture != null) { picture.x = x; picture.y = y; picture.scale = clampedScale; return; }
+        if (picture != null) {
+            picture.x = x; picture.y = y;
+            picture.scale = Float.isFinite(scale) ? Math.clamp(scale, net.minepiece.qol.config.UiSettings.PICTURE_MIN_SCALE, net.minepiece.qol.config.UiSettings.PICTURE_MAX_SCALE) : 1.0F;
+            return;
+        }
+        float clampedScale = Float.isFinite(scale) ? Math.max(0.6F, Math.min(1.8F, scale)) : 1.0F;
         switch (panelId) {
             case 1 -> {
                 this.config.jobsHudX = x;
