@@ -1,26 +1,31 @@
 package net.minepiece.qol.ui;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import javax.imageio.ImageIO;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.Identifier;
 import net.minepiece.qol.config.UiSettings;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.util.Identifier;
 
 public final class CustomPictures {
-    private final Map<String, Identifier> textures = new HashMap<>();
+    private record PictureTexture(String file, Identifier id, int width, int height) { }
+    private final Map<String, PictureTexture> textures = new HashMap<>();
+    private final Map<String, PictureTexture> previousTextures = new HashMap<>();
+    private final Map<String, PictureRotation> rotations = new HashMap<>();
     private final Set<String> failed = new HashSet<>();
 
     public static Path directory() {
@@ -73,37 +78,92 @@ public final class CustomPictures {
         return picture;
     }
 
-    public void draw(DrawContext context, UiSettings.Picture picture, boolean editing) {
+    public static UiSettings.Picture importFolder(Path source, Path directory) throws IOException {
+        if (!Files.isDirectory(source)) throw new IOException("Choose a folder of PNG or JPG images.");
+        UiSettings.Picture picture = null;
+        try (var entries = Files.list(source)) {
+            var files = entries.filter(Files::isRegularFile).filter(file -> {
+                String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+                return name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg");
+            }).sorted().toList();
+            for (Path file : files) {
+                UiSettings.Picture imported;
+                try {
+                    imported = importPicture(file, directory);
+                } catch (IOException | RuntimeException error) {
+                    continue;
+                }
+                if (picture == null) picture = imported;
+                picture.rotationFiles.add(imported.file);
+            }
+        }
+        if (picture == null) throw new IOException("No readable PNG or JPG images found (up to 10 MB and 4096 × 4096 each).");
+        picture.name = source.getFileName() == null ? source.toString() : source.getFileName().toString();
+        return picture;
+    }
+
+    public void draw(GuiGraphicsExtractor context, UiSettings.Picture picture, boolean editing) {
         if (!picture.visible && !editing) return;
         int width = Math.max(1, Math.round(picture.width * picture.scale));
         int height = Math.max(1, Math.round(picture.height * picture.scale));
-        Identifier texture = textures.get(picture.file);
-        if (texture == null && !failed.contains(picture.file)) {
+        boolean rotating = picture.rotationFiles != null && !picture.rotationFiles.isEmpty();
+        String file = rotating ? rotations.computeIfAbsent(picture.file,
+            ignored -> new PictureRotation(ThreadLocalRandom.current()))
+            .current(picture.rotationFiles, picture.intervalSeconds, System.nanoTime()) : picture.file;
+        PictureTexture texture = textures.get(picture.file);
+        if (texture != null && !texture.file.equals(file)) {
+            var previous = previousTextures.get(picture.file);
+            if (previous != null && previous.file.equals(file)) {
+                previousTextures.put(picture.file, texture);
+                textures.put(picture.file, previous);
+                texture = previous;
+            } else {
+                texture = null;
+            }
+        }
+        if (texture == null && !failed.contains(file)) {
             try {
-                if (!picture.file.matches("[a-zA-Z0-9-]+\\.png")) return;
-                try (var stream = Files.newInputStream(directory().resolve(picture.file))) {
+                if (!file.matches("[a-zA-Z0-9-]+\\.png")) return;
+                try (var stream = Files.newInputStream(directory().resolve(file))) {
                     NativeImage nativeImage = NativeImage.read(stream);
-                    texture = Identifier.of("minepiece-qol", "custom/" + picture.file);
-                    MinecraftClient.getInstance().getTextureManager().registerTexture(texture,
-                        new NativeImageBackedTexture(() -> picture.name, nativeImage));
-                    textures.put(picture.file, texture);
+                    Identifier id = Identifier.fromNamespaceAndPath("minepiece-qol", "custom/" + picture.file + "/" + file);
+                    texture = new PictureTexture(file, id, nativeImage.getWidth(), nativeImage.getHeight());
+                    Minecraft.getInstance().getTextureManager().register(id,
+                        new DynamicTexture(() -> picture.name, nativeImage));
+                    var old = textures.put(picture.file, texture);
+                    var expired = previousTextures.remove(picture.file);
+                    if (expired != null) Minecraft.getInstance().getTextureManager().release(expired.id);
+                    // Keep the previous image alive for draws already extracted in this frame.
+                    if (old != null) previousTextures.put(picture.file, old);
                 }
             } catch (IOException | RuntimeException error) {
-                failed.add(picture.file);
+                failed.add(file);
+                texture = null;
             }
         }
         if (texture != null) {
-            context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, picture.x, picture.y, 0, 0,
-                width, height, width, height, UiSettings.color("FFFFFF", picture.opacity));
+            int drawWidth = width;
+            int drawHeight = height;
+            if (rotating) {
+                double fit = Math.min(width / (double) texture.width, height / (double) texture.height);
+                drawWidth = Math.max(1, (int) Math.round(texture.width * fit));
+                drawHeight = Math.max(1, (int) Math.round(texture.height * fit));
+            }
+            context.blit(RenderPipelines.GUI_TEXTURED, texture.id, picture.x + (width - drawWidth) / 2,
+                picture.y + (height - drawHeight) / 2, 0, 0,
+                drawWidth, drawHeight, drawWidth, drawHeight, UiSettings.color("FFFFFF", picture.opacity));
         } else if (editing) {
             context.fill(picture.x, picture.y, picture.x + width, picture.y + height, 0xAA331111);
-            context.drawTextWithShadow(MinecraftClient.getInstance().textRenderer, "Image unavailable", picture.x + 2, picture.y + 2, 0xFFFFFFFF);
+            context.text(Minecraft.getInstance().font, "Image unavailable", picture.x + 2, picture.y + 2, 0xFFFFFFFF);
         }
     }
 
     public void clear() {
-        for (Identifier id : textures.values()) MinecraftClient.getInstance().getTextureManager().destroyTexture(id);
+        for (var texture : textures.values()) Minecraft.getInstance().getTextureManager().release(texture.id);
+        for (var texture : previousTextures.values()) Minecraft.getInstance().getTextureManager().release(texture.id);
         textures.clear();
+        previousTextures.clear();
+        rotations.clear();
         failed.clear();
     }
 }

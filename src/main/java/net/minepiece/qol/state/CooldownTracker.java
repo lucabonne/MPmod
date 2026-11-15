@@ -7,11 +7,13 @@ import net.minepiece.qol.util.LocalizedText;
 public final class CooldownTracker {
     private static final String[] HAKI_USED_MESSAGES = {
         "You have activated haki.",
-        "Has activado el haki."
+        "Has activado el haki.",
+        "Vous avez activé le haki."
     };
     private static final String[] HAKI_READY_MESSAGES = {
         "You can use your haki.",
-        "Puedes usar tu haki."
+        "Puedes usar tu haki.",
+        "Vous pouvez de nouveau utiliser votre haki."
     };
     private static final long HAKI_COOLDOWN_MS = 30_000L;
     private static final long HAKI_READY_VISIBLE_MS = 30_000L;

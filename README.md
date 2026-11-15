@@ -1,30 +1,30 @@
-# Minepiece QoL
+# Minepiece QoL 2.0.5
 
-Client-side mod for Minecraft 1.21.11, by SiickLukee.
+This release adds random folder-based picture rotation to the full 2.0.4 mod, retaining its restored source, assets, and Fabric Loader 0.20.1 support.
 
-## Customize your UI
+The 2.0.2 menus, HUD panels, trackers, translation, AH highlights, pet stats, appearance settings, loadouts, and Essentials features are retained.
 
-Open the mod menu with `.` and select **Appearance**. The main **Panel colors** list has two pages covering all eleven HUD panels (including combined player/fruit/weapon XP, Grinding, and Cooking) plus the chat indicator. Use the arrows beside the heading to switch pages. Each panel row has a six-digit HEX field (optional `#`), a **Random** button, and a live color swatch. Complete valid colors save immediately; incomplete edits keep the previous color. Existing named colors keep their previous appearance. The **HUD opacity & text colors** button opens Appearance directly. **HUD opacity** controls panel backgrounds/borders, and **Text** controls text color; choosing a custom text color also overrides HUD status-row and heading colors. Restoring the default text color (`EAF1FF`) restores automatic status colors.
+## Install
 
-- **Appearance:** set six-digit hex colors for the accent, background, border, and text. Adjust menu/HUD opacity and border thickness. Toggle compact HUD spacing, headings, decorations, text shadows, and rarity icons.
-- **Loadouts:** apply Farming, Fighting, or Grinding presets. Save the current setup with **Save new**. To edit or rename a saved setup, apply it, make changes, enter its name, and press **Update**. The first preset preserves your original arrangement automatically. Use **Remove** to delete a saved setup.
-- **Pictures:** drop PNG/JPG files onto this page, or paste a local file path and press **Import**. Up to eight pictures can be displayed per setup. Images are copied locally into `config/minepiece-qol/images`; nothing is uploaded. Removing a picture from a setup keeps its imported file available to other saved loadouts.
-- **HUD editor:** drag panels or pictures to move them, scroll to resize, and press `H` to hide/show the selected element. Close the editor to return to the menu you opened it from.
+Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.0.5+mc26.2.jar`; install only one version of this mod at a time.
 
-Press `\` while playing to open quick loadout selection. This key can be changed in Minecraft's Controls settings. Loadouts save panel positions, sizes, colors, visibility, overall appearance, and pictures; changing loadouts does not reset XP or money tracking. Saved positions adapt to changes in screen size.
+## Random picture rotation
 
-Epic and Mythic use the mod's existing icon assets. Primordial uses a new geometric badge and is recognized when the item tooltip contains a readable Primordial label. Resource-pack-only Primordial glyphs need their actual text marker to be identified.
+In **Appearance → Pictures**, click **Choose folder**, drop a folder onto the page, or paste its path and click **Import**. Each folder creates one picture panel from its PNG/JPG/JPEG files; subfolders and invalid images are skipped. Images are copied at import time, so import the folder again to include later changes.
 
-## Player XP and grinding
+The panel chooses a random image every **10 seconds** by default, without repeating the current image when multiple images are available. Change **Interval (s)** directly or use its **− / +** buttons (1–3600 seconds). The interval and image list are saved with your settings and loadouts. Single-image imports, opacity, visibility, and HUD placement still work as before.
 
-Player XP is saved locally for each server/account. Open `/profile` once to learn the current level's XP requirement. Subsequent combat XP increases from weapon/fruit item data update the player estimate without waiting for the top XP bar. Shared fruit/weapon gains are counted once. Noncombat item upgrades are excluded using the danger reward signal; derived player XP remains marked `~` because it is an estimate. When the level changes, the HUD requests `/profile` again to learn the new requirement.
+## Build and verify
 
-The grinding box shows XP gained alongside money earned, using the same session reset and daily persistence rules. Whenever the server XP bar changes, its level and percentage reconcile the player estimate and outstanding grinding XP, including booster gains. Between visible readings, item XP continues updating the estimate. Corrections are approximate because the server percentage is rounded; they do not restart the grinding timer.
+Use JDK 25, Loom 1.17, and the included Gradle 9.5.1 wrapper:
 
-Grinding rates use recent combat rewards, with smoothing and a maximum refresh frequency of once every five seconds. Rates stay still between rewards. The timer pauses one minute after the last XP gain. Totals and rates reset at midnight in the computer's local timezone, and same-day totals survive reconnects.
+```sh
+./gradlew --no-daemon test build
+./gradlew --no-daemon runClientGameTest
+```
 
-**Item icon grids** enables the shared tooltip/HUD component renderer. It displays registered item sprites, custom inventory item models, and rarity badges in an aligned grid. Recipe hover grids use the chosen dish quantity; known ingredients use their actual inventory icons. Original lore is retained for parsing, with only the visual rows replaced. Vanilla tooltips that already have their own data component (such as bundles) are left alone.
+The installable artifact is `build/libs/minepieceqol-2.0.5+mc26.2.jar`. The sources JAR is for developers.
 
-## Chat channel indicator
+Production source and assets were restored from `minepieceqol-2.0.2+mc26.2-sources.jar`. The client smoke test checks full-mod initialization, restored keybindings, menu rendering, and inventory rendering. Screenshots are saved under `build/run/clientGameTest/screenshots`.
 
-While chat is open, a compact badge above the input shows Public, Party, or Island and the last confirmed public-language flag. It follows the server confirmations for `/is chat`, `/p chat`, and `/lang`, not the command text alone. Language changes retain the current sending channel. On reconnect, the badge shows `Chat ?` with a neutral icon until the server confirms the channel/language again. Supported flags include English, Italian, French, German, Spanish, Portuguese, Brazilian, Polish, Indonesian, Turkish, Russian, and Dutch; other channel languages show their name with a neutral icon. The badge follows the UI background, text, border, and opacity settings and disappears when chat closes.
+The restored regression suite has 162 passing tests and four failing assertions in GrindingTrackerTest, ProgressHudControllerTest, and UiLoadoutsTest. The same four failures, with identical assertion results, were reproduced using the original 2.0.2 source and Loader 0.19.5. They are retained for visibility; production behavior was preserved. The 2.0.5 package and client smoke test can be run separately with `./gradlew --no-daemon build runClientGameTest -x test`.

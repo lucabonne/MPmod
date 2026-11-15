@@ -4,10 +4,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.regex.Pattern;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minepiece.qol.parse.TooltipParsers;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 
 public final class AuctionTooltipFormatter {
     private static final Pattern PRICE_SUFFIX_PATTERN =
@@ -16,7 +16,7 @@ public final class AuctionTooltipFormatter {
     private AuctionTooltipFormatter() {
     }
 
-    public static void appendPrices(List<Text> lines, List<String> normalizedLines,
+    public static void appendPrices(List<Component> lines, List<String> normalizedLines,
                                     TooltipParsers.AuctionParseResult result, String perItemLabel) {
         for (int i = 0; i < normalizedLines.size(); i++) {
             String line = normalizedLines.get(i);
@@ -29,12 +29,12 @@ public final class AuctionTooltipFormatter {
             }
 
             double unitPrice = selling ? result.unitPrice() : result.averageUnitPrice();
-            MutableText updated = lines.get(i).copy().append(
-                Text.literal(" (" + formatPrice(unitPrice) + perItemLabel + ")").formatted(Formatting.GRAY)
+            MutableComponent updated = lines.get(i).copy().append(
+                Component.literal(" (" + formatPrice(unitPrice) + perItemLabel + ")").withStyle(ChatFormatting.GRAY)
             );
             if (selling) {
-                updated.append(Text.literal(" " + formatDeltaPercent(result.delta()))
-                    .formatted(deltaColor(result.delta())));
+                updated.append(Component.literal(" " + formatDeltaPercent(result.delta()))
+                    .withStyle(deltaColor(result.delta())));
             }
             lines.set(i, updated);
         }
@@ -63,22 +63,22 @@ public final class AuctionTooltipFormatter {
         return (percent.signum() > 0 ? "+" : "") + percent.toPlainString() + "%";
     }
 
-    static Formatting deltaColor(double delta) {
+    static ChatFormatting deltaColor(double delta) {
         if (delta <= -0.90D) {
-            return Formatting.YELLOW;
+            return ChatFormatting.YELLOW;
         }
         if (delta <= -0.74D) {
-            return Formatting.BLUE;
+            return ChatFormatting.BLUE;
         }
         if (delta <= -0.50D) {
-            return Formatting.LIGHT_PURPLE;
+            return ChatFormatting.LIGHT_PURPLE;
         }
         if (delta < 0.0D) {
-            return Formatting.GREEN;
+            return ChatFormatting.GREEN;
         }
         if (delta > 0.0D) {
-            return Formatting.RED;
+            return ChatFormatting.RED;
         }
-        return Formatting.GRAY;
+        return ChatFormatting.GRAY;
     }
 }

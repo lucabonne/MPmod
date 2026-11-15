@@ -7,9 +7,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minepiece.qol.util.TextUtil;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
 
 public final class CookingTracker {
     private static final Pattern HEADER = Pattern.compile("(?iu)^(?:[^\\p{L}]*)(?:ingredients|ingrédients|ingredientes|zutaten|ingredienti|składniki|bahan(?:-bahan)?|malzemeler)\\s*:?");
@@ -61,15 +61,15 @@ public final class CookingTracker {
         return parsed;
     }
 
-    public void tick(PlayerEntity player) {
+    public void tick(Player player) {
         if (this.ingredients.isEmpty()) {
             return;
         }
         Map<String, Integer> counts = new LinkedHashMap<>();
-        for (int slot = 0; slot < player.getInventory().size(); slot++) {
-            ItemStack stack = player.getInventory().getStack(slot);
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
             if (!stack.isEmpty()) {
-                counts.merge(TextUtil.normalize(stack.getName()), stack.getCount(), Integer::sum);
+                counts.merge(TextUtil.normalize(stack.getHoverName()), stack.getCount(), Integer::sum);
             }
         }
         updateInventory(counts);

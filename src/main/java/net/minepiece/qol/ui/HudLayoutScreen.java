@@ -2,15 +2,15 @@ package net.minepiece.qol.ui;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 import net.minepiece.qol.MinepieceQolClient;
 import net.minepiece.qol.config.ConfigManager;
 import net.minepiece.qol.state.BossTracker;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
 public final class HudLayoutScreen extends Screen {
@@ -25,13 +25,13 @@ public final class HudLayoutScreen extends Screen {
     private int draggingOffsetY;
 
     public HudLayoutScreen(MinepieceQolClient mod) {
-        super(Text.literal(mod == null ? "Minepiece HUD Layout" : mod.tr("hud.layout.title")));
+        super(Component.literal(mod == null ? "Minepiece HUD Layout" : mod.tr("hud.layout.title")));
         this.mod = mod;
-        this.parent = MinecraftClient.getInstance().currentScreen;
+        this.parent = Minecraft.getInstance().gui.screen();
     }
 
     @Override
-    public boolean shouldPause() {
+    public boolean isPauseScreen() {
         return true;
     }
 
@@ -41,10 +41,10 @@ public final class HudLayoutScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyInput keyInput) {
+    public boolean keyPressed(KeyEvent keyInput) {
         int keyCode = keyInput.key();
         if (keyCode == GLFW.GLFW_KEY_ESCAPE || keyCode == GLFW.GLFW_KEY_PERIOD) {
-            close();
+            onClose();
             return true;
         }
         if (keyCode == GLFW.GLFW_KEY_H) {
@@ -64,7 +64,8 @@ public final class HudLayoutScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(Click click, boolean doubled) {
+    public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
+        if (click.button() == GLFW.GLFW_MOUSE_BUTTON_RIGHT && this.mod.toggleBossIslandAt(click.x(), click.y())) return true;
         if (click.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) {
             return super.mouseClicked(click, doubled);
         }
@@ -86,7 +87,7 @@ public final class HudLayoutScreen extends Screen {
     }
 
     @Override
-    public boolean mouseDragged(Click click, double deltaX, double deltaY) {
+    public boolean mouseDragged(MouseButtonEvent click, double deltaX, double deltaY) {
         if (click.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT || this.draggingPanelId <= 0) {
             return super.mouseDragged(click, deltaX, deltaY);
         }
@@ -98,7 +99,7 @@ public final class HudLayoutScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(Click click) {
+    public boolean mouseReleased(MouseButtonEvent click) {
         if (click.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT && this.draggingPanelId > 0) {
             this.draggingPanelId = -1;
             this.mod.saveConfig();
@@ -126,8 +127,8 @@ public final class HudLayoutScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext drawContext, int mouseX, int mouseY, float deltaTicks) {
-        super.render(drawContext, mouseX, mouseY, deltaTicks);
+    public void extractRenderState(GuiGraphicsExtractor drawContext, int mouseX, int mouseY, float deltaTicks) {
+        super.extractRenderState(drawContext, mouseX, mouseY, deltaTicks);
 
         drawContext.fill(0, 0, this.width, this.height, 0x28000000);
         drawEditorHelp(drawContext);
@@ -143,35 +144,35 @@ public final class HudLayoutScreen extends Screen {
             String label = panelId + ". " + this.mod.getHudPanelName(panelId)
                 + " x=" + rect.x() + " y=" + rect.y()
                 + " s=" + String.format(java.util.Locale.ROOT, "%.2f", this.mod.getHudPanelScale(panelId));
-            drawContext.drawTextWithShadow(this.textRenderer, label, rect.x(), Math.max(2, rect.y() - 10), color);
+            drawContext.text(this.font, label, rect.x(), Math.max(2, rect.y() - 10), color);
         }
     }
 
     @Override
-    public void close() {
-        MinecraftClient client = MinecraftClient.getInstance();
+    public void onClose() {
+        Minecraft client = Minecraft.getInstance();
         if (client != null) {
-            client.setScreen(this.parent == null ? new MinepieceMenuScreen(this.mod) : this.parent);
+            client.gui.setScreen(this.parent);
         }
     }
 
-    private void drawEditorHelp(DrawContext drawContext) {
+    private void drawEditorHelp(GuiGraphicsExtractor drawContext) {
         String line1 = this.mod.tr("hud.layout.line1");
         String line2 = this.mod.tr("common.selected") + ": " + this.mod.getHudPanelName(this.mod.getHudEditSelectedPanel());
-        String line3 = this.mod.tr("hud.layout.line3");
+        String line3 = String.format(java.util.Locale.ROOT, this.mod.tr("hud.layout.shortcut"), this.mod.getHudEditorShortcutName());
         String line4 = this.mod.tr("ui.image_edit_hint");
         int width = Math.max(
-            Math.max(this.textRenderer.getWidth(line1), this.textRenderer.getWidth(line2)),
-            Math.max(this.textRenderer.getWidth(line3), this.textRenderer.getWidth(line4))
+            Math.max(this.font.width(line1), this.font.width(line2)),
+            Math.max(this.font.width(line3), this.font.width(line4))
         ) + 10;
         int x = 8;
         int y = 8;
         drawContext.fill(x, y, x + width, y + 44, 0xAA000000);
         drawOutline(drawContext, x, y, width, 44, 0x66000000);
-        drawContext.drawTextWithShadow(this.textRenderer, line1, x + 5, y + 4, 0xFFFFFFFF);
-        drawContext.drawTextWithShadow(this.textRenderer, line2, x + 5, y + 14, 0xFFFFDD88);
-        drawContext.drawTextWithShadow(this.textRenderer, line3, x + 5, y + 24, 0xFFAEE8FF);
-        drawContext.drawTextWithShadow(this.textRenderer, line4, x + 5, y + 34, 0xFFFFDD88);
+        drawContext.text(this.font, line1, x + 5, y + 4, 0xFFFFFFFF);
+        drawContext.text(this.font, line2, x + 5, y + 14, 0xFFFFDD88);
+        drawContext.text(this.font, line3, x + 5, y + 24, 0xFFAEE8FF);
+        drawContext.text(this.font, line4, x + 5, y + 34, 0xFFFFDD88);
     }
 
     private int findPanelAt(int mouseX, int mouseY) {
@@ -207,12 +208,6 @@ public final class HudLayoutScreen extends Screen {
         var picture = this.mod.getHudPicture(panelId);
         if (picture != null) return new PanelRect(x, y, Math.round(picture.width * scale), Math.round(picture.height * scale));
         float s = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
-        int rowHeight = this.mod.getConfig().appearance.iconRows ? IconGridTooltipComponent.rowHeight(this.mod.getConfig().appearance.compact) : 10;
-        int lineStep = Math.max(8, Math.round(rowHeight * s));
-        int headerHeight = this.mod.getConfig().appearance.headers ? 12 : 0;
-        int paddingX = this.mod.getConfig().appearance.compact ? 4 : 6;
-        int paddingY = this.mod.getConfig().appearance.compact ? 2 : 4;
-
         List<String> lines = switch (panelId) {
             case 1 -> {
                 ConfigManager.ModConfig cfg = this.mod.getConfig();
@@ -227,11 +222,11 @@ public final class HudLayoutScreen extends Screen {
                 yield value.isEmpty() ? List.of(this.mod.tr("common.no_data")) : value;
             }
             case 3 -> {
-                List<String> value = this.mod.getProfileStatsTracker().getHudLines(this.mod::tr);
+                List<String> value = this.mod.getProfileStatsTracker().getHudLines(this.mod::tr, this.mod.getConfig().appearance.profileStats);
                 yield value.isEmpty() ? List.of(this.mod.tr("common.no_data")) : value;
             }
             case 4 -> {
-                List<BossTracker.HudLine> boss = this.mod.getBossTracker().getZoneBossHudLines(false, this.mod::tr);
+                List<BossTracker.HudLine> boss = this.mod.getBossTracker().getZoneBossHudLines(false, this.mod::tr, this.mod.getConfig().appearance.collapsedBossIslands, this.mod.getConfig().appearance.bossesByTime);
                 if (boss.isEmpty()) {
                     yield List.of(this.mod.tr("common.no_data"));
                 }
@@ -283,6 +278,9 @@ public final class HudLayoutScreen extends Screen {
                 List<String> invXp = this.mod.getXpHudLines();
                 yield invXp.isEmpty() ? List.of(this.mod.tr("common.no_data")) : invXp;
             }
+            case 12 -> ClockHud.lines();
+            case 13 -> this.mod.getEssentials().quests().lines();
+            case 14 -> this.mod.getEssentials().petLines();
             case 11 -> this.mod.getConfig().cookingHudEnabled
                 ? this.mod.getCookingTracker().getHudLines(this.mod::tr, this.mod.getConfig().cookingQuantity) : List.of(this.mod.tr("common.hidden"));
             case 10 -> this.mod.getConfig().grindingHudEnabled
@@ -293,20 +291,25 @@ public final class HudLayoutScreen extends Screen {
             lines = List.of(this.mod.tr("common.no_data"));
         }
 
-        String title = this.mod.getHudPanelName(panelId);
-        int textWidth = this.textRenderer.getWidth(title);
-        for (String line : lines) {
-            int width = (int) Math.ceil((this.textRenderer.getWidth(line) + (this.mod.getConfig().appearance.iconRows ? IconGridTooltipComponent.iconColumn(this.mod.getConfig().appearance.compact) : 0)) * s);
-            if (width > textWidth) {
-                textWidth = width;
-            }
-        }
-        int panelWidth = textWidth + (paddingX * 2);
-        int panelHeight = headerHeight + (paddingY * 2) + (this.mod.getConfig().appearance.iconRows ? (int) Math.ceil(rowHeight * lines.size() * s) : lineStep * lines.size());
-        return new PanelRect(x, y, panelWidth, panelHeight);
+        var cfg = this.mod.getConfig();
+        boolean enabled = switch (panelId) {
+            case 1 -> cfg.jobsOverviewVisible; case 5 -> this.mod.isMinibossHudEnabled(); case 8 -> cfg.scrollsEnabled;
+            case 9 -> cfg.inventoryXpHudEnabled || cfg.profileXpHudEnabled; case 10 -> cfg.grindingHudEnabled;
+            case 11 -> cfg.cookingHudEnabled; case 13 -> cfg.dailyQuestsEnabled; case 14 -> cfg.activePetsEnabled;
+            default -> true;
+        };
+        boolean hasData = switch (panelId) {
+            case 1 -> cfg.jobsTrackingEnabled; case 2 -> cfg.moneyTrackingEnabled; case 3 -> cfg.profileStatsEnabled;
+            case 4, 5 -> this.mod.isBossTrackingEnabled(); default -> true;
+        };
+        if (!hasData) lines = List.of(this.mod.tr("common.no_data"));
+        if (panelId != 6 && panelId != 7 && (!enabled || !this.mod.isHudPanelVisible(panelId))) lines = List.of(this.mod.tr("common.hidden"));
+        var geometry = HudPanelGeometry.measure(panelId, this.mod.getHudPanelName(panelId), lines, x, y, s,
+            cfg.appearance, this.font::width);
+        return new PanelRect(x, y, geometry.width(), geometry.height());
     }
 
-    private static void drawOutline(DrawContext drawContext, int x, int y, int width, int height, int color) {
+    private static void drawOutline(GuiGraphicsExtractor drawContext, int x, int y, int width, int height, int color) {
         drawContext.fill(x, y, x + width, y + 1, color);
         drawContext.fill(x, y + height - 1, x + width, y + height, color);
         drawContext.fill(x, y, x + 1, y + height, color);

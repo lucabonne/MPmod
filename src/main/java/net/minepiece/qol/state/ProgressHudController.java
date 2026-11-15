@@ -3,16 +3,16 @@ package net.minepiece.qol.state;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.LerpingBossEvent;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.TooltipFlag;
 import net.minepiece.qol.mixin.BossBarHudAccessor;
 import net.minepiece.qol.parse.ProfileXpParser;
 import net.minepiece.qol.parse.TooltipParsers;
 import net.minepiece.qol.util.TextUtil;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.hud.ClientBossBar;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.item.Item;
-import net.minecraft.item.tooltip.TooltipType;
 
 public final class ProgressHudController {
     private final ProfileXpTracker profile = new ProfileXpTracker();
@@ -21,13 +21,10 @@ public final class ProgressHudController {
     private long nextScanMs;
     private Screen profileScreen;
     private UUID xpBarId;
-    private boolean itemXpAvailable;
     private PersistentState state;
     private Runnable saveState;
     private String identity = "";
     private long nextSaveMs;
-    private double pendingItemGain;
-    private long pendingItemMs;
     private ProfileXpParser.BarProgress observedBar;
     private ProfileXpParser.BarProgress reconciledBar;
     private long barChangedMs;
@@ -71,21 +68,12 @@ public final class ProgressHudController {
     }
 
     public void onItemXp(double gain, boolean available, long now) {
-        this.itemXpAvailable = available;
-        if (now - this.pendingItemMs > 1000) this.pendingItemGain = 0;
         this.grinding.tick(now);
-        if (gain <= 0) return;
-        if (this.grinding.hasRecentDanger(now)) {
-            applyItemGain(gain, now);
-        } else {
-            // Inventory and actionbar packets can arrive in either order.
-            this.pendingItemGain = now - this.pendingItemMs <= 1000 ? this.pendingItemGain + gain : gain;
-            this.pendingItemMs = now;
-        }
+        if (Double.isFinite(gain) && gain > 0) applyItemGain(gain, now);
     }
 
     public boolean shouldAlignItemSources(long now) {
-        return this.pendingItemGain <= 0 && !this.grinding.hasRecentDanger(now);
+        return !this.grinding.isActive(now);
     }
 
     private void applyItemGain(double gain, long now) {
@@ -110,9 +98,6 @@ public final class ProgressHudController {
         this.nextScanMs = 0;
         this.profileScreen = null;
         this.xpBarId = null;
-        this.itemXpAvailable = false;
-        this.pendingItemGain = 0;
-        this.pendingItemMs = 0;
         this.observedBar = null;
         this.reconciledBar = null;
         this.combatXpSinceBar = 0;
@@ -147,17 +132,12 @@ public final class ProgressHudController {
 
     public void onActionbar(String text, long now) {
         this.grinding.onActionbar(text, now);
-        if (this.pendingItemGain > 0 && now - this.pendingItemMs <= 1000 && this.grinding.hasRecentDanger(now)) {
-            applyItemGain(this.pendingItemGain, now);
-            this.pendingItemGain = 0;
-        } else if (now - this.pendingItemMs > 1000) {
-            this.pendingItemGain = 0;
-        }
+
     }
 
-    public void tick(MinecraftClient client, boolean enabled) {
+    public void tick(Minecraft client, boolean enabled) {
         long now = System.currentTimeMillis();
-        if (this.profileScreen != null && client.currentScreen != this.profileScreen) {
+        if (this.profileScreen != null && client.gui.screen() != this.profileScreen) {
             this.profileScreen = null;
             this.profileRequestUntilMs = 0;
         }
@@ -168,26 +148,23 @@ public final class ProgressHudController {
             return;
         }
         if (this.profileScreen == null && now <= this.profileRequestUntilMs
-            && client.currentScreen instanceof HandledScreen<?>) {
-            this.profileScreen = client.currentScreen;
+            && client.gui.screen() instanceof AbstractContainerScreen<?>) {
+            this.profileScreen = client.gui.screen();
         }
-        if (this.profileScreen instanceof HandledScreen<?> screen && now >= this.nextScanMs) {
+        if (this.profileScreen instanceof AbstractContainerScreen<?> screen && now >= this.nextScanMs) {
             this.nextScanMs = now + 500L;
-            for (var slot : screen.getScreenHandler().slots) {
-                if (slot.inventory == client.player.getInventory() || !slot.hasStack()) {
+            for (var slot : screen.getMenu().slots) {
+                if (slot.container == client.player.getInventory() || !slot.hasItem()) {
                     continue;
                 }
-                captureTooltip(TextUtil.normalizeLines(slot.getStack().getTooltip(Item.TooltipContext.DEFAULT, client.player, TooltipType.BASIC)));
+                captureTooltip(TextUtil.normalizeLines(slot.getItem().getTooltipLines(Item.TooltipContext.EMPTY, client.player, TooltipFlag.NORMAL)));
             }
         }
-        updateXpBar(((BossBarHudAccessor) client.inGameHud.getBossBarHud()).minepiece$getBossBars(), now);
+        updateXpBar(((BossBarHudAccessor) client.gui.hud.getBossOverlay()).minepiece$getBossBars(), now);
         this.grinding.observeProfileXp(this.profile.getGainedXp(), now);
     }
 
-    private void updateXpBar(Map<UUID, ClientBossBar> bars, long now) {
-        if (this.profile.getAnchor() == null) {
-            return;
-        }
+    private void updateXpBar(Map<UUID, LerpingBossEvent> bars, long now) {
         if (this.xpBarId != null && !bars.containsKey(this.xpBarId)) {
             this.xpBarId = null;
         }
@@ -196,7 +173,7 @@ public final class ProgressHudController {
             for (var entry : bars.entrySet()) {
                 ProfileXpParser.BarProgress progress = ProfileXpParser.parseBar(TextUtil.normalize(entry.getValue().getName())).orElse(null);
                 if (progress == null || !(matchesProfileBar(progress, this.profile.getAnchor())
-                    || progress.xpLabel() || progress.level() != null && this.profile.isCached())) {
+                    || progress.xpLabel() || progress.level() != null && (this.profile.isCached() || this.profile.needsSync()))) {
                     continue;
                 }
                 if (candidate != null) {
@@ -225,8 +202,15 @@ public final class ProgressHudController {
         double correction = this.profile.getCurrentXp() - before;
         if (!wasCached && this.combatXpSinceBar > 0) {
             this.grinding.correctXp(Math.max(-this.combatXpSinceBar, correction), now);
-        } else if (!wasCached && !this.itemXpAvailable) {
+        } else if (!wasCached) {
             this.grinding.observeProfileXp(this.profile.getGainedXp(), now);
+        }
+        if (!wasCached && this.reconciledBar != null) {
+            Integer previousLevel = this.reconciledBar.level();
+            boolean advanced = java.util.Objects.equals(previousLevel, progress.level())
+                ? progress.percent() > this.reconciledBar.percent()
+                : previousLevel != null && progress.level() != null && progress.level() > previousLevel;
+            if (advanced) this.grinding.onXpActivity(now);
         }
         this.grinding.setProfileBaseline(this.profile.getGainedXp());
         this.combatXpSinceBar = 0;
@@ -234,7 +218,7 @@ public final class ProgressHudController {
     }
 
     static boolean matchesProfileBar(ProfileXpParser.BarProgress progress, ProfileXpParser.Snapshot profile) {
-        return (progress.level() == null || progress.level() == profile.level())
+        return profile != null && (progress.level() == null || progress.level() == profile.level())
             && (progress.xpLabel() || progress.level() != null || Math.abs(progress.percent() - profile.percent()) <= 0.011D);
     }
 }

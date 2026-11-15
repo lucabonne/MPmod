@@ -17,6 +17,7 @@ public final class PersistentState {
     public MoneyLedger money = new MoneyLedger();
     public Set<String> bossRegistry = new LinkedHashSet<>();
     public Set<String> ignoredBosses = new LinkedHashSet<>();
+    public Map<String, Double> minionResourceXp = new LinkedHashMap<>();
     public Map<String, ProgressRecord> playerProgress = new LinkedHashMap<>();
 
     public static final class ProgressRecord {
@@ -45,6 +46,8 @@ public final class PersistentState {
     public static final class BossSpawnState {
         public String spawnId = "";
         public String bossName = "";
+        public String islandId = "";
+        public String islandName = "";
         public int x;
         public int y;
         public int z;
@@ -57,6 +60,7 @@ public final class PersistentState {
 
     public static final class JobInfo {
         public int level;
+        public boolean levelEstimated;
         public double currentXp = -1.0D;
         public double neededXp;
         public double dailyXp;

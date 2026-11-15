@@ -8,9 +8,22 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import com.mojang.blaze3d.platform.InputConstants;
 import java.io.InputStream;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -18,10 +31,9 @@ import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
-import net.minecraft.client.option.KeyBinding;
 import net.minepiece.qol.commands.ModCommands;
 import net.minepiece.qol.config.ConfigManager;
 import net.minepiece.qol.i18n.UiLocalization;
@@ -54,18 +66,6 @@ import net.minepiece.qol.ui.MinibossWaypointWorldRenderer;
 import net.minepiece.qol.util.LocalizedText;
 import net.minepiece.qol.util.SafeExecutor;
 import net.minepiece.qol.util.TextUtil;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.tooltip.TooltipType;
-import net.minecraft.registry.Registries;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 public final class MinepieceQolClient implements ClientModInitializer {
@@ -120,18 +120,21 @@ public final class MinepieceQolClient implements ClientModInitializer {
     private HudOverlay hudOverlay;
     private MinibossWaypointWorldRenderer minibossWaypointWorldRenderer;
     private ChatTranslationManager chatTranslationManager;
-    private KeyBinding openMenuKeyBinding;
+    private KeyMapping openMenuKeyBinding;
+    private KeyMapping hudEditorKeyBinding;
+    private net.minepiece.qol.essentials.EssentialsFeatures essentials;
+    public net.minepiece.qol.essentials.EssentialsFeatures getEssentials() { return essentials; }
     private final net.minepiece.qol.state.ChatChannelTracker chatChannelTracker = new net.minepiece.qol.state.ChatChannelTracker();
 
     public net.minepiece.qol.state.ChatChannelTracker getChatChannelTracker() { return this.chatChannelTracker; }
 
-    private KeyBinding loadoutKeyBinding;
+    private KeyMapping loadoutKeyBinding;
     private final net.minepiece.qol.ui.CustomPictures customPictures = new net.minepiece.qol.ui.CustomPictures();
 
     public net.minepiece.qol.ui.CustomPictures getCustomPictures() { return this.customPictures; }
     public boolean isHudPanelVisible(int id) { return !this.config.appearance.hiddenPanels.contains(id); }
     public net.minepiece.qol.config.UiSettings.Picture getHudPicture(int id) {
-        int index = id - 12;
+        int index = id - 15;
         return index >= 0 && index < this.config.appearance.pictures.size() ? this.config.appearance.pictures.get(index) : null;
     }
 
@@ -169,6 +172,9 @@ public final class MinepieceQolClient implements ClientModInitializer {
         this.bossTracker = new BossTracker(this.persistentState, this::savePersistentState, this.debugLogManager);
         this.bossGuiAutoScanner = new BossGuiAutoScanner(this.bossTracker, this.debugLogManager);
         this.bossTracker.setMinibossRegistrationEnabled(isBossTrackingEnabled() && this.config.minibossTrackingEnabled);
+        this.essentials = new net.minepiece.qol.essentials.EssentialsFeatures(this, this.persistentState, () -> savePersistentState(this.persistentState));
+        this.essentials.reset();
+        net.minepiece.qol.ui.RarityInventoryTools.register(this);
         this.cooldownTracker = new CooldownTracker();
         this.profileStatsTracker = new ProfileStatsTracker();
         this.profileStatsTracker.attachPersistence(this.persistentState, this::savePersistentState);
@@ -186,22 +192,26 @@ public final class MinepieceQolClient implements ClientModInitializer {
         this.hudOverlay = new HudOverlay(this);
         this.minibossWaypointWorldRenderer = new MinibossWaypointWorldRenderer(this);
 
-        this.openMenuKeyBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+        var mainKeyCategory = KeyMapping.Category.register(Identifier.fromNamespaceAndPath("minepiece-qol", "main"));
+        this.openMenuKeyBinding = KeyMappingHelper.registerKeyMapping(new KeyMapping(
             "key.minepiece-qol.open_menu",
-            InputUtil.Type.KEYSYM,
+            InputConstants.Type.KEYSYM,
             this.config.menuKeybindKey,
-            KeyBinding.Category.create(Identifier.of("minepiece-qol", "main"))
+            mainKeyCategory
+        ));
+        this.hudEditorKeyBinding = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+            "key.minepiece-qol.hud_editor", InputConstants.Type.KEYSYM, InputConstants.KEY_COMMA, mainKeyCategory
         ));
 
-        net.fabricmc.fabric.api.client.rendering.v1.TooltipComponentCallback.EVENT.register(data ->
+        net.fabricmc.fabric.api.client.rendering.v1.ClientTooltipComponentCallback.EVENT.register(data ->
             data instanceof net.minepiece.qol.ui.ItemDetailTooltipData detail
                 ? new net.minepiece.qol.ui.IconGridTooltipComponent(detail.rows(), this.config.appearance.compact, this.config.appearance.shadows)
                 : null);
         ItemTooltipCallback.EVENT.register((stack, context, type, lines) ->
             SafeExecutor.run(this.debugLogManager, "tooltip", () -> this.handleTooltip(stack, lines)));
-        this.loadoutKeyBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-            "key.minepiece-qol.loadout", InputUtil.Type.KEYSYM, org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSLASH,
-            KeyBinding.Category.create(Identifier.of("minepiece-qol", "loadouts"))));
+        this.loadoutKeyBinding = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+            "key.minepiece-qol.loadout", InputConstants.Type.KEYSYM, org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSLASH,
+            KeyMapping.Category.register(Identifier.fromNamespaceAndPath("minepiece-qol", "loadouts"))));
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> ModCommands.register(dispatcher, this));
         ClientSendMessageEvents.ALLOW_CHAT.register(this::handleOutgoingChatMessage);
         ClientSendMessageEvents.COMMAND.register(command -> {
@@ -214,19 +224,23 @@ public final class MinepieceQolClient implements ClientModInitializer {
         });
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
             String normalized = TextUtil.normalize(message);
-            if (!overlay) this.chatChannelTracker.onServerMessage(normalized);
+            if (!overlay) { this.chatChannelTracker.onServerMessage(normalized); this.essentials.onServerMessage(normalized); }
             if (MoneyMessageClassifier.isEligibleServerMessage(normalized, overlay)) {
                 this.moneyTracker.onGameMessage(normalized);
             }
         });
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
-            String server = client.getCurrentServerEntry() == null ? "local" : client.getCurrentServerEntry().address;
-            this.progressHudController.connect(server + "|" + client.getSession().getUuidOrNull(), System.currentTimeMillis());
+            this.essentials.reset();
+            this.bossTracker.resetLocation();
+            String server = client.getCurrentServer() == null ? "local" : client.getCurrentServer().ip;
+            this.progressHudController.connect(server + "|" + client.getUser().getProfileId(), System.currentTimeMillis());
             this.inventoryXpTracker.clear();
             this.cookingTracker.clear();
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            this.essentials.reset();
             this.chatChannelTracker.reset();
+            this.bossTracker.resetLocation();
             this.progressHudController.disconnect(System.currentTimeMillis());
             this.inventoryXpTracker.clear();
             this.cookingTracker.clear();
@@ -242,7 +256,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
         });
         HudElementRegistry.attachElementAfter(
             VanillaHudElements.SUBTITLES,
-            Identifier.of("minepiece-qol", "main_hud"),
+            Identifier.fromNamespaceAndPath("minepiece-qol", "main_hud"),
             (drawContext, tickCounter) -> this.hudOverlay.render(drawContext)
         );
         this.minibossWaypointWorldRenderer.register();
@@ -320,7 +334,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     public int getHudPanelCount() {
-        return 11 + this.config.appearance.pictures.size();
+        return 14 + this.config.appearance.pictures.size();
     }
 
     public String getHudPanelName(int panelId) {
@@ -337,6 +351,9 @@ public final class MinepieceQolClient implements ClientModInitializer {
             case 9 -> tr("hud.panel.xp");
             case 10 -> tr("hud.panel.grinding");
             case 11 -> tr("hud.panel.cooking");
+            case 12 -> tr("hud.panel.clock");
+            case 13 -> tr("hud.panel.daily_quests");
+            case 14 -> tr("hud.panel.active_pets");
             default -> getHudPicture(panelId) == null ? tr("common.unknown") : getHudPicture(panelId).name;
         };
     }
@@ -354,6 +371,9 @@ public final class MinepieceQolClient implements ClientModInitializer {
             case 9 -> this.config.inventoryXpHudX;
             case 10 -> this.config.grindingHudX;
             case 11 -> this.config.cookingHudX;
+            case 12 -> this.config.clockHudX;
+            case 13 -> this.config.dailyQuestsHudX;
+            case 14 -> this.config.activePetsHudX;
             default -> getHudPicture(panelId) == null ? 0 : getHudPicture(panelId).x;
         };
     }
@@ -371,6 +391,9 @@ public final class MinepieceQolClient implements ClientModInitializer {
             case 9 -> this.config.inventoryXpHudY;
             case 10 -> this.config.grindingHudY;
             case 11 -> this.config.cookingHudY;
+            case 12 -> this.config.clockHudY;
+            case 13 -> this.config.dailyQuestsHudY;
+            case 14 -> this.config.activePetsHudY;
             default -> getHudPicture(panelId) == null ? 0 : getHudPicture(panelId).y;
         };
     }
@@ -388,6 +411,9 @@ public final class MinepieceQolClient implements ClientModInitializer {
             case 9 -> this.config.inventoryXpHudScale;
             case 10 -> this.config.grindingHudScale;
             case 11 -> this.config.cookingHudScale;
+            case 12 -> this.config.clockHudScale;
+            case 13 -> this.config.dailyQuestsHudScale;
+            case 14 -> this.config.activePetsHudScale;
             default -> getHudPicture(panelId) == null ? 1.0F : getHudPicture(panelId).scale;
         };
     }
@@ -441,6 +467,21 @@ public final class MinepieceQolClient implements ClientModInitializer {
                 this.config.inventoryXpHudX = x;
                 this.config.inventoryXpHudY = y;
                 this.config.inventoryXpHudScale = clampedScale;
+            }
+            case 13 -> {
+                this.config.dailyQuestsHudX = x;
+                this.config.dailyQuestsHudY = y;
+                this.config.dailyQuestsHudScale = clampedScale;
+            }
+            case 14 -> {
+                this.config.activePetsHudX = x;
+                this.config.activePetsHudY = y;
+                this.config.activePetsHudScale = clampedScale;
+            }
+            case 12 -> {
+                this.config.clockHudX = x;
+                this.config.clockHudY = y;
+                this.config.clockHudScale = clampedScale;
             }
             case 11 -> {
                 this.config.cookingHudX = x;
@@ -496,6 +537,15 @@ public final class MinepieceQolClient implements ClientModInitializer {
         this.config.inventoryXpHudScale = defaults.inventoryXpHudScale;
 
 
+        this.config.dailyQuestsHudX = defaults.dailyQuestsHudX;
+        this.config.dailyQuestsHudY = defaults.dailyQuestsHudY;
+        this.config.dailyQuestsHudScale = defaults.dailyQuestsHudScale;
+        this.config.activePetsHudX = defaults.activePetsHudX;
+        this.config.activePetsHudY = defaults.activePetsHudY;
+        this.config.activePetsHudScale = defaults.activePetsHudScale;
+        this.config.clockHudX = defaults.clockHudX;
+        this.config.clockHudY = defaults.clockHudY;
+        this.config.clockHudScale = defaults.clockHudScale;
         this.config.cookingHudX = defaults.cookingHudX;
         this.config.cookingHudY = defaults.cookingHudY;
         this.config.cookingHudScale = defaults.cookingHudScale;
@@ -520,12 +570,15 @@ public final class MinepieceQolClient implements ClientModInitializer {
             case 9 -> this.config.inventoryXpHudColor;
             case 10 -> this.config.grindingHudColor;
             case 11 -> this.config.cookingHudColor;
+            case 12 -> this.config.clockHudColor;
+            case 13 -> this.config.dailyQuestsHudColor;
+            case 14 -> this.config.activePetsHudColor;
             default -> "default";
         };
     }
 
     public boolean isHudPanelColorable(int panelId) {
-        return panelId >= 0 && panelId <= 11;
+        return panelId >= 0 && panelId <= 14;
     }
 
     public void cycleHudPanelColor(int panelId, int direction) {
@@ -562,6 +615,9 @@ public final class MinepieceQolClient implements ClientModInitializer {
             case 9 -> this.config.inventoryXpHudColor = normalized;
             case 10 -> this.config.grindingHudColor = normalized;
             case 11 -> this.config.cookingHudColor = normalized;
+            case 12 -> this.config.clockHudColor = normalized;
+            case 13 -> this.config.dailyQuestsHudColor = normalized;
+            case 14 -> this.config.activePetsHudColor = normalized;
             default -> {
             }
         }
@@ -589,20 +645,20 @@ public final class MinepieceQolClient implements ClientModInitializer {
         this.configManager.saveConfig(this.config);
     }
 
-    public int resolveHakiHudX(MinecraftClient client) {
+    public int resolveHakiHudX(Minecraft client) {
         if (this.config.hakiHudX >= 0) {
             return this.config.hakiHudX;
         }
-        int centerX = client.getWindow().getScaledWidth() / 2;
+        int centerX = client.getWindow().getGuiScaledWidth() / 2;
         int hotbarStartX = centerX - 91;
         return hotbarStartX - 17;
     }
 
-    public int resolveHakiHudY(MinecraftClient client) {
+    public int resolveHakiHudY(Minecraft client) {
         if (this.config.hakiHudY >= 0) {
             return this.config.hakiHudY;
         }
-        return client.getWindow().getScaledHeight() - this.config.cooldownHudOffsetY - 9;
+        return client.getWindow().getGuiScaledHeight() - this.config.cooldownHudOffsetY - 9;
     }
 
     public DebugLogManager getDebugLogManager() {
@@ -717,7 +773,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
         this.configManager.saveConfig(this.config);
     }
 
-    public void handleChatMessage(Text message) {
+    public void handleChatMessage(Component message) {
         String normalized = TextUtil.normalize(message);
         if (normalized.isBlank()) {
             return;
@@ -734,7 +790,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             this.jobsTracker.captureChatMessage(normalized);
             this.cooldownTracker.onChatMessage(normalized);
             ChatParsers.parseBossKill(normalized).ifPresent(name -> {
-                MinecraftClient client = MinecraftClient.getInstance();
+                Minecraft client = Minecraft.getInstance();
                 if (client != null && client.player != null) {
                     int x = (int) Math.floor(client.player.getX());
                     int y = (int) Math.floor(client.player.getY());
@@ -758,7 +814,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
         });
     }
 
-    public void handleActionbarMessage(Text message) {
+    public void handleActionbarMessage(Component message) {
         String normalized = TextUtil.normalize(message);
         if (normalized.isBlank()) {
             return;
@@ -771,7 +827,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             }
             this.moneyTracker.onActionbarMessage(normalized);
             this.jobsTracker.captureActionbar(normalized);
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             if (client != null && client.player != null) {
                 int x = (int) Math.floor(client.player.getX());
                 int y = (int) Math.floor(client.player.getY());
@@ -781,7 +837,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
         });
     }
 
-    public void handleTitle(Text message) {
+    public void handleTitle(Component message) {
         String normalized = TextUtil.normalize(message);
         if (!normalized.isBlank()) {
             this.debugLogManager.logTitle(normalized);
@@ -791,19 +847,23 @@ public final class MinepieceQolClient implements ClientModInitializer {
         }
     }
 
-    public void renderAuctionTint(DrawContext drawContext, int slotX, int slotY, int screenX, int screenY, Slot slot) {
+    public boolean toggleBossIslandAt(double mouseX, double mouseY) {
+        return this.hudOverlay.toggleBossIslandAt(mouseX, mouseY);
+    }
+
+    public void renderAuctionTint(GuiGraphicsExtractor drawContext, int slotX, int slotY, int screenX, int screenY, Slot slot) {
         renderAuctionTint(drawContext, slotX, slotY, screenX, screenY, slot, null);
     }
 
-    public void renderAuctionTint(DrawContext drawContext, int slotX, int slotY, int screenX, int screenY, Slot slot, List<Text> tooltipLines) {
+    public void renderAuctionTint(GuiGraphicsExtractor drawContext, int slotX, int slotY, int screenX, int screenY, Slot slot, List<Component> tooltipLines) {
         if (!this.config.modEnabled || !this.config.allFeaturesVisible || !this.config.auctionHighlightEnabled) {
-            this.lastAuctionDebugLines.remove(slot.id);
+            this.lastAuctionDebugLines.remove(slot.index);
             return;
         }
 
         Optional<AuctionHighlighter.ActiveHighlight> highlight = getAuctionHighlightForSlot(slot, tooltipLines);
         if (highlight.isEmpty()) {
-            this.lastAuctionDebugLines.remove(slot.id);
+            this.lastAuctionDebugLines.remove(slot.index);
             return;
         }
 
@@ -839,17 +899,17 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     private static final int RARITY_ICON_SIZE = 6;
-    private static final Identifier PET_STAT_TEX_STRENGTH = Identifier.of("minepiece-qol", "textures/gui/pet_stats/strength.png");
-    private static final Identifier PET_STAT_TEX_POWER = Identifier.of("minepiece-qol", "textures/gui/pet_stats/power.png");
-    private static final Identifier PET_STAT_TEX_CRIT_CHANCE = Identifier.of("minepiece-qol", "textures/gui/pet_stats/critical_chance.png");
-    private static final Identifier PET_STAT_TEX_CRIT_DAMAGE = Identifier.of("minepiece-qol", "textures/gui/pet_stats/critical_damage.png");
-    private static final Identifier PET_STAT_TEX_DEFENSE = Identifier.of("minepiece-qol", "textures/gui/pet_stats/defense.png");
-    private static final Identifier PET_STAT_TEX_SPEED = Identifier.of("minepiece-qol", "textures/gui/pet_stats/speed.png");
-    private static final Identifier PET_STAT_TEX_REGEN = Identifier.of("minepiece-qol", "textures/gui/pet_stats/regeneration.png");
-    private static final Identifier PET_STAT_TEX_HEALTH = Identifier.of("minepiece-qol", "textures/gui/pet_stats/health.png");
-    private static final Identifier PET_STAT_TEX_ENERGY = Identifier.of("minepiece-qol", "textures/gui/pet_stats/energy.png");
-    private static final Identifier PET_STAT_TEX_ENERGY_REGEN = Identifier.of("minepiece-qol", "textures/gui/pet_stats/energy_regeneration.png");
-    private static final Identifier PET_STAT_TEX_DEXTERITY = Identifier.of("minepiece-qol", "textures/gui/pet_stats/dexterity.png");
+    private static final Identifier PET_STAT_TEX_STRENGTH = Identifier.fromNamespaceAndPath("minepiece-qol", "textures/gui/pet_stats/strength.png");
+    private static final Identifier PET_STAT_TEX_POWER = Identifier.fromNamespaceAndPath("minepiece-qol", "textures/gui/pet_stats/power.png");
+    private static final Identifier PET_STAT_TEX_CRIT_CHANCE = Identifier.fromNamespaceAndPath("minepiece-qol", "textures/gui/pet_stats/critical_chance.png");
+    private static final Identifier PET_STAT_TEX_CRIT_DAMAGE = Identifier.fromNamespaceAndPath("minepiece-qol", "textures/gui/pet_stats/critical_damage.png");
+    private static final Identifier PET_STAT_TEX_DEFENSE = Identifier.fromNamespaceAndPath("minepiece-qol", "textures/gui/pet_stats/defense.png");
+    private static final Identifier PET_STAT_TEX_SPEED = Identifier.fromNamespaceAndPath("minepiece-qol", "textures/gui/pet_stats/speed.png");
+    private static final Identifier PET_STAT_TEX_REGEN = Identifier.fromNamespaceAndPath("minepiece-qol", "textures/gui/pet_stats/regeneration.png");
+    private static final Identifier PET_STAT_TEX_HEALTH = Identifier.fromNamespaceAndPath("minepiece-qol", "textures/gui/pet_stats/health.png");
+    private static final Identifier PET_STAT_TEX_ENERGY = Identifier.fromNamespaceAndPath("minepiece-qol", "textures/gui/pet_stats/energy.png");
+    private static final Identifier PET_STAT_TEX_ENERGY_REGEN = Identifier.fromNamespaceAndPath("minepiece-qol", "textures/gui/pet_stats/energy_regeneration.png");
+    private static final Identifier PET_STAT_TEX_DEXTERITY = Identifier.fromNamespaceAndPath("minepiece-qol", "textures/gui/pet_stats/dexterity.png");
     private static final int PET_STAT_ICON_SIZE = 4;
     private static final int PET_STAT_MAX_ICONS = 4;
     private static final int PET_STAT_DEFAULT_TEXTURE_SIZE = 16;
@@ -859,19 +919,19 @@ public final class MinepieceQolClient implements ClientModInitializer {
     private final Map<String, Optional<RarityDetector.Rarity>> rarityIconRenderCache = new HashMap<>();
     private final Map<String, List<Identifier>> petStatIconRenderCache = new HashMap<>();
 
-    public void renderRarityIcon(DrawContext drawContext, int slotX, int slotY, Slot slot) {
+    public void renderRarityIcon(GuiGraphicsExtractor drawContext, int slotX, int slotY, Slot slot) {
         renderRarityIcon(drawContext, slotX, slotY, slot, null);
     }
 
-    public void renderRarityIcon(DrawContext drawContext, int slotX, int slotY, Slot slot, List<Text> tooltipLines) {
+    public void renderRarityIcon(GuiGraphicsExtractor drawContext, int slotX, int slotY, Slot slot, List<Component> tooltipLines) {
         if (!this.config.modEnabled || !this.config.allFeaturesVisible || !this.config.rarityIconsEnabled) {
             return;
         }
-        if (slot == null || !slot.hasStack()) {
+        if (slot == null || !slot.hasItem()) {
             return;
         }
 
-        ItemStack stack = slot.getStack();
+        ItemStack stack = slot.getItem();
         String itemKey = buildAuctionItemKey(stack);
         Optional<RarityDetector.Rarity> cachedRarity = this.rarityIconRenderCache.get(itemKey);
         Optional<RarityDetector.Rarity> rarity;
@@ -885,10 +945,10 @@ public final class MinepieceQolClient implements ClientModInitializer {
         }
 
         if (cachedRarity == null && rarity.isEmpty()) {
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             if (client != null && client.player != null) {
                 try {
-                    List<Text> tooltip = stack.getTooltip(Item.TooltipContext.DEFAULT, client.player, TooltipType.BASIC);
+                    List<Component> tooltip = stack.getTooltipLines(Item.TooltipContext.EMPTY, client.player, TooltipFlag.NORMAL);
                     rarity = RarityDetector.detect(stack, tooltip);
                 } catch (Throwable ignored) {
                     // Keep rendering fail-safe if tooltip construction fails on a malformed stack.
@@ -915,15 +975,15 @@ public final class MinepieceQolClient implements ClientModInitializer {
         this.configManager.saveConfig(this.config);
     }
 
-    public void renderPetStatIcons(DrawContext drawContext, int slotX, int slotY, Slot slot, List<Text> tooltipLines) {
+    public void renderPetStatIcons(GuiGraphicsExtractor drawContext, int slotX, int slotY, Slot slot, List<Component> tooltipLines) {
         if (!this.config.modEnabled || !this.config.allFeaturesVisible || !this.config.petStatIconsEnabled) {
             return;
         }
-        if (slot == null || !slot.hasStack()) {
+        if (slot == null || !slot.hasItem()) {
             return;
         }
 
-        ItemStack stack = slot.getStack();
+        ItemStack stack = slot.getItem();
         String itemKey = buildAuctionItemKey(stack);
         List<Identifier> cachedTextures = this.petStatIconRenderCache.get(itemKey);
         if (cachedTextures != null) {
@@ -931,14 +991,14 @@ public final class MinepieceQolClient implements ClientModInitializer {
             return;
         }
 
-        List<Text> tooltip = tooltipLines;
+        List<Component> tooltip = tooltipLines;
         if (tooltip == null || tooltip.isEmpty()) {
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             if (client == null || client.player == null) {
                 return;
             }
             try {
-                tooltip = stack.getTooltip(Item.TooltipContext.DEFAULT, client.player, TooltipType.BASIC);
+                tooltip = stack.getTooltipLines(Item.TooltipContext.EMPTY, client.player, TooltipFlag.NORMAL);
             } catch (Throwable ignored) {
                 return;
             }
@@ -979,7 +1039,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
         drawPetStatTextures(drawContext, slotX, slotY, textureList);
     }
 
-    private static void drawPetStatTextures(DrawContext drawContext, int slotX, int slotY, List<Identifier> textures) {
+    private static void drawPetStatTextures(GuiGraphicsExtractor drawContext, int slotX, int slotY, List<Identifier> textures) {
         if (textures == null || textures.isEmpty()) {
             return;
         }
@@ -991,10 +1051,10 @@ public final class MinepieceQolClient implements ClientModInitializer {
             int iconY = baseY + index * PET_STAT_ICON_SIZE;
             int textureSize = resolvePetStatTextureSize(texture);
             float scale = PET_STAT_ICON_SIZE / (float) Math.max(1, textureSize);
-            drawContext.getMatrices().pushMatrix();
-            drawContext.getMatrices().translate((float) iconX, (float) iconY);
-            drawContext.getMatrices().scale(scale, scale);
-            drawContext.drawTexture(
+            drawContext.pose().pushMatrix();
+            drawContext.pose().translate((float) iconX, (float) iconY);
+            drawContext.pose().scale(scale, scale);
+            drawContext.blit(
                 RenderPipelines.GUI_TEXTURED,
                 texture,
                 0,
@@ -1006,7 +1066,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
                 textureSize,
                 textureSize
             );
-            drawContext.getMatrices().popMatrix();
+            drawContext.pose().popMatrix();
             index++;
             if (index >= PET_STAT_MAX_ICONS) {
                 break;
@@ -1021,12 +1081,12 @@ public final class MinepieceQolClient implements ClientModInitializer {
         }
 
         int resolved = PET_STAT_DEFAULT_TEXTURE_SIZE;
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client != null) {
             try {
-                Optional<net.minecraft.resource.Resource> resource = client.getResourceManager().getResource(texture);
+                Optional<net.minecraft.server.packs.resources.Resource> resource = client.getResourceManager().getResource(texture);
                 if (resource.isPresent()) {
-                    try (InputStream input = resource.get().getInputStream()) {
+                    try (InputStream input = resource.get().open()) {
                         byte[] header = input.readNBytes(24);
                         if (header.length >= 24 && header[0] == (byte) 0x89 && header[1] == 0x50
                             && header[2] == 0x4E && header[3] == 0x47) {
@@ -1128,26 +1188,14 @@ public final class MinepieceQolClient implements ClientModInitializer {
         return label.trim();
     }
 
-    public void captureBossFromTooltipLines(ItemStack stack, List<Text> tooltip) {
+    public void captureBossFromTooltipLines(ItemStack stack, List<Component> tooltip) {
         if (stack == null || stack.isEmpty() || tooltip == null || tooltip.isEmpty()) {
             return;
         }
         List<String> normalizedLines = TextUtil.normalizeLines(tooltip);
-        Optional<TooltipParsers.BossTooltipData> parsed = TooltipParsers.parseBossTooltip(normalizedLines, TextUtil.normalize(stack.getName()));
-        if (parsed.isPresent()) {
-            TooltipParsers.BossTooltipData data = parsed.get();
-            this.bossTracker.captureParsedTooltip(data);
-            this.debugLogManager.logInternal(String.format(
-                Locale.ROOT,
-                "[BOSS] hover parsed: name=%s coords=(%d,%d,%d) remaining=%ds cycle=%dm lines=%s",
-                data.bossName(),
-                data.x(),
-                data.y(),
-                data.z(),
-                data.remainingSeconds(),
-                Math.max(0, data.cycleSeconds() / 60),
-                String.join(" | ", normalizedLines)
-            ));
+        List<TooltipParsers.BossTooltipData> parsed = TooltipParsers.parseBossTooltips(normalizedLines, TextUtil.normalize(stack.getHoverName()));
+        if (!parsed.isEmpty()) {
+            this.bossTracker.captureParsedTooltips(TextUtil.normalize(stack.getHoverName()), parsed);
             return;
         }
 
@@ -1206,12 +1254,12 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     public void runBalanceCommand() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.player == null || client.getNetworkHandler() == null) {
+        Minecraft client = Minecraft.getInstance();
+        if (client == null || client.player == null || client.getConnection() == null) {
             return;
         }
         this.moneyTracker.onCommandSent("balance");
-        client.getNetworkHandler().sendChatCommand("balance");
+        client.getConnection().sendCommand("balance");
     }
 
     public void setJobsTrackingEnabled(boolean enabled) {
@@ -1267,13 +1315,13 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     public void runProfileCommand() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.player == null || client.getNetworkHandler() == null) {
+        Minecraft client = Minecraft.getInstance();
+        if (client == null || client.player == null || client.getConnection() == null) {
             return;
         }
         this.profileStatsTracker.armProfileHoverSync();
         this.progressHudController.onCommandSent("profile");
-        client.getNetworkHandler().sendChatCommand("profile");
+        client.getConnection().sendCommand("profile");
     }
 
     public void sendProfileCommand() {
@@ -1282,7 +1330,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     public void copyLastDebugLine() {
-        this.debugLogManager.copyLastToClipboard(MinecraftClient.getInstance());
+        this.debugLogManager.copyLastToClipboard(Minecraft.getInstance());
     }
 
     public String setTalkTarget(String targetName) {
@@ -1307,7 +1355,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
         return this.talkTarget;
     }
 
-    private void handleTooltip(ItemStack stack, List<Text> lines) {
+    private void handleTooltip(ItemStack stack, List<Component> lines) {
         List<String> normalizedLines = TextUtil.normalizeLines(lines);
         this.debugLogManager.logTooltip(normalizedLines);
 
@@ -1323,7 +1371,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             this.progressHudController.captureTooltip(normalizedLines);
         }
         this.tryUpdateStatsFromLines(normalizedLines);
-        this.bossTracker.captureTooltip(TextUtil.normalize(stack == null ? null : stack.getName()), normalizedLines);
+        this.bossTracker.captureTooltip(TextUtil.normalize(stack == null ? null : stack.getHoverName()), normalizedLines);
 
         List<TooltipParsers.PetStatLine> petLines = TooltipParsers.parsePetRolls(
             normalizedLines,
@@ -1336,45 +1384,47 @@ public final class MinepieceQolClient implements ClientModInitializer {
         if (this.config.modEnabled && this.config.auctionHighlightEnabled) {
             auctionResult.ifPresent(result -> AuctionTooltipFormatter.appendPrices(lines, normalizedLines, result, tr("auction.per_item")));
         }
-        for (TooltipParsers.PetStatLine petLine : petLines) {
+        for (TooltipParsers.PetStatLine petLine : this.config.petRollsEnabled ? petLines : List.<TooltipParsers.PetStatLine>of()) {
             long rounded = Math.round(petLine.percent());
-            Formatting pctColor = petPercentColor(rounded);
-            Text originalLine = lines.get(petLine.lineIndex());
+            ChatFormatting pctColor = petPercentColor(rounded);
+            Component originalLine = lines.get(petLine.lineIndex());
             lines.set(
                 petLine.lineIndex(),
                 originalLine.copy().append(
-                    Text.literal(String.format(Locale.ROOT, " (%.0f%%)", (double) rounded)).formatted(pctColor)
+                    Component.literal(String.format(Locale.ROOT, " (%.0f%%)", (double) rounded)).withStyle(pctColor)
                 )
             );
         }
+        this.essentials.annotate(stack, lines);
 
     }
 
-    private static Formatting petPercentColor(long percent) {
+    private static ChatFormatting petPercentColor(long percent) {
         if (percent >= 90L) {
-            return Formatting.GREEN;
+            return ChatFormatting.GREEN;
         }
         if (percent >= 75L) {
-            return Formatting.YELLOW;
+            return ChatFormatting.YELLOW;
         }
         if (percent >= 50L) {
-            return Formatting.GOLD; // orange-like
+            return ChatFormatting.GOLD; // orange-like
         }
-        return Formatting.RED;
+        return ChatFormatting.RED;
     }
 
-    private void onClientTick(MinecraftClient client) {
-        if (client.player == null || client.inGameHud == null) {
+    private void onClientTick(Minecraft client) {
+        if (client.player == null || client.gui == null) {
             return;
         }
 
         if (this.config.modEnabled && this.config.cookingHudEnabled) {
             this.cookingTracker.tick(client.player);
         }
+        SafeExecutor.run(this.debugLogManager, "essentials", () -> this.essentials.tick(client));
         syncMenuKeybindConfig();
         handleMenuKeyBinding(client);
-        while (this.loadoutKeyBinding.wasPressed()) {
-            if (client.currentScreen == null) client.setScreen(new net.minepiece.qol.ui.AppearanceScreen(this, null, 1));
+        while (this.loadoutKeyBinding.consumeClick()) {
+            if (client.gui.screen() == null) client.gui.setScreen(new net.minepiece.qol.ui.AppearanceScreen(this, null, 1));
         }
         showMenuOpenHintOnce(client);
         if (this.config.modEnabled && (this.config.inventoryXpHudEnabled || this.config.profileXpHudEnabled || this.config.grindingHudEnabled)) {
@@ -1391,8 +1441,8 @@ public final class MinepieceQolClient implements ClientModInitializer {
             this.config.modEnabled && (this.config.profileXpHudEnabled || this.config.grindingHudEnabled)));
 
         SafeExecutor.run(this.debugLogManager, "tab-footer", () -> {
-            PlayerListHudAccessor accessor = (PlayerListHudAccessor) client.inGameHud.getPlayerListHud();
-            Text footer = accessor.minepiece$getFooter();
+            PlayerListHudAccessor accessor = (PlayerListHudAccessor) client.gui.hud.getTabList();
+            Component footer = accessor.minepiece$getFooter();
             String normalizedFooter = TextUtil.normalize(footer);
             if (!normalizedFooter.equals(this.lastTabFooter)) {
                 this.lastTabFooter = normalizedFooter;
@@ -1419,31 +1469,35 @@ public final class MinepieceQolClient implements ClientModInitializer {
             this.scrollTracker.clear();
         }
 
+        if (this.config.modEnabled && isBossTrackingEnabled()) {
+            this.bossTracker.observeLocationBars(((net.minepiece.qol.mixin.BossBarHudAccessor) client.gui.hud.getBossOverlay())
+                .minepiece$getBossBars().values().stream().map(bar -> TextUtil.normalize(bar.getName())).toList());
+        }
         this.bossTracker.tick();
         this.eventCountdownTracker.tick();
     }
 
-    private void showMenuOpenHintOnce(MinecraftClient client) {
+    private void showMenuOpenHintOnce(Minecraft client) {
         if (this.menuOpenHintShown || client == null || client.player == null || this.openMenuKeyBinding == null) {
             return;
         }
-        String keyName = this.openMenuKeyBinding.getBoundKeyLocalizedText().getString();
+        String keyName = this.openMenuKeyBinding.getTranslatedKeyMessage().getString();
         String message = String.format(Locale.ROOT, tr("startup.open_menu_hint"), keyName);
-        client.inGameHud.getChatHud().addMessage(Text.literal(message));
+        client.gui.hud.getChat().addClientSystemMessage(Component.literal(message));
         this.menuOpenHintShown = true;
     }
 
-    private void handleMenuKeyBinding(MinecraftClient client) {
+    private void handleMenuKeyBinding(Minecraft client) {
         if (client == null || this.openMenuKeyBinding == null) {
             return;
         }
-        while (this.openMenuKeyBinding.wasPressed()) {
-            if (client.currentScreen instanceof MinepieceMenuScreen) {
-                client.setScreen(null);
+        while (this.openMenuKeyBinding.consumeClick()) {
+            if (client.gui.screen() instanceof MinepieceMenuScreen) {
+                client.gui.setScreen(null);
                 continue;
             }
-            if (client.currentScreen == null) {
-                client.setScreen(new MinepieceMenuScreen(this));
+            if (client.gui.screen() == null) {
+                client.gui.setScreen(new MinepieceMenuScreen(this));
             }
         }
     }
@@ -1452,7 +1506,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
         if (this.openMenuKeyBinding == null) {
             return;
         }
-        int boundKeyCode = InputUtil.fromTranslationKey(this.openMenuKeyBinding.getBoundKeyTranslationKey()).getCode();
+        int boundKeyCode = InputConstants.getKey(this.openMenuKeyBinding.saveString()).getValue();
         if (boundKeyCode == this.config.menuKeybindKey) {
             return;
         }
@@ -1460,8 +1514,27 @@ public final class MinepieceQolClient implements ClientModInitializer {
         this.configManager.saveConfig(this.config);
     }
 
+    // Handle raw press/repeat actions so holding the binding cannot toggle across screen changes.
+    public boolean handleHudEditorShortcut(InputConstants.Key key, int action) {
+        Minecraft client = Minecraft.getInstance();
+        if (this.hudEditorKeyBinding == null || this.hudEditorKeyBinding.isUnbound() || !this.hudEditorKeyBinding.matches(key)
+            || client.player == null || (client.gui.screen() != null && !(client.gui.screen() instanceof HudLayoutScreen))
+            || action == InputConstants.RELEASE) {
+            return false;
+        }
+        if (action == InputConstants.PRESS) {
+            if (client.gui.screen() instanceof HudLayoutScreen) client.gui.setScreen(null);
+            else openHudLayoutEditor();
+        }
+        return true;
+    }
+
+    public String getHudEditorShortcutName() {
+        return this.hudEditorKeyBinding.getTranslatedKeyMessage().getString();
+    }
+
     public void openHudLayoutEditor() {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client == null) {
             return;
         }
@@ -1472,7 +1545,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             this.config.hakiHudY = resolveHakiHudY(client);
             this.configManager.saveConfig(this.config);
         }
-        client.setScreen(new HudLayoutScreen(this));
+        client.gui.setScreen(new HudLayoutScreen(this));
     }
 
     private void tryUpdateStatsFromLines(List<String> normalizedLines) {
@@ -1500,7 +1573,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             return;
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         int selectedSlot = -1;
         if (client != null && client.player != null) {
             selectedSlot = client.player.getInventory().getSelectedSlot();
@@ -1528,10 +1601,13 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     private void onCommandSent(String command) {
+        if (this.essentials.background().isIssuingCommand()) return;
+        this.essentials.background().cancel();
         if (command == null || command.isBlank()) {
             return;
         }
         this.progressHudController.onCommandSent(command);
+        this.bossGuiAutoScanner.onCommandSent(command);
 
         if (this.config.modEnabled && this.config.allFeaturesVisible && this.config.profileStatsEnabled) {
             this.statsRefreshController.onCommandSent(command);
@@ -1559,8 +1635,8 @@ public final class MinepieceQolClient implements ClientModInitializer {
             return true;
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.getNetworkHandler() == null) {
+        Minecraft client = Minecraft.getInstance();
+        if (client == null || client.getConnection() == null) {
             return true;
         }
 
@@ -1569,7 +1645,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             return false;
         }
 
-        client.getNetworkHandler().sendChatCommand("msg " + this.talkTarget + " " + trimmed);
+        client.getConnection().sendCommand("msg " + this.talkTarget + " " + trimmed);
         this.debugLogManager.logInternal("[TALK] redirected chat to /msg " + this.talkTarget);
         return false;
     }
@@ -1578,27 +1654,27 @@ public final class MinepieceQolClient implements ClientModInitializer {
         return getAuctionHighlightForSlot(slot, null);
     }
 
-    private Optional<AuctionHighlighter.ActiveHighlight> getAuctionHighlightForSlot(Slot slot, List<Text> tooltipLines) {
-        if (slot == null || !slot.hasStack()) {
+    private Optional<AuctionHighlighter.ActiveHighlight> getAuctionHighlightForSlot(Slot slot, List<Component> tooltipLines) {
+        if (slot == null || !slot.hasItem()) {
             return Optional.empty();
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client == null || client.player == null) {
             return Optional.empty();
         }
 
         try {
-            ItemStack stack = slot.getStack();
+            ItemStack stack = slot.getItem();
             String itemKey = buildAuctionItemKey(stack);
             Optional<AuctionHighlighter.ActiveHighlight> cached = this.auctionHighlightRenderCache.get(itemKey);
             if (cached != null) {
                 return cached;
             }
 
-            List<Text> tooltip = tooltipLines;
+            List<Component> tooltip = tooltipLines;
             if (tooltip == null || tooltip.isEmpty()) {
-                tooltip = stack.getTooltip(Item.TooltipContext.DEFAULT, client.player, TooltipType.BASIC);
+                tooltip = stack.getTooltipLines(Item.TooltipContext.EMPTY, client.player, TooltipFlag.NORMAL);
             }
             List<String> normalizedLines = TextUtil.normalizeLines(tooltip);
             Optional<AuctionHighlighter.ActiveHighlight> parsed =
@@ -1621,7 +1697,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
         } catch (Throwable throwable) {
             this.debugLogManager.logInternal("Parser failure in ah-slot: "
                 + throwable.getClass().getSimpleName() + " - " + throwable.getMessage());
-            return this.auctionHighlighter.getCachedHighlight(buildAuctionItemKey(slot.getStack()));
+            return this.auctionHighlighter.getCachedHighlight(buildAuctionItemKey(slot.getItem()));
         }
     }
 
@@ -1639,8 +1715,8 @@ public final class MinepieceQolClient implements ClientModInitializer {
         if (stack == null || stack.isEmpty()) {
             return "";
         }
-        return Registries.ITEM.getId(stack.getItem()) + "|"
-            + TextUtil.normalize(stack.getName()) + "|"
+        return BuiltInRegistries.ITEM.getKey(stack.getItem()) + "|"
+            + TextUtil.normalize(stack.getHoverName()) + "|"
             + stack.getComponents().hashCode() + "|"
             + stack.getCount();
     }
@@ -1667,7 +1743,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             absX,
             absY
         );
-        String previous = this.lastAuctionDebugLines.put(slot.id, line);
+        String previous = this.lastAuctionDebugLines.put(slot.index, line);
         if (!line.equals(previous)) {
             this.debugLogManager.logInternal(line);
         }

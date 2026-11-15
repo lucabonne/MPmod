@@ -47,4 +47,58 @@ class CustomPicturesTest {
         ImageIO.write(new BufferedImage(4097, 1, BufferedImage.TYPE_INT_ARGB), "png", wide.toFile());
         assertThrows(IOException.class, () -> CustomPictures.importPicture(wide, temp));
     }
+
+    @Test void importsFolderAsOneRotationAndSkipsUnsupportedOrInvalidFiles() throws Exception {
+        Path folder = Files.createDirectory(temp.resolve("Holiday photos"));
+        var image = new BufferedImage(32, 16, BufferedImage.TYPE_INT_RGB);
+        Path png = folder.resolve("one.PNG");
+        Path jpg = folder.resolve("two.jpg");
+        Path jpeg = folder.resolve("three.JPEG");
+        ImageIO.write(image, "png", png.toFile());
+        ImageIO.write(image, "jpg", jpg.toFile());
+        ImageIO.write(image, "jpg", jpeg.toFile());
+        byte[] pngBefore = Files.readAllBytes(png);
+        byte[] jpgBefore = Files.readAllBytes(jpg);
+        byte[] jpegBefore = Files.readAllBytes(jpeg);
+        Files.writeString(folder.resolve("broken.png"), "not an image");
+        Files.writeString(folder.resolve("notes.txt"), "keep me");
+        ImageIO.write(new BufferedImage(4097, 1, BufferedImage.TYPE_INT_RGB), "png", folder.resolve("wide.png").toFile());
+        Path nested = Files.createDirectory(folder.resolve("nested"));
+        ImageIO.write(image, "png", nested.resolve("hidden.png").toFile());
+
+        Path imports = temp.resolve("imports");
+        var picture = CustomPictures.importFolder(folder, imports);
+
+        assertEquals("Holiday photos", picture.name);
+        assertEquals(3, picture.rotationFiles.size());
+        assertEquals(3, picture.rotationFiles.stream().distinct().count());
+        assertEquals(picture.file, picture.rotationFiles.getFirst());
+        assertEquals(10, picture.intervalSeconds);
+        for (String file : picture.rotationFiles) {
+            assertTrue(file.matches("[a-zA-Z0-9-]+\\.png"));
+            assertNotNull(ImageIO.read(imports.resolve(file).toFile()));
+        }
+        assertArrayEquals(pngBefore, Files.readAllBytes(png));
+        assertArrayEquals(jpgBefore, Files.readAllBytes(jpg));
+        assertArrayEquals(jpegBefore, Files.readAllBytes(jpeg));
+        assertEquals("keep me", Files.readString(folder.resolve("notes.txt")));
+    }
+
+    @Test void rejectsFoldersWithoutAnyUsableImages() throws Exception {
+        Path folder = Files.createDirectory(temp.resolve("empty"));
+        assertThrows(IOException.class, () -> CustomPictures.importFolder(folder, temp.resolve("imports")));
+        Files.writeString(folder.resolve("bad.jpg"), "not an image");
+        assertThrows(IOException.class, () -> CustomPictures.importFolder(folder, temp.resolve("imports")));
+        assertThrows(IOException.class, () -> CustomPictures.importFolder(temp.resolve("missing"), temp.resolve("imports")));
+        assertThrows(IOException.class, () -> CustomPictures.importFolder(folder.resolve("bad.jpg"), temp.resolve("imports")));
+    }
+
+    @Test void importsASingleImageFolder() throws Exception {
+        Path folder = Files.createDirectory(temp.resolve("one photo"));
+        ImageIO.write(new BufferedImage(32, 64, BufferedImage.TYPE_INT_ARGB), "png", folder.resolve("one.png").toFile());
+        var picture = CustomPictures.importFolder(folder, temp.resolve("imports"));
+        assertEquals(1, picture.rotationFiles.size());
+        assertEquals(picture.file, picture.rotationFiles.getFirst());
+        assertTrue(Files.isRegularFile(temp.resolve("imports").resolve(picture.file)));
+    }
 }

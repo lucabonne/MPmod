@@ -16,7 +16,6 @@ public final class GrindingTracker {
     private final Map<String, DisplayedGain> previousGains = new HashMap<>();
     private final ArrayDeque<RateSample> samples = new ArrayDeque<>();
     private String day = "";
-    private long lastDangerMs = -1;
     private long lastXpMs = -1;
     private long lastTickMs = -1;
     private long lastRateMs = -1;
@@ -34,7 +33,6 @@ public final class GrindingTracker {
 
     public void reset() {
         this.samples.clear();
-        this.lastDangerMs = -1;
         this.lastXpMs = -1;
         this.lastTickMs = -1;
         this.lastRateMs = -1;
@@ -50,35 +48,35 @@ public final class GrindingTracker {
 
     public void onActionbar(String text, long now) {
         tick(now);
-        double dangerDelta = 0;
+        boolean dangerVisible = false;
         double moneyDelta = 0;
         for (ActionbarParser.SymbolGain gain : ActionbarParser.parseSymbolGains(text)) {
             if ((!gain.symbol().equals("军") && !gain.symbol().equals("实")) || !Double.isFinite(gain.value()) || gain.value() < 0) continue;
             DisplayedGain previous = this.previousGains.put(gain.symbol(), new DisplayedGain(gain.value(), now));
             double delta = previous == null || now - previous.time() > REWARD_DISPLAY_MS || gain.value() < previous.value()
                 ? gain.value() : Math.max(0, gain.value() - previous.value());
-            if (gain.symbol().equals("军")) dangerDelta += delta;
+            if (gain.symbol().equals("军")) dangerVisible |= gain.value() > 0;
             else moneyDelta += delta;
         }
-        if (dangerDelta > 0) {
-            this.lastDangerMs = now;
+        if (dangerVisible) {
             this.money += moneyDelta;
             this.pendingMoney += moneyDelta;
         }
     }
 
-    public boolean hasRecentDanger(long now) {
-        return this.lastDangerMs >= 0 && now >= this.lastDangerMs && now - this.lastDangerMs <= REWARD_DISPLAY_MS;
-    }
-
-    public void onXpGain(double gain, long now) {
+    public void onXpActivity(long now) {
         tick(now);
-        if (!Double.isFinite(gain) || gain <= 0 || !hasRecentDanger(now)) return;
         if (!isActive(now)) {
             this.samples.clear();
             this.windowStartMs = this.activeMs;
         }
         this.lastXpMs = now;
+    }
+
+    public void onXpGain(double gain, long now) {
+        tick(now);
+        if (!Double.isFinite(gain) || gain <= 0) return;
+        onXpActivity(now);
         this.xp += gain;
         this.samples.addLast(new RateSample(this.activeMs, gain, this.pendingMoney));
         this.pendingMoney = 0;
@@ -138,7 +136,6 @@ public final class GrindingTracker {
     public void pause(long now) {
         tick(now);
         this.lastXpMs = -1;
-        this.lastDangerMs = -1;
         this.lastProfileXp = Double.NaN;
         this.pendingMoney = 0;
         this.samples.clear();

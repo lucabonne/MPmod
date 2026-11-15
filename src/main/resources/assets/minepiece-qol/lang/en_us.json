@@ -2,5 +2,7 @@
   "key.categories.minepiece-qol": "Minepiece QoL",
   "key.minepiece-qol.open_menu": "Open Mod Menu",
   "key.minepiece-qol.loadout": "Quick UI loadouts",
-  "key.category.minepiece-qol.loadouts": "Minepiece UI"
+  "key.category.minepiece-qol.loadouts": "Minepiece UI",
+  "key.category.minepiece-qol.main": "Minepiece QoL",
+  "key.minepiece-qol.hud_editor": "Open / close HUD editor"
 }

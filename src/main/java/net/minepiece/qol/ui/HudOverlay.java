@@ -3,19 +3,18 @@ package net.minepiece.qol.ui;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minepiece.qol.MinepieceQolClient;
 import net.minepiece.qol.config.ConfigManager;
 import net.minepiece.qol.config.UiSettings;
 import net.minepiece.qol.state.BossTracker;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
 
 public final class HudOverlay {
     private int PANEL_PADDING_X = 6;
     private int PANEL_PADDING_Y = 4;
     private static final int PANEL_LINE_SPACING = 10;
-    private int PANEL_HEADER_HEIGHT = 12;
     private static final int PANEL_BORDER_COLOR = 0x66000000;
     private static final int EDIT_SELECTED_COLOR = 0xCCFFD766;
     private static final int EDIT_UNSELECTED_COLOR = 0x66FFFFFF;
@@ -89,14 +88,35 @@ public final class HudOverlay {
     private static final PanelTheme SCROLLS_THEME = STATS_THEME;
 
     private final MinepieceQolClient mod;
+    private final List<IslandHit> islandHits = new java.util.ArrayList<>();
+    private record IslandHit(String islandId, HudPanelGeometry.RowRect bounds) { }
+
+    public boolean toggleBossIslandAt(double mouseX, double mouseY) {
+        var client = Minecraft.getInstance();
+        var config = this.mod.getConfig();
+        if (client.player == null || client.gui.hud.isHidden() || !config.modEnabled || !config.allFeaturesVisible
+            || !isBossTrackingEnabled(config) || !this.mod.isHudPanelVisible(4)) return false;
+        if (!(client.gui.screen() instanceof net.minecraft.client.gui.screens.ChatScreen)
+            && !(client.gui.screen() instanceof HudLayoutScreen)) return false;
+        for (var hit : this.islandHits) {
+            if (!hit.bounds().contains(mouseX, mouseY)) continue;
+            var collapsed = config.appearance.collapsedBossIslands;
+            if (!collapsed.remove(hit.islandId())) collapsed.add(hit.islandId());
+            this.islandHits.clear();
+            this.mod.saveConfig();
+            return true;
+        }
+        return false;
+    }
 
     public HudOverlay(MinepieceQolClient mod) {
         this.mod = mod;
     }
 
-    public void render(DrawContext drawContext) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.player == null || client.options.hudHidden) {
+    public void render(GuiGraphicsExtractor drawContext) {
+        this.islandHits.clear();
+        Minecraft client = Minecraft.getInstance();
+        if (client == null || client.player == null || client.gui.hud.isHidden()) {
             return;
         }
 
@@ -107,8 +127,7 @@ public final class HudOverlay {
 
         PANEL_PADDING_X = config.appearance.compact ? 4 : 6;
         PANEL_PADDING_Y = config.appearance.compact ? 2 : 4;
-        PANEL_HEADER_HEIGHT = config.appearance.headers ? 12 : 0;
-        TextRenderer textRenderer = client.textRenderer;
+        Font textRenderer = client.font;
         for (var picture : config.appearance.pictures) this.mod.getCustomPictures().draw(drawContext, picture, this.mod.isHudEditMode());
         boolean editMode = this.mod.isHudEditMode();
         int selected = this.mod.getHudEditSelectedPanel();
@@ -123,16 +142,15 @@ public final class HudOverlay {
         List<String> jobsOverviewLines = (config.jobsTrackingEnabled && config.jobsOverviewVisible)
             ? this.mod.getJobsTracker().getOverviewHudLines(this.mod::tr) : List.of();
         List<String> moneyLines = config.moneyTrackingEnabled ? this.mod.getMoneyTracker().getHudLines(this.mod::tr) : List.of();
-        List<String> statsLines = config.profileStatsEnabled ? this.mod.getProfileStatsTracker().getHudLines(this.mod::tr) : List.of();
-        List<BossTracker.HudLine> bossLines = isBossTrackingEnabled(config) ? this.mod.getBossTracker().getZoneBossHudLines(false, this.mod::tr) : List.of();
+        List<String> statsLines = config.profileStatsEnabled ? this.mod.getProfileStatsTracker().getHudLines(this.mod::tr, config.appearance.profileStats) : List.of();
+        List<BossTracker.HudLine> bossLines = isBossTrackingEnabled(config) ? this.mod.getBossTracker().getZoneBossHudLines(false, this.mod::tr, config.appearance.collapsedBossIslands, config.appearance.bossesByTime) : List.of();
         List<BossTracker.HudLine> minibossLines = isBossTrackingEnabled(config) ? this.mod.getBossTracker().getMinibossHudLines(false, this.mod::tr) : List.of();
         List<BossTracker.HudLine> scrollLines = config.scrollsEnabled ? this.mod.getScrollTracker().getHudLines(this.mod::tr) : List.of();
         List<String> inventoryXpLines = this.mod.getXpHudLines();
 
         PanelRect jobsRect = renderStringPanel(
             drawContext,
-            textRenderer,
-            this.mod.getHudPanelName(1),
+            textRenderer, 1, this.mod.getHudPanelName(1),
             jobsOverviewLines,
             config.jobsHudX,
             config.jobsHudY,
@@ -144,8 +162,7 @@ public final class HudOverlay {
         );
         PanelRect moneyRect = renderStringPanel(
             drawContext,
-            textRenderer,
-            this.mod.getHudPanelName(2),
+            textRenderer, 2, this.mod.getHudPanelName(2),
             moneyLines,
             config.moneyHudX,
             config.moneyHudY,
@@ -157,8 +174,7 @@ public final class HudOverlay {
         );
         PanelRect statsRect = renderStringPanel(
             drawContext,
-            textRenderer,
-            this.mod.getHudPanelName(3),
+            textRenderer, 3, this.mod.getHudPanelName(3),
             statsLines,
             config.statsHudX,
             config.statsHudY,
@@ -169,14 +185,13 @@ public final class HudOverlay {
             this.mod.isHudPanelVisible(3)
         );
         PanelRect bossesRect = renderToggleableColoredPanel(
-            drawContext, textRenderer, this.mod.getHudPanelName(4), bossLines,
+            drawContext, textRenderer, 4, this.mod.getHudPanelName(4), bossLines,
             config.bossHudX, config.bossHudY, config.bossHudScale,
             bossesTheme, editMode, selected == 4, this.mod.isHudPanelVisible(4)
         );
         PanelRect minibossRect = renderToggleableColoredPanel(
             drawContext,
-            textRenderer,
-            this.mod.getHudPanelName(5),
+            textRenderer, 5, this.mod.getHudPanelName(5),
             minibossLines,
             config.minibossHudX,
             config.minibossHudY,
@@ -188,8 +203,7 @@ public final class HudOverlay {
         );
         PanelRect scrollsRect = renderToggleableColoredPanel(
             drawContext,
-            textRenderer,
-            this.mod.getHudPanelName(8),
+            textRenderer, 8, this.mod.getHudPanelName(8),
             scrollLines,
             config.scrollsHudX,
             config.scrollsHudY,
@@ -201,8 +215,7 @@ public final class HudOverlay {
         );
         PanelRect inventoryXpRect = renderStringPanel(
             drawContext,
-            textRenderer,
-            this.mod.getHudPanelName(9),
+            textRenderer, 9, this.mod.getHudPanelName(9),
             inventoryXpLines,
             config.inventoryXpHudX,
             config.inventoryXpHudY,
@@ -214,23 +227,41 @@ public final class HudOverlay {
         );
 
         PanelRect grindingRect = renderStringPanel(
-            drawContext, textRenderer, this.mod.getHudPanelName(10),
+            drawContext, textRenderer, 10, this.mod.getHudPanelName(10),
             this.mod.getProgressHudController().grinding().getHudLines(this.mod::tr, System.currentTimeMillis()),
             config.grindingHudX, config.grindingHudY, config.grindingHudScale,
             resolveThemedPanel(MONEY_THEME, config.grindingHudColor), editMode, selected == 10, config.grindingHudEnabled && this.mod.isHudPanelVisible(10)
         );
 
+        for (int id : new int[]{13, 14}) {
+            boolean enabled = id == 13 ? config.dailyQuestsEnabled : config.activePetsEnabled;
+            renderStringPanel(drawContext, textRenderer, id, this.mod.getHudPanelName(id),
+                enabled ? (id == 13 ? this.mod.getEssentials().quests().lines() : this.mod.getEssentials().petLines()) : List.of(),
+                this.mod.getHudPanelX(id), this.mod.getHudPanelY(id), this.mod.getHudPanelScale(id),
+                resolveThemedPanel(id == 13 ? JOBS_THEME : STATS_THEME, this.mod.getHudPanelColor(id)),
+                editMode, selected == id, enabled && this.mod.isHudPanelVisible(id));
+        }
+        net.minepiece.qol.ui.RarityInventoryTools.drawHotbar(this.mod, drawContext);
+        PanelRect clockRect = renderStringPanel(
+            drawContext, textRenderer, 12, this.mod.getHudPanelName(12), ClockHud.lines(),
+            config.clockHudX, config.clockHudY, config.clockHudScale,
+            resolveThemedPanel(MONEY_THEME, config.clockHudColor), editMode, selected == 12, this.mod.isHudPanelVisible(12)
+        );
+        if (editMode && clockRect != null) {
+            drawContext.text(textRenderer, "12", clockRect.x - 7, clockRect.y - 7, 0xFFFFFFFF);
+        }
+
         PanelRect cookingRect = renderStringPanel(
-            drawContext, textRenderer, this.mod.getHudPanelName(11),
+            drawContext, textRenderer, 11, this.mod.getHudPanelName(11),
             this.mod.getCookingTracker().getHudLines(this.mod::tr, config.cookingQuantity),
             config.cookingHudX, config.cookingHudY, config.cookingHudScale,
             resolveThemedPanel(MONEY_THEME, config.cookingHudColor), editMode, selected == 11, config.cookingHudEnabled && this.mod.isHudPanelVisible(11)
         );
         if (editMode && cookingRect != null) {
-            drawContext.drawTextWithShadow(textRenderer, "11", cookingRect.x - 7, cookingRect.y - 7, 0xFFFFFFFF);
+            drawContext.text(textRenderer, "11", cookingRect.x - 7, cookingRect.y - 7, 0xFFFFFFFF);
         }
 
-        if (config.eventsEnabled && (this.mod.isHudPanelVisible(6) || editMode)) {
+        if ((config.eventsEnabled && this.mod.isHudPanelVisible(6)) || editMode) {
             int eventColor = resolveConfiguredTextColor(config.eventsHudColor, 0xFFFFFFFF);
             drawScaledText(
                 drawContext,
@@ -239,28 +270,29 @@ public final class HudOverlay {
                 config.eventsHudX,
                 config.eventsHudY,
                 eventColor,
-                clampScale(config.eventsHudScale)
+                clampScale(config.eventsHudScale) * config.appearance.panelStyle(6).textScale
             );
         }
 
         String statsHint = this.mod.getStatsRefreshController().getHudHintText();
         if (!statsHint.isBlank() && statsRect != null) {
             int hintY = statsRect.y + statsRect.height + 3;
-            drawContext.drawTextWithShadow(textRenderer, statsHint, statsRect.x, hintY, 0xFFAAAAAA);
+            drawContext.text(textRenderer, statsHint, statsRect.x, hintY, 0xFFAAAAAA);
         }
 
-        String hakiLine = config.hakiEnabled && (this.mod.isHudPanelVisible(7) || editMode) ? this.mod.getCooldownTracker().getHakiHudText(this.mod::tr) : "";
+        String hakiLine = (config.hakiEnabled && this.mod.isHudPanelVisible(7) || editMode) ? this.mod.getCooldownTracker().getHakiHudText(this.mod::tr) : "";
+        if (editMode && hakiLine.isBlank()) hakiLine = this.mod.tr("common.ready");
         if (!hakiLine.isBlank()) {
             int hakiDefaultColor = this.mod.getCooldownTracker().isHakiReady() ? 0xFFFF5555 : 0xFFFFFFFF;
             int hakiColor = resolveConfiguredTextColor(config.hakiHudColor, hakiDefaultColor);
             int hakiX = this.mod.resolveHakiHudX(client);
             int hakiY = this.mod.resolveHakiHudY(client);
-            drawContext.getMatrices().pushMatrix();
-            drawContext.getMatrices().translate((float) hakiX, (float) hakiY);
-            float hakiScale = clampScale(config.hakiHudScale);
-            drawContext.getMatrices().scale(hakiScale, hakiScale);
-            drawContext.drawTextWithShadow(textRenderer, hakiLine, 0, 0, hakiColor);
-            drawContext.getMatrices().popMatrix();
+            drawContext.pose().pushMatrix();
+            drawContext.pose().translate((float) hakiX, (float) hakiY);
+            float hakiScale = clampScale(config.hakiHudScale) * config.appearance.panelStyle(7).textScale;
+            drawContext.pose().scale(hakiScale, hakiScale);
+            drawContext.text(textRenderer, hakiLine, 0, 0, hakiColor);
+            drawContext.pose().popMatrix();
         }
 
         if (editMode) {
@@ -269,7 +301,7 @@ public final class HudOverlay {
     }
 
     private PanelRect renderStringPanel(
-        DrawContext drawContext, TextRenderer textRenderer, String title,
+        GuiGraphicsExtractor drawContext, Font textRenderer, int panelId, String title,
         List<String> lines, int x, int y, float scale, PanelTheme theme,
         boolean editMode, boolean selected, boolean enabled
     ) {
@@ -281,11 +313,11 @@ public final class HudOverlay {
         for (String line : resolved) {
             colored.add(new BossTracker.HudLine(line, theme.textColor()));
         }
-        return renderColoredPanel(drawContext, textRenderer, title, colored, x, y, scale, theme, editMode, selected);
+        return renderColoredPanel(drawContext, textRenderer, panelId, title, colored, x, y, scale, theme, editMode, selected);
     }
 
     private PanelRect renderColoredPanel(
-        DrawContext drawContext, TextRenderer textRenderer, String title,
+        GuiGraphicsExtractor drawContext, Font textRenderer, int panelId, String title,
         List<BossTracker.HudLine> lines, int x, int y, float scale,
         PanelTheme theme, boolean editMode, boolean selected
     ) {
@@ -300,43 +332,38 @@ public final class HudOverlay {
 
         var appearance = this.mod.getConfig().appearance;
         renderLines = renderLines.stream().map(line -> new BossTracker.HudLine(
-            line.text(), appearance.hudTextColor(line.color()))).toList();
+            line.text(), appearance.hudTextColor(line.color()), line.islandId())).toList();
         boolean iconRows = this.mod.getConfig().appearance.iconRows;
         var component = iconRows ? new IconGridTooltipComponent(HudIcons.rows(this.mod, title, renderLines),
             this.mod.getConfig().appearance.compact, this.mod.getConfig().appearance.shadows) : null;
-        int lineStep = Math.max(8, Math.round((iconRows ? IconGridTooltipComponent.rowHeight(this.mod.getConfig().appearance.compact) : PANEL_LINE_SPACING) * clampedScale));
-        int textWidth = 0;
-        for (BossTracker.HudLine line : renderLines) {
-            int width = (int) Math.ceil(textRenderer.getWidth(line.text()) * clampedScale);
-            if (width > textWidth) {
-                textWidth = width;
-            }
+        var geometry = HudPanelGeometry.measure(panelId, title, renderLines.stream().map(BossTracker.HudLine::text).toList(),
+            x, y, clampedScale, appearance, textRenderer::width);
+        int lineStep = geometry.lineStep();
+        int panelWidth = geometry.width();
+        int panelHeight = geometry.height();
+        for (int i = 0; i < renderLines.size(); i++) {
+            if (!renderLines.get(i).islandId().isBlank()) this.islandHits.add(new IslandHit(renderLines.get(i).islandId(), geometry.row(i)));
         }
-        if (component != null) textWidth = (int) Math.ceil(component.getWidth(textRenderer) * clampedScale);
-        int titleWidth = textRenderer.getWidth(title);
-        int panelWidth = Math.max(textWidth, titleWidth) + (PANEL_PADDING_X * 2);
-        int panelHeight = PANEL_HEADER_HEIGHT + (PANEL_PADDING_Y * 2) + (component == null
-            ? renderLines.size() * lineStep : (int) Math.ceil(component.getHeight(textRenderer) * clampedScale));
 
-        drawPanelFrame(drawContext, textRenderer, title, x, y, panelWidth, panelHeight, theme);
+        drawPanelFrame(drawContext, textRenderer, title, x, y, panelWidth, panelHeight, theme, geometry);
 
-        int textX = x + PANEL_PADDING_X;
-        int textY = y + PANEL_HEADER_HEIGHT + PANEL_PADDING_Y;
+        int textX = geometry.textX();
+        int textY = geometry.textY();
         int offsetY = 0;
         boolean customTheme = isCustomTheme(theme);
         if (component != null) {
-            drawContext.getMatrices().pushMatrix();
-            drawContext.getMatrices().translate((float) textX, (float) textY);
-            drawContext.getMatrices().scale(clampedScale, clampedScale);
-            component.drawText(drawContext, textRenderer, 0, 0);
-            component.drawItems(textRenderer, 0, 0, component.getWidth(textRenderer), component.getHeight(textRenderer), drawContext);
-            drawContext.getMatrices().popMatrix();
+            drawContext.pose().pushMatrix();
+            drawContext.pose().translate((float) textX, (float) textY);
+            drawContext.pose().scale(geometry.scale(), geometry.scale());
+            component.extractText(drawContext, textRenderer, 0, 0);
+            component.extractImage(textRenderer, 0, 0, component.getWidth(textRenderer), component.getHeight(textRenderer), drawContext);
+            drawContext.pose().popMatrix();
         }
         for (BossTracker.HudLine line : component == null ? renderLines : List.<BossTracker.HudLine>of()) {
             int lineColor = customTheme
                 ? ensureReadableColor(line.color(), theme.backgroundColor(), theme.textColor())
                 : line.color();
-            drawScaledText(drawContext, textRenderer, line.text(), textX, textY + offsetY, lineColor, clampedScale);
+            drawScaledText(drawContext, textRenderer, line.text(), textX, textY + offsetY, lineColor, geometry.scale());
             offsetY += lineStep;
         }
 
@@ -347,8 +374,9 @@ public final class HudOverlay {
     }
 
     private PanelRect renderToggleableColoredPanel(
-        DrawContext drawContext,
-        TextRenderer textRenderer,
+        GuiGraphicsExtractor drawContext,
+        Font textRenderer,
+        int panelId,
         String title,
         List<BossTracker.HudLine> lines,
         int x,
@@ -365,24 +393,25 @@ public final class HudOverlay {
         List<BossTracker.HudLine> renderLines = enabled
             ? lines
             : List.of(new BossTracker.HudLine(this.mod.tr("common.hidden"), theme.textColor()));
-        return renderColoredPanel(drawContext, textRenderer, title, renderLines, x, y, scale, theme, editMode, selected);
+        return renderColoredPanel(drawContext, textRenderer, panelId, title, renderLines, x, y, scale, theme, editMode, selected);
     }
 
     private void drawPanelFrame(
-        DrawContext drawContext,
-        TextRenderer textRenderer,
+        GuiGraphicsExtractor drawContext,
+        Font textRenderer,
         String title,
         int x,
         int y,
         int width,
         int height,
-        PanelTheme theme
+        PanelTheme theme,
+        HudPanelGeometry geometry
     ) {
         var appearance = this.mod.getConfig().appearance;
         drawContext.fill(x, y, x + width, y + height, theme.backgroundColor());
-        if (appearance.headers) {
-            drawContext.fill(x, y, x + width, y + PANEL_HEADER_HEIGHT, theme.headerColor());
-            drawContext.drawText(textRenderer, title, x + 4, y + 2, theme.titleColor(), appearance.shadows);
+        if (geometry.headerHeight() > 0) {
+            drawContext.fill(x, y, x + width, y + geometry.headerHeight(), theme.headerColor());
+            drawScaledText(drawContext, textRenderer, title, x + 4, y + 2, theme.titleColor(), geometry.titleScale());
         }
         for (int i = 0; i < appearance.borderWidth; i++) {
             drawOutline(drawContext, x + i, y + i, width - i * 2, height - i * 2, theme.borderOuterColor());
@@ -393,14 +422,14 @@ public final class HudOverlay {
         }
     }
 
-    private static void drawOutline(DrawContext drawContext, int x, int y, int width, int height, int color) {
+    private static void drawOutline(GuiGraphicsExtractor drawContext, int x, int y, int width, int height, int color) {
         drawContext.fill(x, y, x + width, y + 1, color);
         drawContext.fill(x, y + height - 1, x + width, y + height, color);
         drawContext.fill(x, y, x + 1, y + height, color);
         drawContext.fill(x + width - 1, y, x + width, y + height, color);
     }
 
-    private static void drawCornerOrnaments(DrawContext drawContext, int x, int y, int width, int height, PanelTheme theme) {
+    private static void drawCornerOrnaments(GuiGraphicsExtractor drawContext, int x, int y, int width, int height, PanelTheme theme) {
         int s = 4;
         // top-left
         drawContext.fill(x, y, x + s, y + 1, theme.cornerBaseColor());
@@ -424,35 +453,35 @@ public final class HudOverlay {
         drawContext.fill(x + width - 2, y + height - s + 1, x + width - 1, y + height - 1, theme.cornerHighlightColor());
     }
 
-    private static void drawSparkles(DrawContext drawContext, int x, int y, int width, int height, int sparkleColor) {
+    private static void drawSparkles(GuiGraphicsExtractor drawContext, int x, int y, int width, int height, int sparkleColor) {
         drawPlus(drawContext, x + Math.max(6, width - 12), y + 3, sparkleColor);
         drawPlus(drawContext, x + Math.max(4, width - 8), y + Math.max(8, height - 6), sparkleColor);
     }
 
-    private static void drawPlus(DrawContext drawContext, int x, int y, int color) {
+    private static void drawPlus(GuiGraphicsExtractor drawContext, int x, int y, int color) {
         drawContext.fill(x - 1, y, x + 2, y + 1, color);
         drawContext.fill(x, y - 1, x + 1, y + 2, color);
     }
 
     private void drawScaledText(
-        DrawContext drawContext,
-        TextRenderer textRenderer,
+        GuiGraphicsExtractor drawContext,
+        Font textRenderer,
         String text,
         int x,
         int y,
         int color,
         float scale
     ) {
-        drawContext.getMatrices().pushMatrix();
-        drawContext.getMatrices().translate((float) x, (float) y);
-        drawContext.getMatrices().scale(scale, scale);
-        drawContext.drawText(textRenderer, text, 0, 0, color, this.mod.getConfig().appearance.shadows);
-        drawContext.getMatrices().popMatrix();
+        drawContext.pose().pushMatrix();
+        drawContext.pose().translate((float) x, (float) y);
+        drawContext.pose().scale(scale, scale);
+        drawContext.text(textRenderer, text, 0, 0, color, this.mod.getConfig().appearance.shadows);
+        drawContext.pose().popMatrix();
     }
 
     private void drawHudEditorHelp(
-        DrawContext drawContext,
-        TextRenderer textRenderer,
+        GuiGraphicsExtractor drawContext,
+        Font textRenderer,
         int selected,
         PanelRect jobsRect,
         PanelRect moneyRect,
@@ -475,41 +504,42 @@ public final class HudOverlay {
             case 9 -> this.mod.getHudPanelName(9);
             case 10 -> this.mod.getHudPanelName(10);
             case 11 -> this.mod.getHudPanelName(11);
+            case 12 -> this.mod.getHudPanelName(12);
             default -> this.mod.getHudPanelName(1);
         };
         String controls = this.mod.tr("hud.editor.controls");
         int boxX = 8;
         int boxY = 8;
-        int boxW = textRenderer.getWidth(controls) + 8;
+        int boxW = textRenderer.width(controls) + 8;
         int boxH = 24;
         drawContext.fill(boxX, boxY, boxX + boxW, boxY + boxH, 0xAA000000);
         drawOutline(drawContext, boxX, boxY, boxW, boxH, PANEL_BORDER_COLOR);
-        drawContext.drawTextWithShadow(textRenderer, controls, boxX + 4, boxY + 4, 0xFFFFFFFF);
-        drawContext.drawTextWithShadow(textRenderer, this.mod.tr("common.selected") + ": " + selectedName, boxX + 4, boxY + 14, 0xFFFFDD88);
+        drawContext.text(textRenderer, controls, boxX + 4, boxY + 4, 0xFFFFFFFF);
+        drawContext.text(textRenderer, this.mod.tr("common.selected") + ": " + selectedName, boxX + 4, boxY + 14, 0xFFFFDD88);
 
         if (jobsRect != null) {
-            drawContext.drawTextWithShadow(textRenderer, "1", jobsRect.x - 7, jobsRect.y - 7, 0xFFFFFFFF);
+            drawContext.text(textRenderer, "1", jobsRect.x - 7, jobsRect.y - 7, 0xFFFFFFFF);
         }
         if (moneyRect != null) {
-            drawContext.drawTextWithShadow(textRenderer, "2", moneyRect.x - 7, moneyRect.y - 7, 0xFFFFFFFF);
+            drawContext.text(textRenderer, "2", moneyRect.x - 7, moneyRect.y - 7, 0xFFFFFFFF);
         }
         if (statsRect != null) {
-            drawContext.drawTextWithShadow(textRenderer, "3", statsRect.x - 7, statsRect.y - 7, 0xFFFFFFFF);
+            drawContext.text(textRenderer, "3", statsRect.x - 7, statsRect.y - 7, 0xFFFFFFFF);
         }
         if (bossesRect != null) {
-            drawContext.drawTextWithShadow(textRenderer, "4", bossesRect.x - 7, bossesRect.y - 7, 0xFFFFFFFF);
+            drawContext.text(textRenderer, "4", bossesRect.x - 7, bossesRect.y - 7, 0xFFFFFFFF);
         }
         if (minibossRect != null) {
-            drawContext.drawTextWithShadow(textRenderer, "5", minibossRect.x - 7, minibossRect.y - 7, 0xFFFFFFFF);
+            drawContext.text(textRenderer, "5", minibossRect.x - 7, minibossRect.y - 7, 0xFFFFFFFF);
         }
         if (scrollsRect != null) {
-            drawContext.drawTextWithShadow(textRenderer, "8", scrollsRect.x - 7, scrollsRect.y - 7, 0xFFFFFFFF);
+            drawContext.text(textRenderer, "8", scrollsRect.x - 7, scrollsRect.y - 7, 0xFFFFFFFF);
         }
         if (inventoryXpRect != null) {
-            drawContext.drawTextWithShadow(textRenderer, "9", inventoryXpRect.x - 7, inventoryXpRect.y - 7, 0xFFFFFFFF);
+            drawContext.text(textRenderer, "9", inventoryXpRect.x - 7, inventoryXpRect.y - 7, 0xFFFFFFFF);
         }
         if (grindingRect != null) {
-            drawContext.drawTextWithShadow(textRenderer, "10", grindingRect.x - 7, grindingRect.y - 7, 0xFFFFFFFF);
+            drawContext.text(textRenderer, "10", grindingRect.x - 7, grindingRect.y - 7, 0xFFFFFFFF);
         }
     }
 

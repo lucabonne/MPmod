@@ -13,7 +13,7 @@ public final class UiLoadouts {
         layout.screenWidth = Math.max(1, width);
         layout.screenHeight = Math.max(1, height);
         layout.appearance = mod.getConfig().appearance.copy();
-        for (int id = 1; id <= 11; id++) {
+        for (int id = 1; id <= 14; id++) {
             layout.panels.put(id, new UiSettings.Placement(mod.getHudPanelX(id), mod.getHudPanelY(id),
                 mod.getHudPanelScale(id), mod.getHudPanelColor(id)));
         }
@@ -25,7 +25,7 @@ public final class UiLoadouts {
         for (var entry : layout.panels.entrySet()) {
             int id = entry.getKey();
             var p = entry.getValue();
-            if (id < 1 || id > 11 || p == null) continue;
+            if (id < 1 || id > 14 || p == null) continue;
             mod.setHudPanelLayout(id, UiSettings.resizePosition(p.x, layout.screenWidth, width),
                 UiSettings.resizePosition(p.y, layout.screenHeight, height), p.scale);
             mod.setHudPanelColor(id, p.color);
@@ -44,8 +44,8 @@ public final class UiLoadouts {
             default -> List.of(10, 9, 2, 5);
         };
         mod.getConfig().appearance.hiddenPanels.clear();
-        for (int id = 1; id <= 11; id++) {
-            if (!priority.contains(id)) mod.getConfig().appearance.hiddenPanels.add(id);
+        for (int id = 1; id <= 14; id++) {
+            if (id != 12 && !priority.contains(id)) mod.getConfig().appearance.hiddenPanels.add(id);
         }
         // Two panels per edge, leaving the crosshair and central view unobstructed.
         for (int i = 0; i < priority.size(); i++) {

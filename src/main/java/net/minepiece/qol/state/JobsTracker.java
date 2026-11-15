@@ -19,7 +19,7 @@ public final class JobsTracker {
     public static final List<String> HUD_JOB_ORDER = List.of("fisherman", "farmer", "miner", "lumberjack");
     private static final ZoneId JOBS_ZONE = ZoneId.of("Europe/Rome");
     private static final Pattern LEVEL_UP_PATTERN = Pattern.compile(
-        "(?:level|lvl|niveau|nivel|stufe|livello|poziom|seviye)\\s*[:.]?\\s*(\\d{1,4})",
+        "(?:level|lvl|niveau|nivel|stufe|livello|poziom|tingkat|seviye)\\s*[:.]?\\s*(\\d{1,4})",
         Pattern.CASE_INSENSITIVE
     );
     private static final Map<String, List<String>> JOB_KEYWORDS = Map.of(
@@ -77,12 +77,13 @@ public final class JobsTracker {
                     }
                 }
 
-                if (level < 0 || needed < 10.0D || needed > 1_000_000_000.0D) {
+                if (level < 0 || needed <= 0.0D || needed > 1_000_000_000.0D) {
                     continue;
                 }
 
                 PersistentState.JobInfo info = this.state.jobs.computeIfAbsent(jobName, key -> new PersistentState.JobInfo());
                 info.level = level;
+                info.levelEstimated = false;
                 info.neededXp = needed;
                 info.currentXp = -1.0D;
                 info.dailyXp = 0.0D;
@@ -177,6 +178,7 @@ public final class JobsTracker {
         }
         PersistentState.JobInfo info = this.state.jobs.computeIfAbsent(jobName, key -> new PersistentState.JobInfo());
         info.level = Math.max(0, level);
+        info.levelEstimated = false;
         info.currentXp = Math.max(0.0D, currentXp);
         info.neededXp = Math.max(0.0D, neededXp);
         info.lastSeenMs = System.currentTimeMillis();
@@ -196,16 +198,17 @@ public final class JobsTracker {
         if (!HUD_JOB_ORDER.contains(jobName)) {
             return localized(localizer, "cmd.jobs.unknown_job", "Unknown job. Use fisherman, farmer, miner, or lumberjack.");
         }
-        if (level < 0 || neededXp < 10.0D || neededXp > 1_000_000_000.0D) {
+        if (level < 0 || neededXp <= 0.0D || neededXp > 1_000_000_000.0D) {
             return localized(
                 localizer,
                 "cmd.jobs.invalid_values",
-                "Invalid values. Level must be 0+ and needed XP must be between 10 and 1000000000."
+                "Invalid values. Level must be 0+ and needed XP must be greater than 0 and at most 1000000000."
             );
         }
 
         PersistentState.JobInfo info = this.state.jobs.computeIfAbsent(jobName, key -> new PersistentState.JobInfo());
         info.level = level;
+        info.levelEstimated = false;
         info.neededXp = neededXp;
         info.currentXp = -1.0D;
         info.dailyXp = 0.0D;
@@ -228,86 +231,76 @@ public final class JobsTracker {
     }
 
     public void captureChatMessage(String text) {
-        if (text == null || text.isBlank()) {
-            return;
-        }
-
-        String jobName = findMentionedJob(text);
-        if (jobName.isBlank()) {
-            return;
-        }
-
-        int level = parseMentionedLevel(text);
-        if (level < 0) {
-            return;
-        }
-
+        if (text == null || text.isBlank()) return;
+        String jobName = identifiedJob(text);
+        if (jobName.isBlank()) return;
         PersistentState.JobInfo info = this.state.jobs.computeIfAbsent(jobName, key -> new PersistentState.JobInfo());
-        info.level = level;
+        int level = parseMentionedLevel(text);
+        if (level >= 0) {
+            if (level != info.level) {
+                info.currentXp = -1.0D;
+                info.neededXp = 0.0D;
+            }
+            info.level = level;
+            info.levelEstimated = false;
+        }
         info.lastSeenMs = System.currentTimeMillis();
         this.state.currentJob = jobName;
         this.stateSaver.accept(this.state);
-        this.debugLogManager.logInternal("Job level set from chat for " + jobName + " -> " + level);
     }
 
     public void captureVisibleText(String text) {
-        if (text == null || text.isBlank()) {
-            return;
-        }
-
-        String namedJob = findMentionedJob(text);
-        if (!namedJob.isBlank() && !namedJob.equals(this.state.currentJob)) {
-            this.state.currentJob = namedJob;
-        }
+        if (text == null || text.isBlank()) return;
+        String namedJob = identifiedJob(text);
+        if (!namedJob.isBlank()) captureChatMessage(text);
+        if (namedJob.isBlank() && text.indexOf('蓝') < 0) return;
 
         ActionbarParser.parseJobActionbar(text).ifPresent(snapshot -> {
+            if (!Double.isFinite(snapshot.currentXp()) || !Double.isFinite(snapshot.neededXp())
+                || snapshot.neededXp() <= 0.0D || snapshot.neededXp() > 1_000_000_000.0D
+                || snapshot.currentXp() < 0.0D || snapshot.currentXp() > snapshot.neededXp()) return;
             rolloverDailyIfNeeded();
             long now = System.currentTimeMillis();
             double moneyDelta = computeDisplayedGainDelta(snapshot.moneyGain(), this.lastDisplayedMoneyGain, now);
             double xpDelta = computeDisplayedGainDelta(snapshot.xpGain(), this.lastDisplayedXpGain, now);
-
             this.lastMoneyGain = snapshot.moneyGain();
             this.lastXpGain = snapshot.xpGain();
             this.lastDisplayedMoneyGain = snapshot.moneyGain();
             this.lastDisplayedXpGain = snapshot.xpGain();
             this.lastDisplayedGainMs = now;
-            this.visibleUntilMs = System.currentTimeMillis() + ACTIONBAR_VISIBLE_MS;
+            this.visibleUntilMs = now + ACTIONBAR_VISIBLE_MS;
             this.state.jobsDailyMoney += moneyDelta;
 
-            String matchedJob = findJobForNeeded(snapshot.neededXp());
-            if (!matchedJob.isBlank()) {
-                this.state.currentJob = matchedJob;
-            }
-
-            if (this.state.currentJob.isBlank()) {
-                return;
-            }
-
+            // The XP requirement is shared by jobs: it cannot identify the active job.
+            if (this.state.currentJob.isBlank()) return;
             PersistentState.JobInfo info = this.state.jobs.get(this.state.currentJob);
-            if (info == null) {
-                return;
-            }
-
-            boolean resetDetected = info.currentXp >= 0.0D && snapshot.currentXp() + XP_EPSILON < info.currentXp;
+            if (info == null) return;
             boolean neededChanged = info.neededXp > 0.0D && !sameXp(info.neededXp, snapshot.neededXp());
-            boolean saneNeeded = snapshot.neededXp() >= 10.0D && snapshot.neededXp() <= 1_000_000_000.0D;
-
-            if (saneNeeded && info.neededXp <= 0.0D) {
-                info.neededXp = snapshot.neededXp();
+            boolean resetDetected = info.currentXp >= 0.0D && snapshot.currentXp() + XP_EPSILON < info.currentXp;
+            if (neededChanged || info.level <= 0 || info.levelEstimated) {
+                info.level = JobLevels.levelForNeeded(snapshot.neededXp());
+                info.levelEstimated = info.level > 0;
             }
-
             info.currentXp = snapshot.currentXp();
+            info.neededXp = snapshot.neededXp();
             info.dailyXp += xpDelta;
             info.lastSeenMs = now;
-            if (saneNeeded && (info.neededXp == 0.0D || neededChanged)) {
-                info.neededXp = snapshot.neededXp();
-            }
-
             if (neededChanged || resetDetected || now - this.lastPersistMs >= 2_000L) {
                 this.lastPersistMs = now;
                 this.stateSaver.accept(this.state);
             }
         });
+    }
+
+    private static String identifiedJob(String text) {
+        String job = findMentionedJob(text);
+        if (job.isBlank()) return "";
+        if (text.indexOf('蓝') >= 0 || parseMentionedLevel(text) >= 0
+            || LocalizedText.containsAny(text, "job", "profession", "métier", "metier", "trabajo", "beruf", "lavoro", "praca", "pekerjaan", "meslek")) return job;
+        for (String keyword : JOB_KEYWORDS.get(job)) {
+            if (text.strip().equalsIgnoreCase(keyword)) return job;
+        }
+        return "";
     }
 
     public String summary() {
@@ -322,7 +315,7 @@ public final class JobsTracker {
         List<String> parts = new ArrayList<>();
         for (Map.Entry<String, PersistentState.JobInfo> entry : this.state.jobs.entrySet()) {
             PersistentState.JobInfo info = entry.getValue();
-            parts.add(displayJobName(entry.getKey(), localizer) + " LVL " + info.level + " " + formatXpProgress(info));
+            parts.add(displayJobName(entry.getKey(), localizer) + " " + formatLevel(info) + " " + formatXpProgress(info));
         }
         return String.join(" | ", parts);
     }
@@ -376,7 +369,7 @@ public final class JobsTracker {
         }
 
         return List.of(
-            localized(localizer, "jobs.hud_job", "Job:") + " " + displayJobName(this.state.currentJob, localizer) + " LVL " + info.level,
+            localized(localizer, "jobs.hud_job", "Job:") + " " + displayJobName(this.state.currentJob, localizer) + " " + formatLevel(info),
             localized(localizer, "jobs.hud_xp", "XP:") + " " + formatXpProgress(info),
             String.format(
                 Locale.ROOT,
@@ -387,27 +380,28 @@ public final class JobsTracker {
         );
     }
 
-    private String findJobForNeeded(double neededXp) {
-        for (Map.Entry<String, PersistentState.JobInfo> entry : this.state.jobs.entrySet()) {
-            if (sameXp(entry.getValue().neededXp, neededXp)) {
-                return entry.getKey();
-            }
-        }
-        return "";
+    private static String formatLevel(PersistentState.JobInfo info) {
+        return (info != null && info.levelEstimated ? "~" : "") + "LVL "
+            + (info == null || info.level <= 0 ? "?" : Integer.toString(info.level));
     }
 
     private static String findMentionedJob(String text) {
+        String normalized = LocalizedText.normalizedContent(text);
+        String found = "";
         for (String jobName : HUD_JOB_ORDER) {
-            List<String> keywords = JOB_KEYWORDS.getOrDefault(jobName, List.of(jobName));
-            if (LocalizedText.containsAny(text, keywords.toArray(String[]::new))) {
-                return jobName;
+            boolean matches = JOB_KEYWORDS.get(jobName).stream().anyMatch(keyword -> Pattern.compile(
+                "(?<![\\p{L}\\p{N}])" + Pattern.quote(LocalizedText.normalized(keyword)) + "(?![\\p{L}\\p{N}])")
+                .matcher(normalized).find());
+            if (matches) {
+                if (!found.isBlank()) return "";
+                found = jobName;
             }
         }
-        return "";
+        return found;
     }
 
     private static int parseMentionedLevel(String text) {
-        Matcher matcher = LEVEL_UP_PATTERN.matcher(text);
+        Matcher matcher = LEVEL_UP_PATTERN.matcher(LocalizedText.normalized(text));
         if (!matcher.find()) {
             return -1;
         }
@@ -427,8 +421,7 @@ public final class JobsTracker {
 
     private static String formatOverviewLine(String jobName, PersistentState.JobInfo info, Function<String, String> localizer) {
         String label = displayJobName(jobName, localizer);
-        String level = info == null || info.level <= 0 ? "?" : Integer.toString(info.level);
-        return label + " LVL " + level + " " + formatXpProgress(info);
+        return label + " " + formatLevel(info) + " " + formatXpProgress(info);
     }
 
     private static String displayJobName(String jobName, Function<String, String> localizer) {

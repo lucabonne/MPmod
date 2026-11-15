@@ -45,18 +45,18 @@ class GrindingTrackerTest {
         assertTrue(tracker.getHudLines(key -> key, 50000).stream().anyMatch(line -> line.equals("progress.gained: ~300")));
     }
 
-    @Test void onlyDangerRewardsCountMoneyAndCombatXp() {
+    @Test void onlyDangerRewardsCountMoneyButAnyXpCounts() {
         GrindingTracker tracker = new GrindingTracker();
         tracker.onActionbar("+500 实", 1000);
         tracker.onXpGain(50, 1000);
-        assertFalse(tracker.isActive(1000));
+        assertTrue(tracker.isActive(1000));
         assertEquals(0, tracker.getMoney());
-        assertEquals(0, tracker.getXp());
+        assertEquals(50, tracker.getXp());
         tracker.onActionbar("+1 军 +600 实", 2000);
         tracker.onXpGain(50, 2000);
         assertTrue(tracker.isActive(2000));
         assertEquals(100, tracker.getMoney());
-        assertEquals(50, tracker.getXp());
+        assertEquals(100, tracker.getXp());
         tracker.onActionbar("+1000 实", 2500);
         assertEquals(100, tracker.getMoney());
     }

@@ -21,12 +21,39 @@ public final class UiSettings {
     public boolean decorations = false;
     public boolean shadows = true;
     public boolean headers = true;
+    public Map<Integer, PanelStyle> panelStyles = new LinkedHashMap<>();
+    public List<String> profileStats = new ArrayList<>(List.of("power", "strength", "speed"));
+    public boolean bossesByTime;
+
+    public static final class PanelStyle {
+        public float textScale = 1;
+        public int minWidth;
+        public int minHeight;
+        public Boolean title;
+        public boolean titleVisible(boolean defaultValue) { return title == null ? defaultValue : title; }
+        public void normalize() {
+            textScale = Float.isFinite(textScale) ? Math.clamp(textScale, 0.6F, 1.8F) : 1;
+            minWidth = Math.clamp(minWidth, 0, 2048);
+            minHeight = Math.clamp(minHeight, 0, 2048);
+        }
+    }
+
+    public PanelStyle panelStyle(int id) {
+        return panelStyles.getOrDefault(id, new PanelStyle());
+    }
+
+    public PanelStyle editPanelStyle(int id) {
+        return panelStyles.computeIfAbsent(id, ignored -> new PanelStyle());
+    }
     public List<Integer> hiddenPanels = new ArrayList<>();
+    public List<String> collapsedBossIslands = new ArrayList<>();
     public List<Picture> pictures = new ArrayList<>();
 
     public static final class Picture {
         public String file = "";
         public String name = "Picture";
+        public List<String> rotationFiles = new ArrayList<>();
+        public int intervalSeconds = 10;
         public int x = 12;
         public int y = 12;
         public int width = 80;
@@ -68,10 +95,21 @@ public final class UiSettings {
         menuOpacity = Math.clamp(menuOpacity, 0, 100);
         hudOpacity = Math.clamp(hudOpacity, 0, 100);
         borderWidth = Math.clamp(borderWidth, 0, 3);
+        if (panelStyles == null) panelStyles = new LinkedHashMap<>();
+        panelStyles.entrySet().removeIf(e -> e.getKey() == null || e.getValue() == null || e.getKey() < 0 || e.getKey() > 14);
+        panelStyles.values().forEach(PanelStyle::normalize);
+        if (profileStats == null) profileStats = new ArrayList<>(List.of("power", "strength", "speed"));
+        profileStats = new ArrayList<>(profileStats.stream().filter(key -> key != null && net.minepiece.qol.state.ProfileStatsTracker.STAT_KEYS.contains(key)).distinct().toList());
+        if (collapsedBossIslands == null) collapsedBossIslands = new ArrayList<>();
+        collapsedBossIslands.removeIf(id -> id == null || id.isBlank());
         if (hiddenPanels == null) hiddenPanels = new ArrayList<>();
         if (pictures == null) pictures = new ArrayList<>();
         pictures.removeIf(p -> p == null || p.file == null || !p.file.matches("[a-zA-Z0-9-]+\\.png"));
         for (Picture p : pictures) {
+            if (p.rotationFiles == null) p.rotationFiles = new ArrayList<>();
+            p.rotationFiles = new ArrayList<>(p.rotationFiles.stream()
+                .filter(file -> file != null && file.matches("[a-zA-Z0-9-]+\\.png")).distinct().toList());
+            p.intervalSeconds = Math.clamp(p.intervalSeconds, 1, 3600);
             p.scale = Float.isFinite(p.scale) ? Math.clamp(p.scale, 0.6F, 1.8F) : 1;
             p.opacity = Math.clamp(p.opacity, 0, 100);
             p.width = Math.clamp(p.width, 8, 512);

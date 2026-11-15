@@ -1,6 +1,9 @@
 package net.minepiece.qol.config;
 
 import com.google.gson.Gson;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -79,5 +82,51 @@ class UiSettingsTest {
         assertEquals(100, UiSettings.resizePosition(200, 800, 400));
         assertEquals(-1, UiSettings.resizePosition(-1, 800, 400));
         assertEquals(384, UiSettings.resizePosition(800, 800, 400));
+    }
+
+    @Test void legacyPicturesKeepTheirSettingsWithoutEnablingRotation() {
+        var settings = new Gson().fromJson("{\"pictures\":[{\"file\":\"cat.png\",\"x\":145,\"opacity\":60}]}", UiSettings.class);
+        settings.normalize();
+        var picture = settings.pictures.getFirst();
+        assertEquals("cat.png", picture.file);
+        assertEquals(145, picture.x);
+        assertEquals(60, picture.opacity);
+        assertTrue(picture.rotationFiles.isEmpty());
+        assertEquals(10, picture.intervalSeconds);
+    }
+
+    @Test void rotationSettingsSurviveCopyAndSavedLoadoutRoundTripIndependently() {
+        UiSettings settings = new UiSettings();
+        var picture = new UiSettings.Picture();
+        picture.file = "cat.png";
+        picture.rotationFiles.addAll(List.of("cat.png", "dog.png"));
+        picture.intervalSeconds = 42;
+        settings.pictures.add(picture);
+        var saved = new UiSettings.Loadout();
+        saved.appearance = settings.copy();
+        picture.rotationFiles.clear();
+        picture.intervalSeconds = 1;
+        var decoded = new Gson().fromJson(new Gson().toJson(saved), UiSettings.Loadout.class);
+        assertEquals(List.of("cat.png", "dog.png"), decoded.appearance.pictures.getFirst().rotationFiles);
+        assertEquals(42, decoded.appearance.pictures.getFirst().intervalSeconds);
+        assertEquals(List.of("cat.png", "dog.png"), saved.appearance.pictures.getFirst().rotationFiles);
+    }
+
+    @Test void normalizesRotationFilesAndIntervalWithoutRemovingValidPictures() {
+        UiSettings settings = new UiSettings();
+        var picture = new UiSettings.Picture();
+        picture.file = "cat.png";
+        picture.rotationFiles = new ArrayList<>(Arrays.asList("cat.png", null, "../secret.png", "dog.png", "cat.png", ""));
+        picture.intervalSeconds = 0;
+        settings.pictures.add(picture);
+        settings.normalize();
+        assertEquals(1, settings.pictures.size());
+        assertEquals(List.of("cat.png", "dog.png"), picture.rotationFiles);
+        assertEquals(1, picture.intervalSeconds);
+        picture.rotationFiles = null;
+        picture.intervalSeconds = Integer.MAX_VALUE;
+        settings.normalize();
+        assertTrue(picture.rotationFiles.isEmpty());
+        assertEquals(3600, picture.intervalSeconds);
     }
 }

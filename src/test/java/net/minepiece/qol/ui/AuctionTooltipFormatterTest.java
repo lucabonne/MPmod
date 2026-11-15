@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minepiece.qol.i18n.UiLocalization;
 import net.minepiece.qol.parse.TooltipParsers;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -39,17 +39,17 @@ class AuctionTooltipFormatterTest {
         "-0.74, BLUE", "-0.89999, BLUE", "-0.90, YELLOW",
         "0.052631578947, RED", "0, GRAY"
     })
-    void usesUnroundedColorThresholds(double delta, Formatting expected) {
+    void usesUnroundedColorThresholds(double delta, ChatFormatting expected) {
         assertEquals(expected, AuctionTooltipFormatter.deltaColor(delta));
     }
 
     @Test
     void appendsBothUnitPricesPreservesStylesAndDoesNotDuplicate() {
-        Text selling = Text.literal("Selling price: 400").formatted(Formatting.GOLD);
-        Text average = Text.literal("Average price: 380").formatted(Formatting.AQUA);
-        Text unrelated = Text.literal("Seller: Player");
-        List<Text> lines = new ArrayList<>(List.of(selling, average, unrelated));
-        List<String> original = lines.stream().map(Text::getString).toList();
+        Component selling = Component.literal("Selling price: 400").withStyle(ChatFormatting.GOLD);
+        Component average = Component.literal("Average price: 380").withStyle(ChatFormatting.AQUA);
+        Component unrelated = Component.literal("Seller: Player");
+        List<Component> lines = new ArrayList<>(List.of(selling, average, unrelated));
+        List<String> original = lines.stream().map(Component::getString).toList();
         TooltipParsers.AuctionParseResult result = TooltipParsers.parseAuctionHighlight(original, 10).orElseThrow();
         AuctionTooltipFormatter.appendPrices(lines, original, result, "/item");
 
@@ -57,39 +57,39 @@ class AuctionTooltipFormatterTest {
         assertEquals("Average price: 380 (38/item)", lines.get(1).getString());
         assertEquals(selling.getStyle(), lines.get(0).getStyle());
         assertEquals(average.getStyle(), lines.get(1).getStyle());
-        assertEquals(Formatting.RED.getColorValue(), lines.get(0).getSiblings().getLast().getStyle().getColor().getRgb());
+        assertEquals(net.minecraft.network.chat.TextColor.RED, lines.get(0).getSiblings().getLast().getStyle().getColor());
         assertSame(unrelated, lines.get(2));
         assertEquals("Selling price: 400", selling.getString());
 
-        List<String> decorated = lines.stream().map(Text::getString).toList();
+        List<String> decorated = lines.stream().map(Component::getString).toList();
         assertEquals(result, TooltipParsers.parseAuctionHighlight(decorated, 10).orElseThrow());
         AuctionTooltipFormatter.appendPrices(lines, decorated, result, "/item");
         AuctionTooltipFormatter.appendPrices(lines, original, result, "/item");
-        assertEquals(decorated, lines.stream().map(Text::getString).toList());
+        assertEquals(decorated, lines.stream().map(Component::getString).toList());
     }
 
     @Test
     void compactPricesOnBothLinesDoNotDuplicateOrChangeCalculations() {
-        List<Text> lines = new ArrayList<>(List.of(
-            Text.literal("Selling price: 16M"), Text.literal("Average price: 15M")
+        List<Component> lines = new ArrayList<>(List.of(
+            Component.literal("Selling price: 16M"), Component.literal("Average price: 15M")
         ));
-        List<String> original = lines.stream().map(Text::getString).toList();
+        List<String> original = lines.stream().map(Component::getString).toList();
         var result = TooltipParsers.parseAuctionHighlight(original, 10).orElseThrow();
         AuctionTooltipFormatter.appendPrices(lines, original, result, "/item");
         assertEquals("Selling price: 16M (1.6M/item) +6.67%", lines.get(0).getString());
         assertEquals("Average price: 15M (1.5M/item)", lines.get(1).getString());
-        List<String> decorated = lines.stream().map(Text::getString).toList();
+        List<String> decorated = lines.stream().map(Component::getString).toList();
         assertEquals(result, TooltipParsers.parseAuctionHighlight(decorated, 10).orElseThrow());
         AuctionTooltipFormatter.appendPrices(lines, decorated, result, "/item");
-        assertEquals(decorated, lines.stream().map(Text::getString).toList());
+        assertEquals(decorated, lines.stream().map(Component::getString).toList());
     }
 
     @Test
     void formatsFractionalPricesAndLocalizedLabels() {
-        List<Text> lines = new ArrayList<>(List.of(
-            Text.literal("· Prezzo di vendita: 10"), Text.literal("· Prezzo medio: 20")
+        List<Component> lines = new ArrayList<>(List.of(
+            Component.literal("· Prezzo di vendita: 10"), Component.literal("· Prezzo medio: 20")
         ));
-        List<String> original = lines.stream().map(Text::getString).toList();
+        List<String> original = lines.stream().map(Component::getString).toList();
         TooltipParsers.AuctionParseResult result = TooltipParsers.parseAuctionHighlight(original, 3).orElseThrow();
         AuctionTooltipFormatter.appendPrices(lines, original, result, UiLocalization.text("it", "auction.per_item"));
         assertEquals("· Prezzo di vendita: 10 (3.33/oggetto) -50%", lines.get(0).getString());

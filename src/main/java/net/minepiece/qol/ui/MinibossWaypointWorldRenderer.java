@@ -1,26 +1,22 @@
 package net.minepiece.qol.ui;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.List;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.blockentity.BeaconRenderer;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.state.level.LevelRenderState;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.Shapes;
 import net.minepiece.qol.MinepieceQolClient;
 import net.minepiece.qol.state.BossTracker;
 import net.minepiece.qol.util.NumberParser;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.render.LightmapTextureManager;
-import net.minecraft.client.render.RenderLayers;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.VertexRendering;
-import net.minecraft.client.render.block.entity.BeaconBlockEntityRenderer;
-import net.minecraft.client.render.command.OrderedRenderCommandQueue;
-import net.minecraft.client.render.state.CameraRenderState;
-import net.minecraft.client.render.state.WorldRenderState;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.shape.VoxelShapes;
 
 public final class MinibossWaypointWorldRenderer {
     private static final float TIMER_TARGET_SCREEN_SCALE = 2.2F;
@@ -42,18 +38,17 @@ public final class MinibossWaypointWorldRenderer {
     }
 
     public void register() {
-        WorldRenderEvents.AFTER_ENTITIES.register(this::render);
+        LevelRenderEvents.COLLECT_SUBMITS.register(this::render);
     }
 
-    private void render(WorldRenderContext context) {
+    private void render(LevelRenderContext context) {
         if (!this.mod.getConfig().modEnabled || !this.mod.getConfig().allFeaturesVisible) {
             return;
         }
-        MatrixStack matrices = context.matrices();
-        VertexConsumerProvider consumers = context.consumers();
-        OrderedRenderCommandQueue commandQueue = context.commandQueue();
-        WorldRenderState worldState = context.worldState();
-        if (matrices == null || consumers == null || commandQueue == null || worldState == null) {
+        PoseStack matrices = context.poseStack();
+        SubmitNodeCollector commandQueue = context.submitNodeCollector();
+        LevelRenderState worldState = context.levelState();
+        if (matrices == null || commandQueue == null || worldState == null) {
             return;
         }
         CameraRenderState cameraState = worldState.cameraRenderState;
@@ -67,12 +62,12 @@ public final class MinibossWaypointWorldRenderer {
             return;
         }
 
-        Vec3d cameraPos = cameraState.pos;
-        MinecraftClient client = MinecraftClient.getInstance();
-        TextRenderer textRenderer = client.textRenderer;
-        float tickDelta = client.getRenderTickCounter().getTickProgress(true);
+        Vec3 cameraPos = cameraState.pos;
+        Minecraft client = Minecraft.getInstance();
+        Font textRenderer = client.font;
+        float tickDelta = client.getDeltaTracker().getGameTimeDeltaPartialTick(true);
 
-        matrices.push();
+        matrices.pushPose();
         matrices.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
         int index = 0;
@@ -80,7 +75,6 @@ public final class MinibossWaypointWorldRenderer {
             int rgb = colorFor(waypoint.symbol(), index);
             drawWaypoint(
                 matrices,
-                consumers,
                 commandQueue,
                 textRenderer,
                 client,
@@ -99,7 +93,6 @@ public final class MinibossWaypointWorldRenderer {
         for (BossTracker.BossWaypoint waypoint : bossWaypoints) {
             drawWaypoint(
                 matrices,
-                consumers,
                 commandQueue,
                 textRenderer,
                 client,
@@ -114,16 +107,15 @@ public final class MinibossWaypointWorldRenderer {
             );
         }
 
-        matrices.pop();
+        matrices.popPose();
     }
 
     private static void drawWaypoint(
-        MatrixStack matrices,
-        VertexConsumerProvider consumers,
-        OrderedRenderCommandQueue commandQueue,
-        TextRenderer textRenderer,
-        MinecraftClient client,
-        Vec3d cameraPos,
+        PoseStack matrices,
+        SubmitNodeCollector commandQueue,
+        Font textRenderer,
+        Minecraft client,
+        Vec3 cameraPos,
         CameraRenderState cameraState,
         float tickDelta,
         int xBlock,
@@ -132,26 +124,24 @@ public final class MinibossWaypointWorldRenderer {
         long remainingMs,
         int rgb
     ) {
-        float red = ((rgb >> 16) & 0xFF) / 255.0F;
-        float green = ((rgb >> 8) & 0xFF) / 255.0F;
-        float blue = (rgb & 0xFF) / 255.0F;
-
         double x = xBlock;
         double y = yBlock;
         double z = zBlock;
 
         // Draw block outline
         int outlineColor = (0xFF << 24) | rgb;
-        VertexConsumer outline = consumers.getBuffer(RenderLayers.lines());
-        VertexRendering.drawOutline(matrices, outline, VoxelShapes.fullCube(), x, y, z, outlineColor, 1.0F);
+        matrices.pushPose();
+        matrices.translate(x, y, z);
+        commandQueue.submitShapeOutline(matrices, Shapes.block(), RenderTypes.lines(), outlineColor, 1.0F, false);
+        matrices.popPose();
 
         // Beacon beam
-        matrices.push();
+        matrices.pushPose();
         matrices.translate(x, y, z);
-        BeaconBlockEntityRenderer.renderBeam(
+        BeaconRenderer.submitBeaconBeam(
             matrices,
             commandQueue,
-            BeaconBlockEntityRenderer.BEAM_TEXTURE,
+            BeaconRenderer.BEAM_LOCATION,
             tickDelta,
             1.0F,
             0,
@@ -160,53 +150,33 @@ public final class MinibossWaypointWorldRenderer {
             0.18F,
             0.24F
         );
-        matrices.pop();
+        matrices.popPose();
 
         // Timer text billboard
         String timer = remainingMs <= 0L ? "READY" : NumberParser.formatTimer(remainingMs);
-        Text timerText = Text.literal(timer);
+        Component timerText = Component.literal(timer);
         double dx = (x + 0.5D) - cameraPos.x;
         double dy = (y + 1.02D) - cameraPos.y;
         double dz = (z + 0.5D) - cameraPos.z;
         double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        double fovDeg = client.options.getFov().getValue();
-        double focalLength = (client.getWindow().getScaledWidth() / 2.0D) / Math.tan(Math.toRadians(fovDeg) * 0.5D);
+        double fovDeg = client.options.fov().get();
+        double focalLength = (client.getWindow().getGuiScaledWidth() / 2.0D) / Math.tan(Math.toRadians(fovDeg) * 0.5D);
         float textScale = (float) (TIMER_TARGET_SCREEN_SCALE * distance / Math.max(1.0D, focalLength));
         if (textScale < TIMER_MIN_WORLD_SCALE) {
             textScale = TIMER_MIN_WORLD_SCALE;
         }
-        matrices.push();
+        matrices.pushPose();
         matrices.translate(x + 0.5D, y + 1.02D, z + 0.5D);
-        matrices.multiply(cameraState.orientation);
+        matrices.mulPose(cameraState.orientation);
         matrices.scale(textScale, -textScale, textScale);
-        float textX = -textRenderer.getWidth(timerText) / 2.0F;
-        int bgColor = (int) (client.options.getTextBackgroundOpacity(0.25F) * 255.0F) << 24;
+        float textX = -textRenderer.width(timerText) / 2.0F;
+        int bgColor = (int) (client.options.getBackgroundOpacity(0.25F) * 255.0F) << 24;
         int textColor = 0xFF000000 | rgb;
-        textRenderer.draw(
-            timerText,
-            textX,
-            0.0F,
-            textColor,
-            false,
-            matrices.peek().getPositionMatrix(),
-            consumers,
-            TextRenderer.TextLayerType.SEE_THROUGH,
-            bgColor,
-            0x00F000F0
-        );
-        textRenderer.draw(
-            timerText,
-            textX,
-            0.0F,
-            textColor,
-            false,
-            matrices.peek().getPositionMatrix(),
-            consumers,
-            TextRenderer.TextLayerType.NORMAL,
-            0x00000000,
-            LightmapTextureManager.applyEmission(0x00F000F0, 2)
-        );
-        matrices.pop();
+        commandQueue.submitText(matrices, textX, 0.0F, timerText.getVisualOrderText(), false,
+            Font.DisplayMode.SEE_THROUGH, 0x00F000F0, textColor, bgColor, 0);
+        commandQueue.submitText(matrices, textX, 0.0F, timerText.getVisualOrderText(), false,
+            Font.DisplayMode.NORMAL, 0x00F000F0, textColor, 0, 0);
+        matrices.popPose();
     }
 
     private static int colorFor(String symbol, int index) {

@@ -1,39 +1,46 @@
 package net.minepiece.qol.ui;
 
 import java.util.Locale;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minepiece.qol.MinepieceQolClient;
 import net.minepiece.qol.config.UiSettings;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
 
 public final class ChatChannelOverlay {
     private ChatChannelOverlay() { }
 
-    public static void render(DrawContext context, int inputX, int inputY) {
+    public static void render(GuiGraphicsExtractor context, int inputX, int inputY) {
         MinepieceQolClient mod = MinepieceQolClient.get();
-        if (mod == null || !mod.getConfig().modEnabled || !mod.getConfig().allFeaturesVisible) return;
+        if (mod == null || !mod.getConfig().modEnabled || !mod.getConfig().allFeaturesVisible || !mod.isHudPanelVisible(0)) return;
         var tracker = mod.getChatChannelTracker();
         var theme = mod.getConfig().appearance;
-        var font = MinecraftClient.getInstance().textRenderer;
+        var font = Minecraft.getInstance().font;
         String label = mod.tr("chat_channel." + tracker.channel().name().toLowerCase(Locale.ROOT));
         String code = tracker.languageCode();
         if (code.isEmpty() && !tracker.language().isBlank()) label += " · " + tracker.language();
-        int x = Math.max(2, inputX - 2), y = Math.max(0, inputY - 17);
-        int width = 26 + font.getWidth(label);
-        context.fill(x, y, x + width, y + 14, HudOverlay.panelBackground(theme.chatPanelColor, theme));
+        var panel = theme.panelStyle(0);
+        float scale = panel.textScale;
+        int height = Math.max(panel.minHeight, (int) Math.ceil(14 * scale));
+        int x = Math.max(2, inputX - 2), y = Math.max(0, inputY - height - 3);
+        int width = Math.max(panel.minWidth, (int) Math.ceil((26 + font.width(label)) * scale));
+        context.fill(x, y, x + width, y + height, HudOverlay.panelBackground(theme.chatPanelColor, theme));
         for (int i = 0; i < theme.borderWidth; i++) {
             int color = UiSettings.color(theme.border, theme.hudOpacity);
             context.fill(x + i, y + i, x + width - i, y + i + 1, color);
-            context.fill(x + i, y + 13 - i, x + width - i, y + 14 - i, color);
-            context.fill(x + i, y + i, x + i + 1, y + 14 - i, color);
-            context.fill(x + width - i - 1, y + i, x + width - i, y + 14 - i, color);
+            context.fill(x + i, y + height - 1 - i, x + width - i, y + height - i, color);
+            context.fill(x + i, y + i, x + i + 1, y + height - i, color);
+            context.fill(x + width - i - 1, y + i, x + width - i, y + height - i, color);
         }
-        drawFlag(context, code, x + 3, y + 2);
-        context.drawText(font, label, x + 23, y + 3, UiSettings.color(theme.text, 100), theme.shadows);
+        context.pose().pushMatrix();
+        context.pose().translate((float) x, (float) y);
+        context.pose().scale(scale, scale);
+        drawFlag(context, code, 3, 2);
+        context.text(font, label, 23, 3, UiSettings.color(theme.text, 100), theme.shadows);
+        context.pose().popMatrix();
     }
 
     // Small pixel flags avoid relying on emoji support in Minecraft's font.
-    private static void drawFlag(DrawContext context, String code, int x, int y) {
+    private static void drawFlag(GuiGraphicsExtractor context, String code, int x, int y) {
         for (int py = 0; py < 10; py++) {
             for (int px = 0; px < 16; px++) {
                 int color = switch (code) {

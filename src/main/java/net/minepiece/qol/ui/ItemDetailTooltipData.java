@@ -2,18 +2,18 @@ package net.minepiece.qol.ui;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.inventory.tooltip.TooltipComponent;
+import net.minecraft.world.item.ItemStack;
 import net.minepiece.qol.MinepieceQolClient;
 import net.minepiece.qol.config.UiSettings;
 import net.minepiece.qol.state.CookingTracker;
 import net.minepiece.qol.state.RarityDetector;
 import net.minepiece.qol.util.TextUtil;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.tooltip.TooltipData;
 
-public record ItemDetailTooltipData(List<IconGridTooltipComponent.Row> rows, boolean hasIngredients) implements TooltipData {
+public record ItemDetailTooltipData(List<IconGridTooltipComponent.Row> rows, boolean hasIngredients) implements TooltipComponent {
     public static ItemDetailTooltipData from(ItemStack stack, MinepieceQolClient mod) {
-        var lore = stack.get(DataComponentTypes.LORE);
+        var lore = stack.get(DataComponents.LORE);
         if (lore == null) return null;
         var rarity = RarityDetector.detect(stack);
         var ingredients = CookingTracker.parseIngredients(TextUtil.normalizeLines(lore.lines()));
@@ -28,11 +28,11 @@ public record ItemDetailTooltipData(List<IconGridTooltipComponent.Row> rows, boo
         for (var entry : ingredients.entrySet()) {
             ItemStack item = HudIcons.findInventoryItem(entry.getKey());
             int owned = 0;
-            var player = net.minecraft.client.MinecraftClient.getInstance().player;
+            var player = net.minecraft.client.Minecraft.getInstance().player;
             if (player != null) {
-                for (int i = 0; i < player.getInventory().size(); i++) {
-                    ItemStack candidate = player.getInventory().getStack(i);
-                    if (!candidate.isEmpty() && TextUtil.normalize(candidate.getName()).equalsIgnoreCase(entry.getKey())) owned += candidate.getCount();
+                for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+                    ItemStack candidate = player.getInventory().getItem(i);
+                    if (!candidate.isEmpty() && TextUtil.normalize(candidate.getHoverName()).equalsIgnoreCase(entry.getKey())) owned += candidate.getCount();
                 }
             }
             int needed = entry.getValue() * quantity;
@@ -41,7 +41,7 @@ public record ItemDetailTooltipData(List<IconGridTooltipComponent.Row> rows, boo
         }
         return new ItemDetailTooltipData(List.copyOf(rows), !ingredients.isEmpty());
     }
-    public static void removeReplacedLines(List<net.minecraft.text.Text> lines, boolean hasIngredients) {
+    public static void removeReplacedLines(List<net.minecraft.network.chat.Component> lines, boolean hasIngredients) {
         boolean inIngredients = false;
         var iterator = lines.listIterator();
         if (iterator.hasNext()) iterator.next(); // The first row is always the item name.

@@ -9,13 +9,13 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minepiece.qol.util.LocalizedText;
 import net.minepiece.qol.util.TextUtil;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.tooltip.TooltipType;
-import net.minecraft.text.Text;
 
 public final class ScrollTracker {
     private static final long SCAN_INTERVAL_MS = 750L;
@@ -52,7 +52,7 @@ public final class ScrollTracker {
         this.nextScanAtMs = 0L;
     }
 
-    public void scanInventory(PlayerEntity player) {
+    public void scanInventory(Player player) {
         if (player == null) {
             clear();
             return;
@@ -65,13 +65,13 @@ public final class ScrollTracker {
         this.nextScanAtMs = now + SCAN_INTERVAL_MS;
 
         List<ScrollEntry> parsed = new ArrayList<>();
-        for (int slot = 0; slot < player.getInventory().size(); slot++) {
-            ItemStack stack = player.getInventory().getStack(slot);
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
             if (stack == null || stack.isEmpty()) {
                 continue;
             }
 
-            String name = TextUtil.normalize(stack.getName());
+            String name = TextUtil.normalize(stack.getHoverName());
             if (!looksLikeScrollName(name)) {
                 continue;
             }
@@ -125,10 +125,10 @@ public final class ScrollTracker {
         return lines;
     }
 
-    private static Optional<ScrollEntry> parseScroll(PlayerEntity player, ItemStack stack, String normalizedName) {
-        List<Text> tooltip;
+    private static Optional<ScrollEntry> parseScroll(Player player, ItemStack stack, String normalizedName) {
+        List<Component> tooltip;
         try {
-            tooltip = stack.getTooltip(Item.TooltipContext.DEFAULT, player, TooltipType.BASIC);
+            tooltip = stack.getTooltipLines(Item.TooltipContext.EMPTY, player, TooltipFlag.NORMAL);
         } catch (Throwable ignored) {
             return Optional.empty();
         }
@@ -314,7 +314,7 @@ public final class ScrollTracker {
         };
     }
 
-    private static RarityDetector.Rarity detectScrollRarity(ItemStack stack, List<Text> tooltip) {
+    private static RarityDetector.Rarity detectScrollRarity(ItemStack stack, List<Component> tooltip) {
         RarityDetector.Rarity detected = RarityDetector.detect(stack, tooltip).orElse(RarityDetector.Rarity.COMMON);
         if (detected == RarityDetector.Rarity.EPIC && containsMarker(tooltip, SCROLL_MYTHIC_MARKER)) {
             return RarityDetector.Rarity.MYTHIC;
@@ -322,11 +322,11 @@ public final class ScrollTracker {
         return detected;
     }
 
-    private static boolean containsMarker(List<Text> lines, String marker) {
+    private static boolean containsMarker(List<Component> lines, String marker) {
         if (lines == null || lines.isEmpty() || marker == null || marker.isBlank()) {
             return false;
         }
-        for (Text line : lines) {
+        for (Component line : lines) {
             if (line != null && line.getString().contains(marker)) {
                 return true;
             }

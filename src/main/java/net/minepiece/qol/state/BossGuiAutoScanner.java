@@ -4,19 +4,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
 import net.minepiece.qol.parse.TooltipParsers;
 import net.minepiece.qol.util.LocalizedText;
 import net.minepiece.qol.util.TextUtil;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.tooltip.TooltipType;
-import net.minecraft.registry.Registries;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.text.Text;
 
 public final class BossGuiAutoScanner {
     private static final long SCAN_INTERVAL_MS = 500L;
@@ -28,19 +24,28 @@ public final class BossGuiAutoScanner {
 
     private Screen lastScreen;
     private long lastScanMs;
+    private long bossCommandUntilMs;
+    private Screen requestedScreen;
+
+    public void onCommandSent(String command) {
+        if (command != null && command.trim().matches("(?i)/?boss")) {
+            this.bossCommandUntilMs = System.currentTimeMillis() + 10_000;
+            this.requestedScreen = null;
+        }
+    }
 
     public BossGuiAutoScanner(BossTracker bossTracker, DebugLogManager debugLogManager) {
         this.bossTracker = bossTracker;
         this.debugLogManager = debugLogManager;
     }
 
-    public void tick(MinecraftClient client) {
+    public void tick(Minecraft client) {
         if (client == null || client.player == null) {
             return;
         }
 
-        Screen currentScreen = client.currentScreen;
-        if (!(currentScreen instanceof HandledScreen<?> handledScreen)) {
+        Screen currentScreen = client.gui.screen();
+        if (!(currentScreen instanceof AbstractContainerScreen<?> handledScreen)) {
             resetScreenState();
             return;
         }
@@ -60,11 +65,16 @@ public final class BossGuiAutoScanner {
 
         int changedSlotsScanned = 0;
         String screenTitle = TextUtil.normalize(currentScreen.getTitle());
-        boolean likelyBossSelectionScreen = isLikelyBossSelectionScreen(screenTitle);
+        if (this.requestedScreen != null && this.requestedScreen != currentScreen) this.requestedScreen = null;
+        if (now <= this.bossCommandUntilMs) {
+            this.requestedScreen = currentScreen;
+            this.bossCommandUntilMs = 0;
+        }
+        boolean likelyBossSelectionScreen = currentScreen == this.requestedScreen || isLikelyBossSelectionScreen(screenTitle);
         if (!likelyBossSelectionScreen) {
             boolean hasBossCandidate = false;
-            for (Slot slot : handledScreen.getScreenHandler().slots) {
-                if (slot != null && slot.hasStack() && looksLikeBossCandidateName(TextUtil.normalize(slot.getStack().getName()))) {
+            for (Slot slot : handledScreen.getMenu().slots) {
+                if (slot != null && slot.container != client.player.getInventory() && slot.hasItem() && looksLikeBossCandidateName(TextUtil.normalize(slot.getItem().getHoverName()))) {
                     hasBossCandidate = true;
                     break;
                 }
@@ -74,14 +84,14 @@ public final class BossGuiAutoScanner {
             }
         }
 
-        for (int slotIndex = 0; slotIndex < handledScreen.getScreenHandler().slots.size(); slotIndex++) {
-            Slot slot = handledScreen.getScreenHandler().slots.get(slotIndex);
-            if (slot == null || !slot.hasStack()) {
+        for (int slotIndex = 0; slotIndex < handledScreen.getMenu().slots.size(); slotIndex++) {
+            Slot slot = handledScreen.getMenu().slots.get(slotIndex);
+            if (slot == null || slot.container == client.player.getInventory() || !slot.hasItem()) {
                 continue;
             }
 
-            ItemStack stack = slot.getStack();
-            String stackName = TextUtil.normalize(stack.getName());
+            ItemStack stack = slot.getItem();
+            String stackName = TextUtil.normalize(stack.getHoverName());
             if (!likelyBossSelectionScreen && !looksLikeBossCandidateName(stackName)) {
                 continue;
             }
@@ -92,27 +102,28 @@ public final class BossGuiAutoScanner {
             }
 
             changedSlotsScanned++;
-            List<Text> tooltip = stack.getTooltip(Item.TooltipContext.DEFAULT, client.player, TooltipType.BASIC);
-            List<String> normalizedLines = TextUtil.normalizeLines(tooltip);
+            List<String> normalizedLines = net.minepiece.qol.essentials.ItemText.nameAndLore(stack).stream()
+                .map(TextUtil::normalize).toList();
 
-            Optional<TooltipParsers.BossTooltipData> parsed =
-                TooltipParsers.parseBossTooltip(normalizedLines, stackName);
-            if (parsed.isPresent()) {
-                TooltipParsers.BossTooltipData data = parsed.get();
-                this.bossTracker.captureParsedTooltip(data);
-                log(String.format(
-                    Locale.ROOT,
-                    "[BOSS] parsed title=%s slot=%d name=%s coords=(%d,%d,%d) remaining=%ds cycle=%dm spawn=%s",
-                    quote(screenTitle),
-                    slotIndex,
-                    data.bossName(),
-                    data.x(),
-                    data.y(),
-                    data.z(),
-                    data.remainingSeconds(),
-                    data.cycleSeconds() / 60,
-                    activeOrUnknownSpawn()
-                ));
+            List<TooltipParsers.BossTooltipData> parsed =
+                TooltipParsers.parseBossTooltips(normalizedLines, stackName);
+            if (!parsed.isEmpty()) {
+                this.bossTracker.captureParsedTooltips(stackName, parsed);
+                for (TooltipParsers.BossTooltipData data : parsed) {
+                    log(String.format(
+                        Locale.ROOT,
+                        "[BOSS] parsed title=%s slot=%d name=%s coords=(%d,%d,%d) remaining=%ds cycle=%dm spawn=%s",
+                        quote(screenTitle),
+                        slotIndex,
+                        data.bossName(),
+                        data.x(),
+                        data.y(),
+                        data.z(),
+                        data.remainingSeconds(),
+                        data.cycleSeconds() / 60,
+                        activeOrUnknownSpawn()
+                    ));
+                }
                 continue;
             }
 
@@ -141,13 +152,14 @@ public final class BossGuiAutoScanner {
             log(String.format(Locale.ROOT, "[BOSS] scan title=%s changedSlots=%d totalSlots=%d spawn=%s",
                 quote(screenTitle),
                 changedSlotsScanned,
-                handledScreen.getScreenHandler().slots.size(),
+                handledScreen.getMenu().slots.size(),
                 activeOrUnknownSpawn()));
         }
     }
 
     private void resetScreenState() {
         this.lastScreen = null;
+        this.requestedScreen = null;
         this.slotSignatures.clear();
         this.lastScanMs = 0L;
     }
@@ -207,7 +219,7 @@ public final class BossGuiAutoScanner {
                 }
             }
         }
-        return TextUtil.normalize(stack == null ? null : stack.getName());
+        return TextUtil.normalize(stack == null ? null : stack.getHoverName());
     }
 
     private static boolean isControlOrPlaceholderName(String name) {
@@ -229,7 +241,7 @@ public final class BossGuiAutoScanner {
         if (stack == null || stack.isEmpty()) {
             return "";
         }
-        return Registries.ITEM.getId(stack.getItem()) + "|" + stack.getCount() + "|" + stack.getComponents().hashCode();
+        return BuiltInRegistries.ITEM.getKey(stack.getItem()) + "|" + stack.getCount() + "|" + stack.getComponents().hashCode();
     }
 
     private static String quote(String value) {

@@ -9,14 +9,14 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minepiece.qol.util.LocalizedText;
 import net.minepiece.qol.util.TextUtil;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.tooltip.TooltipType;
-import net.minecraft.registry.Registries;
-import net.minecraft.text.Text;
 
 public final class InventoryXpTracker {
     private static final long SCAN_INTERVAL_MS = 100L;
@@ -118,7 +118,7 @@ public final class InventoryXpTracker {
         this.parseCache.clear();
     }
 
-    public void scanInventory(PlayerEntity player) {
+    public void scanInventory(Player player) {
         if (player == null) {
             clear();
             return;
@@ -132,8 +132,8 @@ public final class InventoryXpTracker {
 
         List<TrackedItem> parsed = new ArrayList<>();
         this.icons.clear();
-        for (int slot = 0; slot < player.getInventory().size(); slot++) {
-            ItemStack stack = player.getInventory().getStack(slot);
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
             if (stack == null || stack.isEmpty()) {
                 continue;
             }
@@ -194,16 +194,16 @@ public final class InventoryXpTracker {
         return lines;
     }
 
-    private static Optional<TrackedItem> parseTrackableItem(PlayerEntity player, ItemStack stack) {
-        String rawName = TextUtil.normalize(stack.getName());
+    private static Optional<TrackedItem> parseTrackableItem(Player player, ItemStack stack) {
+        String rawName = TextUtil.normalize(stack.getHoverName());
         String name = stripLevelSuffix(rawName);
         if (name.isBlank()) {
             return Optional.empty();
         }
 
-        List<Text> tooltip;
+        List<Component> tooltip;
         try {
-            tooltip = stack.getTooltip(Item.TooltipContext.DEFAULT, player, TooltipType.BASIC);
+            tooltip = stack.getTooltipLines(Item.TooltipContext.EMPTY, player, TooltipFlag.NORMAL);
         } catch (Throwable ignored) {
             return Optional.empty();
         }
@@ -239,9 +239,9 @@ public final class InventoryXpTracker {
         if (stack == null || stack.isEmpty()) {
             return "";
         }
-        return Registries.ITEM.getId(stack.getItem()) + "|"
+        return BuiltInRegistries.ITEM.getKey(stack.getItem()) + "|"
             + stack.getCount() + "|"
-            + TextUtil.normalize(stack.getName()) + "|"
+            + TextUtil.normalize(stack.getHoverName()) + "|"
             + stack.getComponents().hashCode();
     }
 

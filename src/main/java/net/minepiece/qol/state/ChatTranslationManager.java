@@ -24,9 +24,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minepiece.qol.config.ConfigManager;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
 
 public final class ChatTranslationManager {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(4L);
@@ -434,13 +434,13 @@ public final class ChatTranslationManager {
             ? String.format(Locale.ROOT, "[TR %s->%s] %s", sourceCode, targetCode, clipped)
             : String.format(Locale.ROOT, "[TR %s->%s] %s › %s", sourceCode, targetCode, authorPrefix, clipped);
 
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client == null) {
             return;
         }
         client.execute(() -> {
-            if (client.inGameHud != null && client.inGameHud.getChatHud() != null) {
-                client.inGameHud.getChatHud().addMessage(Text.literal(outgoing));
+            if (client.gui != null && client.gui.hud.getChat() != null) {
+                client.gui.hud.getChat().addClientSystemMessage(Component.literal(outgoing));
             }
         });
     }

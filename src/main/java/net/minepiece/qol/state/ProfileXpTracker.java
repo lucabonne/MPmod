@@ -59,6 +59,7 @@ public final class ProfileXpTracker {
         if (this.currentXp >= this.anchor.requiredXp()) {
             this.needsSync = true;
             this.displayedLevel = this.anchor.level() + 1;
+            this.percent = Double.NaN;
             return;
         }
         this.percent = this.currentXp / this.anchor.requiredXp() * 100;
@@ -81,6 +82,7 @@ public final class ProfileXpTracker {
         sync(saved.snapshot());
         this.needsSync = saved.needsSync();
         this.displayedLevel = saved.displayedLevel();
+        if (this.needsSync) this.percent = Double.NaN;
         this.cached = true;
         this.estimated = true;
     }
@@ -120,7 +122,11 @@ public final class ProfileXpTracker {
 
     /** Reconcile a fresh server reading; a lower percentage at the same level is a correction, not a level-up. */
     public void reconcilePercent(ProfileXpParser.BarProgress progress) {
-        if (this.anchor == null) return;
+        if (this.anchor == null) {
+            this.displayedLevel = progress.level();
+            this.percent = progress.percent();
+            return;
+        }
         if (progress.level() == null) {
             updatePercent(progress);
             return;
@@ -128,11 +134,12 @@ public final class ProfileXpTracker {
         this.cached = false;
         this.displayedLevel = progress.level();
         if (progress.level() != this.anchor.level()) {
+            this.percent = progress.percent();
             this.needsSync = true;
             return;
         }
         this.needsSync = false;
-        if (Math.round(this.percent * 100.0D) / 100.0D != progress.percent()) {
+        if (!Double.isFinite(this.percent) || Math.round(this.percent * 100.0D) / 100.0D != progress.percent()) {
             this.currentXp = progress.percent() / 100.0D * this.anchor.requiredXp();
             this.percent = progress.percent();
             this.estimated = true;
@@ -157,14 +164,14 @@ public final class ProfileXpTracker {
     }
 
     public List<String> getHudLines(Function<String, String> tr) {
-        if (this.anchor == null) {
+        if (this.anchor == null && this.displayedLevel == null) {
             return List.of(tr.apply("progress.sync_hint"));
         }
         List<String> lines = new ArrayList<>();
         lines.add(tr.apply("progress.level") + ": " + (this.displayedLevel == null ? "?" : this.displayedLevel)
-            + (needsSync() ? "" : String.format(Locale.ROOT, " (%.2f%%)", this.percent)));
+            + (!Double.isFinite(this.percent) ? "" : String.format(Locale.ROOT, " (%.2f%%)", this.percent)));
         if (needsSync()) {
-            lines.add(tr.apply("progress.level_sync_hint"));
+            lines.add(tr.apply(this.anchor == null ? "progress.sync_hint" : "progress.level_sync_hint"));
         } else {
             lines.add("XP: " + (this.estimated ? "~" : "") + number(this.currentXp) + " / " + number(this.anchor.requiredXp()));
         }

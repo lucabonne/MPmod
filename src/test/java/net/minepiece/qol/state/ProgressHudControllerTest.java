@@ -40,7 +40,9 @@ class ProgressHudControllerTest {
         controller.observeXpBar(returned, 8000);
         assertEquals(1400, controller.profile().getCurrentXp(), 0.001);
         assertEquals(400, controller.grinding().getXp(), 0.001);
-        assertFalse(controller.grinding().isActive(63100)); // Corrections do not restart the idle timer.
+        // An advancing bar counts as activity: idle starts from its reconcile at 7500.
+        assertTrue(controller.grinding().isActive(67400));
+        assertFalse(controller.grinding().isActive(67500));
     }
 
     @Test
@@ -105,17 +107,16 @@ class ProgressHudControllerTest {
     }
 
     @Test
-    void itemPacketCanArriveBeforeDangerButNoncombatUpgradesAreNotPlayerXp() {
+    void itemXpAppliesImmediatelyAndActionbarDoesNotDoubleCount() {
         long now = System.currentTimeMillis();
         ProgressHudController controller = new ProgressHudController();
         controller.profile().sync(new ProfileXpParser.Snapshot(0, 63, 47784, 307450));
         controller.onItemXp(100, true, now);
-        assertEquals(47784, controller.profile().getCurrentXp());
+        assertEquals(47884, controller.profile().getCurrentXp());
         controller.onActionbar("+1 军 +100 实", now + 100);
         assertEquals(47884, controller.profile().getCurrentXp());
         controller.onItemXp(500, true, now + 60000);
-        controller.onActionbar("+1 军 +100 实", now + 65000);
-        assertEquals(47884, controller.profile().getCurrentXp());
+        assertEquals(48384, controller.profile().getCurrentXp());
     }
 
     @Test
