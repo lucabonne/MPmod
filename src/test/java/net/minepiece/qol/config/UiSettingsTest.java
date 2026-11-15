@@ -93,6 +93,20 @@ class UiSettingsTest {
         assertEquals(60, picture.opacity);
         assertTrue(picture.rotationFiles.isEmpty());
         assertEquals(10, picture.intervalSeconds);
+        assertFalse(picture.fullscreen);
+        assertEquals("none", picture.fade);
+        assertEquals(50, picture.fadePercent);
+    }
+
+    @Test void normalizesFullscreenAndFadeSettings() {
+        var settings = new Gson().fromJson("{\"pictures\":[{\"file\":\"cat.png\",\"fullscreen\":true,\"fade\":\"diagonal\",\"fadePercent\":900},"
+            + "{\"file\":\"dog.png\",\"fade\":\"bottom\",\"fadePercent\":0}]}", UiSettings.class);
+        settings.normalize();
+        assertTrue(settings.pictures.get(0).fullscreen);
+        assertEquals("none", settings.pictures.get(0).fade);
+        assertEquals(100, settings.pictures.get(0).fadePercent);
+        assertEquals("bottom", settings.pictures.get(1).fade);
+        assertEquals(5, settings.pictures.get(1).fadePercent);
     }
 
     @Test void rotationSettingsSurviveCopyAndSavedLoadoutRoundTripIndependently() {

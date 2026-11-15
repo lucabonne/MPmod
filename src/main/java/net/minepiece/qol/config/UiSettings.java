@@ -61,7 +61,15 @@ public final class UiSettings {
         public float scale = 1;
         public int opacity = 100;
         public boolean visible = true;
+        /** Cover the whole screen (cropped, never stretched) instead of using x/y/size. */
+        public boolean fullscreen = false;
+        /** Edge the image fades out toward: none, top, bottom, left or right. */
+        public String fade = "none";
+        /** How far the fade reaches across the image, in percent. */
+        public int fadePercent = 50;
     }
+
+    public static final List<String> FADES = List.of("none", "top", "bottom", "left", "right");
 
     public static final class Placement {
         public int x;
@@ -96,7 +104,7 @@ public final class UiSettings {
         hudOpacity = Math.clamp(hudOpacity, 0, 100);
         borderWidth = Math.clamp(borderWidth, 0, 3);
         if (panelStyles == null) panelStyles = new LinkedHashMap<>();
-        panelStyles.entrySet().removeIf(e -> e.getKey() == null || e.getValue() == null || e.getKey() < 0 || e.getKey() > 14);
+        panelStyles.entrySet().removeIf(e -> e.getKey() == null || e.getValue() == null || e.getKey() < 0 || e.getKey() > 15);
         panelStyles.values().forEach(PanelStyle::normalize);
         if (profileStats == null) profileStats = new ArrayList<>(List.of("power", "strength", "speed"));
         profileStats = new ArrayList<>(profileStats.stream().filter(key -> key != null && net.minepiece.qol.state.ProfileStatsTracker.STAT_KEYS.contains(key)).distinct().toList());
@@ -112,6 +120,8 @@ public final class UiSettings {
             p.intervalSeconds = Math.clamp(p.intervalSeconds, 1, 3600);
             p.scale = Float.isFinite(p.scale) ? Math.clamp(p.scale, 0.6F, 1.8F) : 1;
             p.opacity = Math.clamp(p.opacity, 0, 100);
+            if (!FADES.contains(p.fade)) p.fade = "none";
+            p.fadePercent = Math.clamp(p.fadePercent, 5, 100);
             p.width = Math.clamp(p.width, 8, 512);
             p.height = Math.clamp(p.height, 8, 512);
         }

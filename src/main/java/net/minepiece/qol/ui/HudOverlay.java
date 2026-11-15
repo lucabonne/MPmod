@@ -241,6 +241,10 @@ public final class HudOverlay {
                 resolveThemedPanel(id == 13 ? JOBS_THEME : STATS_THEME, this.mod.getHudPanelColor(id)),
                 editMode, selected == id, enabled && this.mod.isHudPanelVisible(id));
         }
+        renderToggleableColoredPanel(drawContext, textRenderer, 15, this.mod.getHudPanelName(15), this.mod.getSafeChestHudLines(),
+            this.mod.getHudPanelX(15), this.mod.getHudPanelY(15), this.mod.getHudPanelScale(15),
+            resolveThemedPanel(MONEY_THEME, this.mod.getHudPanelColor(15)), editMode, selected == 15,
+            config.safeChestsEnabled && this.mod.isHudPanelVisible(15));
         net.minepiece.qol.ui.RarityInventoryTools.drawHotbar(this.mod, drawContext);
         PanelRect clockRect = renderStringPanel(
             drawContext, textRenderer, 12, this.mod.getHudPanelName(12), ClockHud.lines(),

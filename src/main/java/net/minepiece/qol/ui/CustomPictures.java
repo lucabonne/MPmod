@@ -142,6 +142,16 @@ public final class CustomPictures {
             }
         }
         if (texture != null) {
+            if (picture.fullscreen) {
+                // Cover: scale until both sides fill the screen, then crop the overflow evenly.
+                int screenW = context.guiWidth(), screenH = context.guiHeight();
+                double cover = Math.max(screenW / (double) texture.width, screenH / (double) texture.height);
+                int virtualW = Math.max(screenW, (int) Math.ceil(texture.width * cover));
+                int virtualH = Math.max(screenH, (int) Math.ceil(texture.height * cover));
+                blitFaded(context, texture.id, picture, 0, 0, screenW, screenH,
+                    (virtualW - screenW) / 2, (virtualH - screenH) / 2, virtualW, virtualH);
+                return;
+            }
             int drawWidth = width;
             int drawHeight = height;
             if (rotating) {
@@ -149,13 +159,44 @@ public final class CustomPictures {
                 drawWidth = Math.max(1, (int) Math.round(texture.width * fit));
                 drawHeight = Math.max(1, (int) Math.round(texture.height * fit));
             }
-            context.blit(RenderPipelines.GUI_TEXTURED, texture.id, picture.x + (width - drawWidth) / 2,
-                picture.y + (height - drawHeight) / 2, 0, 0,
-                drawWidth, drawHeight, drawWidth, drawHeight, UiSettings.color("FFFFFF", picture.opacity));
+            blitFaded(context, texture.id, picture, picture.x + (width - drawWidth) / 2, picture.y + (height - drawHeight) / 2,
+                drawWidth, drawHeight, 0, 0, drawWidth, drawHeight);
         } else if (editing) {
             context.fill(picture.x, picture.y, picture.x + width, picture.y + height, 0xAA331111);
             context.text(Minecraft.getInstance().font, "Image unavailable", picture.x + 2, picture.y + 2, 0xFFFFFFFF);
         }
+    }
+
+    private static final int FADE_STRIPS = 48;
+
+    /**
+     * Draws a w×h area whose texture is mapped as a virtualW×virtualH image, offset by (u, v).
+     * A fade is drawn as thin strips, each with its own opacity.
+     */
+    private static void blitFaded(GuiGraphicsExtractor context, Identifier id, UiSettings.Picture picture,
+                                  int x, int y, int w, int h, int u, int v, int virtualW, int virtualH) {
+        boolean vertical = "top".equals(picture.fade) || "bottom".equals(picture.fade);
+        int length = vertical ? h : w;
+        int strips = "none".equals(picture.fade) ? 1 : Math.min(FADE_STRIPS, length);
+        for (int i = 0; i < strips; i++) {
+            int from = length * i / strips, to = length * (i + 1) / strips;
+            if (to <= from) continue;
+            double center = (from + to) / 2.0 / length;
+            int color = UiSettings.color("FFFFFF", fadeOpacity(picture.opacity, picture.fade, picture.fadePercent, center));
+            if (vertical) context.blit(RenderPipelines.GUI_TEXTURED, id, x, y + from, u, v + from, w, to - from, w, to - from, virtualW, virtualH, color);
+            else context.blit(RenderPipelines.GUI_TEXTURED, id, x + from, y, u + from, v, to - from, h, to - from, h, virtualW, virtualH, color);
+        }
+    }
+
+    /** Opacity at position {@code t} (0 = top/left, 1 = bottom/right) for a fade toward {@code fade}'s edge. */
+    static int fadeOpacity(int opacity, String fade, int fadePercent, double t) {
+        double toEdge = switch (fade == null ? "none" : fade) {
+            case "top", "left" -> t;
+            case "bottom", "right" -> 1 - t;
+            default -> 1;
+        };
+        double reach = Math.clamp(fadePercent, 5, 100) / 100.0;
+        return (int) Math.round(opacity * Math.clamp(toEdge / reach, 0, 1));
     }
 
     public void clear() {

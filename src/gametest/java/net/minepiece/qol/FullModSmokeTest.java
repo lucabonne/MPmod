@@ -111,6 +111,16 @@ public final class FullModSmokeTest implements FabricClientGameTest {
                 });
                 context.waitTicks(10);
                 context.takeScreenshot("2.0.5-images");
+                context.runOnClient(client -> {
+                    var mod = MinepieceQolClient.get();
+                    var picture = mod.getConfig().appearance.pictures.getFirst();
+                    picture.fullscreen = true;
+                    picture.fade = "bottom";
+                    picture.fadePercent = 60;
+                    client.gui.setScreen(null);
+                });
+                context.waitTicks(10);
+                context.takeScreenshot("2.0.6-fullscreen-fade");
             } finally {
                 context.runOnClient(client -> {
                     var mod = MinepieceQolClient.get();

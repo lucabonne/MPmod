@@ -1,12 +1,16 @@
-# Minepiece QoL 2.0.5
+# Minepiece QoL 2.0.6
 
-This release adds random folder-based picture rotation to the full 2.0.4 mod, retaining its restored source, assets, and Fabric Loader 0.20.1 support.
+This release adds a **Marineford safes** HUD panel: the lock countdown of all six safes (purple, green, orange, red, yellow, blue), each in its own color, read from the text above each safe and grouped under a **Spawn** header per server spawn, like the bosses panel. Timers keep counting after you walk away; a safe shows **Ready** when it awaits lockpicking and **Picked** after `Lock picking successful!` until its new timer is seen. `/mpsafes` shows what the mod reads above each safe. Toggle it under Extras, move it in the HUD editor (panel 15; custom pictures now start at 16).
+
+Pictures can now cover the **full screen** (cropped to fit, never stretched) and **fade** to transparent toward the top, bottom, left or right edge over 5–100% of the image.
+
+2.0.5 added random folder-based picture rotation.
 
 The 2.0.2 menus, HUD panels, trackers, translation, AH highlights, pet stats, appearance settings, loadouts, and Essentials features are retained.
 
 ## Install
 
-Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.0.5+mc26.2.jar`; install only one version of this mod at a time.
+Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.0.6+mc26.2.jar`; install only one version of this mod at a time.
 
 ## Random picture rotation
 
@@ -23,8 +27,8 @@ Use JDK 25, Loom 1.17, and the included Gradle 9.5.1 wrapper:
 ./gradlew --no-daemon runClientGameTest
 ```
 
-The installable artifact is `build/libs/minepieceqol-2.0.5+mc26.2.jar`. The sources JAR is for developers.
+The installable artifact is `build/libs/minepieceqol-2.0.6+mc26.2.jar`. The sources JAR is for developers.
 
 Production source and assets were restored from `minepieceqol-2.0.2+mc26.2-sources.jar`. The client smoke test checks full-mod initialization, restored keybindings, menu rendering, and inventory rendering. Screenshots are saved under `build/run/clientGameTest/screenshots`.
 
-The restored regression suite has 162 passing tests and four failing assertions in GrindingTrackerTest, ProgressHudControllerTest, and UiLoadoutsTest. The same four failures, with identical assertion results, were reproduced using the original 2.0.2 source and Loader 0.19.5. They are retained for visibility; production behavior was preserved. The 2.0.5 package and client smoke test can be run separately with `./gradlew --no-daemon build runClientGameTest -x test`.
+The regression suite has 180 passing tests. The package and client smoke test can be run separately with `./gradlew --no-daemon build runClientGameTest -x test`.

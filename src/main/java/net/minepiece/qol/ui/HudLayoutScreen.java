@@ -206,6 +206,7 @@ public final class HudLayoutScreen extends Screen {
 
     private PanelRect getPanelRectWith(int panelId, int x, int y, float scale) {
         var picture = this.mod.getHudPicture(panelId);
+        if (picture != null && picture.fullscreen) return null; // covers the screen: not draggable
         if (picture != null) return new PanelRect(x, y, Math.round(picture.width * scale), Math.round(picture.height * scale));
         float s = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
         List<String> lines = switch (panelId) {
@@ -281,6 +282,7 @@ public final class HudLayoutScreen extends Screen {
             case 12 -> ClockHud.lines();
             case 13 -> this.mod.getEssentials().quests().lines();
             case 14 -> this.mod.getEssentials().petLines();
+            case 15 -> this.mod.getSafeChestHudLines().stream().map(BossTracker.HudLine::text).toList();
             case 11 -> this.mod.getConfig().cookingHudEnabled
                 ? this.mod.getCookingTracker().getHudLines(this.mod::tr, this.mod.getConfig().cookingQuantity) : List.of(this.mod.tr("common.hidden"));
             case 10 -> this.mod.getConfig().grindingHudEnabled
@@ -296,6 +298,7 @@ public final class HudLayoutScreen extends Screen {
             case 1 -> cfg.jobsOverviewVisible; case 5 -> this.mod.isMinibossHudEnabled(); case 8 -> cfg.scrollsEnabled;
             case 9 -> cfg.inventoryXpHudEnabled || cfg.profileXpHudEnabled; case 10 -> cfg.grindingHudEnabled;
             case 11 -> cfg.cookingHudEnabled; case 13 -> cfg.dailyQuestsEnabled; case 14 -> cfg.activePetsEnabled;
+            case 15 -> cfg.safeChestsEnabled;
             default -> true;
         };
         boolean hasData = switch (panelId) {

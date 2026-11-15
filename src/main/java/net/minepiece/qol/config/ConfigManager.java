@@ -163,6 +163,8 @@ public final class ConfigManager {
         if (!Float.isFinite(config.activePetsHudScale) || config.activePetsHudScale <= 0) config.activePetsHudScale = 0.8F;
         if (config.dailyQuestsHudColor == null) config.dailyQuestsHudColor = "default";
         if (config.activePetsHudColor == null) config.activePetsHudColor = "default";
+        if (!Float.isFinite(config.safeChestsHudScale) || config.safeChestsHudScale <= 0) config.safeChestsHudScale = 0.8F;
+        if (config.safeChestsHudColor == null) config.safeChestsHudColor = "default";
         config.cookingQuantity = Math.max(1, Math.min(64, config.cookingQuantity));
         if (config.cookingHudScale <= 0.0F) {
             config.cookingHudScale = 1.0F;
@@ -277,6 +279,11 @@ public final class ConfigManager {
         public int activePetsHudY = 190;
         public float activePetsHudScale = 0.8F;
         public String activePetsHudColor = "default";
+        public boolean safeChestsEnabled = true;
+        public int safeChestsHudX = 440;
+        public int safeChestsHudY = 260;
+        public float safeChestsHudScale = 0.8F;
+        public String safeChestsHudColor = "default";
         public boolean rarityIconsEnabled = true;
         public boolean petStatIconsEnabled = true;
         public List<ChatTranslationRule> chatTranslationRules = new ArrayList<>();

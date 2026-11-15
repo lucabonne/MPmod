@@ -132,9 +132,47 @@ public final class MinepieceQolClient implements ClientModInitializer {
     private final net.minepiece.qol.ui.CustomPictures customPictures = new net.minepiece.qol.ui.CustomPictures();
 
     public net.minepiece.qol.ui.CustomPictures getCustomPictures() { return this.customPictures; }
+    private final net.minepiece.qol.state.SafeChestTracker safeChests = new net.minepiece.qol.state.SafeChestTracker();
+    private int safeScanTicks;
+
+    /** Empty unless the player is near Marineford or a safe has been seen this session. */
+    public List<BossTracker.HudLine> getSafeChestHudLines() {
+        var player = Minecraft.getInstance().player;
+        boolean near = player != null && net.minepiece.qol.state.SafeChestTracker.nearIsland(player.getX(), player.getY(), player.getZ());
+        if (!near && !this.safeChests.hasData()) return List.of();
+        return this.safeChests.lines(this::tr, System.currentTimeMillis(), this.bossTracker.getCurrentSpawnId(), near).stream()
+            .map(line -> new BossTracker.HudLine(line.text(), line.color())).toList();
+    }
+
+    private void scanSafeChests(Minecraft client) {
+        if (!this.config.safeChestsEnabled || client.level == null || ++this.safeScanTicks < 10) return;
+        this.safeScanTicks = 0;
+        var player = client.player;
+        if (!net.minepiece.qol.state.SafeChestTracker.nearIsland(player.getX(), player.getY(), player.getZ())) return;
+        String[] texts = readSafeTexts(client);
+        long now = System.currentTimeMillis();
+        for (int i = 0; i < texts.length; i++) this.safeChests.observe(this.bossTracker.getCurrentSpawnId(), i, texts[i], now);
+    }
+
+    /** Floating text currently loaded above each safe (null where none). */
+    public String[] readSafeTexts(Minecraft client) {
+        String[] texts = new String[net.minepiece.qol.state.SafeChestTracker.SAFES.size()];
+        if (client.level == null) return texts;
+        for (var entity : client.level.entitiesForRendering()) {
+            // Holograms are text displays or named armor stands, depending on the server plugin.
+            String text = entity instanceof net.minecraft.world.entity.Display.TextDisplay display ? TextUtil.normalize(display.getText())
+                : entity.hasCustomName() ? TextUtil.normalize(entity.getCustomName()) : "";
+            if (text.isBlank()) continue;
+            int index = net.minepiece.qol.state.SafeChestTracker.safeAt(entity.getX(), entity.getY(), entity.getZ());
+            if (index >= 0) texts[index] = texts[index] == null ? text : texts[index] + " " + text;
+        }
+        return texts;
+    }
+
+    public net.minepiece.qol.state.SafeChestTracker getSafeChests() { return this.safeChests; }
     public boolean isHudPanelVisible(int id) { return !this.config.appearance.hiddenPanels.contains(id); }
     public net.minepiece.qol.config.UiSettings.Picture getHudPicture(int id) {
-        int index = id - 15;
+        int index = id - 16;
         return index >= 0 && index < this.config.appearance.pictures.size() ? this.config.appearance.pictures.get(index) : null;
     }
 
@@ -224,6 +262,8 @@ public final class MinepieceQolClient implements ClientModInitializer {
         });
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
             String normalized = TextUtil.normalize(message);
+            var player = Minecraft.getInstance().player;
+            if (player != null) this.safeChests.onChatMessage(this.bossTracker.getCurrentSpawnId(), normalized, player.getX(), player.getY(), player.getZ());
             if (!overlay) { this.chatChannelTracker.onServerMessage(normalized); this.essentials.onServerMessage(normalized); }
             if (MoneyMessageClassifier.isEligibleServerMessage(normalized, overlay)) {
                 this.moneyTracker.onGameMessage(normalized);
@@ -334,7 +374,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
     }
 
     public int getHudPanelCount() {
-        return 14 + this.config.appearance.pictures.size();
+        return 15 + this.config.appearance.pictures.size();
     }
 
     public String getHudPanelName(int panelId) {
@@ -354,6 +394,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             case 12 -> tr("hud.panel.clock");
             case 13 -> tr("hud.panel.daily_quests");
             case 14 -> tr("hud.panel.active_pets");
+            case 15 -> tr("hud.panel.safes");
             default -> getHudPicture(panelId) == null ? tr("common.unknown") : getHudPicture(panelId).name;
         };
     }
@@ -374,6 +415,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             case 12 -> this.config.clockHudX;
             case 13 -> this.config.dailyQuestsHudX;
             case 14 -> this.config.activePetsHudX;
+            case 15 -> this.config.safeChestsHudX;
             default -> getHudPicture(panelId) == null ? 0 : getHudPicture(panelId).x;
         };
     }
@@ -394,6 +436,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             case 12 -> this.config.clockHudY;
             case 13 -> this.config.dailyQuestsHudY;
             case 14 -> this.config.activePetsHudY;
+            case 15 -> this.config.safeChestsHudY;
             default -> getHudPicture(panelId) == null ? 0 : getHudPicture(panelId).y;
         };
     }
@@ -414,6 +457,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             case 12 -> this.config.clockHudScale;
             case 13 -> this.config.dailyQuestsHudScale;
             case 14 -> this.config.activePetsHudScale;
+            case 15 -> this.config.safeChestsHudScale;
             default -> getHudPicture(panelId) == null ? 1.0F : getHudPicture(panelId).scale;
         };
     }
@@ -477,6 +521,11 @@ public final class MinepieceQolClient implements ClientModInitializer {
                 this.config.activePetsHudX = x;
                 this.config.activePetsHudY = y;
                 this.config.activePetsHudScale = clampedScale;
+            }
+            case 15 -> {
+                this.config.safeChestsHudX = x;
+                this.config.safeChestsHudY = y;
+                this.config.safeChestsHudScale = clampedScale;
             }
             case 12 -> {
                 this.config.clockHudX = x;
@@ -543,6 +592,9 @@ public final class MinepieceQolClient implements ClientModInitializer {
         this.config.activePetsHudX = defaults.activePetsHudX;
         this.config.activePetsHudY = defaults.activePetsHudY;
         this.config.activePetsHudScale = defaults.activePetsHudScale;
+        this.config.safeChestsHudX = defaults.safeChestsHudX;
+        this.config.safeChestsHudY = defaults.safeChestsHudY;
+        this.config.safeChestsHudScale = defaults.safeChestsHudScale;
         this.config.clockHudX = defaults.clockHudX;
         this.config.clockHudY = defaults.clockHudY;
         this.config.clockHudScale = defaults.clockHudScale;
@@ -573,12 +625,13 @@ public final class MinepieceQolClient implements ClientModInitializer {
             case 12 -> this.config.clockHudColor;
             case 13 -> this.config.dailyQuestsHudColor;
             case 14 -> this.config.activePetsHudColor;
+            case 15 -> this.config.safeChestsHudColor;
             default -> "default";
         };
     }
 
     public boolean isHudPanelColorable(int panelId) {
-        return panelId >= 0 && panelId <= 14;
+        return panelId >= 0 && panelId <= 15;
     }
 
     public void cycleHudPanelColor(int panelId, int direction) {
@@ -618,6 +671,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             case 12 -> this.config.clockHudColor = normalized;
             case 13 -> this.config.dailyQuestsHudColor = normalized;
             case 14 -> this.config.activePetsHudColor = normalized;
+            case 15 -> this.config.safeChestsHudColor = normalized;
             default -> {
             }
         }
@@ -1421,6 +1475,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             this.cookingTracker.tick(client.player);
         }
         SafeExecutor.run(this.debugLogManager, "essentials", () -> this.essentials.tick(client));
+        SafeExecutor.run(this.debugLogManager, "safe-chests", () -> scanSafeChests(client));
         syncMenuKeybindConfig();
         handleMenuKeyBinding(client);
         while (this.loadoutKeyBinding.consumeClick()) {

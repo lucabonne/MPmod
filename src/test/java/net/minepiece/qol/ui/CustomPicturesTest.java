@@ -101,4 +101,14 @@ class CustomPicturesTest {
         assertEquals(picture.file, picture.rotationFiles.getFirst());
         assertTrue(Files.isRegularFile(temp.resolve("imports").resolve(picture.file)));
     }
+
+    @Test void fadeReachesZeroAtTheChosenEdgeAndFullOpacityPastItsLength() {
+        assertEquals(80, CustomPictures.fadeOpacity(80, "none", 50, 0.99));
+        assertEquals(0, CustomPictures.fadeOpacity(80, "bottom", 50, 1.0));
+        assertEquals(40, CustomPictures.fadeOpacity(80, "bottom", 50, 0.75)); // halfway through the fade
+        assertEquals(80, CustomPictures.fadeOpacity(80, "bottom", 50, 0.4));  // before the fade starts
+        assertEquals(0, CustomPictures.fadeOpacity(100, "left", 100, 0.0));
+        assertEquals(50, CustomPictures.fadeOpacity(100, "left", 100, 0.5));
+        assertEquals(100, CustomPictures.fadeOpacity(100, "top", 20, 0.3));
+    }
 }

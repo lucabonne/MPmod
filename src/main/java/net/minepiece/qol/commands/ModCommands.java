@@ -35,6 +35,21 @@ public final class ModCommands {
                     return 1;
                 })));
 
+        // Diagnostic: what the safes panel reads from the floating text right now.
+        dispatcher.register(ClientCommands.literal("mpsafes").executes(context -> {
+            var client = net.minecraft.client.Minecraft.getInstance();
+            String[] texts = mod.readSafeTexts(client);
+            String spawn = mod.getBossTracker().getCurrentSpawnId();
+            reply(context.getSource(), "Current spawn: " + (spawn.isBlank() ? "(unknown)" : spawn));
+            for (int i = 0; i < texts.length; i++) {
+                var safe = net.minepiece.qol.state.SafeChestTracker.SAFES.get(i);
+                reply(context.getSource(), mod.tr("safes." + safe.key()) + ": "
+                    + mod.getSafeChests().status(spawn, i, System.currentTimeMillis()) + "  <-  "
+                    + (texts[i] == null ? "(no floating text loaded)" : texts[i]));
+            }
+            return 1;
+        }));
+
         dispatcher.register(ClientCommands.literal("mptranslate")
             .then(ClientCommands.literal("routes")
                 .executes(context -> {

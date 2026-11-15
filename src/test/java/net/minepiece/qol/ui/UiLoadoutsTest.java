@@ -32,7 +32,7 @@ class UiLoadoutsTest {
         assertEquals(30, mod.getHudPanelY(9));
         assertEquals(0.75F, mod.getHudPanelScale(9));
         assertEquals("red", mod.getHudPanelColor(9));
-        assertEquals(40, mod.getHudPanelX(15)); // Pictures start at panel 15.
+        assertEquals(40, mod.getHudPanelX(16)); // Pictures start at panel 16.
         assertFalse(mod.isHudPanelVisible(4));
         assertFalse(mod.getConfig().moneyTrackingEnabled);
         mod.getConfig().appearance.pictures.getFirst().x = 900;

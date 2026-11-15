@@ -342,8 +342,9 @@ public final class MinepieceMenuScreen extends Screen {
         featureToggle("extras.daily_quests", cfg.dailyQuestsEnabled, 0, v -> cfg.dailyQuestsEnabled = v);
         featureToggle("extras.active_pets", cfg.activePetsEnabled, 24, v -> cfg.activePetsEnabled = v);
         featureToggle("extras.background", cfg.backgroundRefreshEnabled, 48, v -> cfg.backgroundRefreshEnabled = v);
+        featureToggle("extras.safes", cfg.safeChestsEnabled, 72, v -> cfg.safeChestsEnabled = v);
         addRenderableWidget(Button.builder(trText("extras.refresh"), b -> this.mod.getEssentials().refresh())
-            .bounds(contentX, contentY + 80, 220, 18).build());
+            .bounds(contentX, contentY + 104, 220, 18).build());
     }
 
     private void buildStatDisplay() {

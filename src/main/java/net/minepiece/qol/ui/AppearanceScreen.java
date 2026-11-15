@@ -127,7 +127,7 @@ public final class AppearanceScreen extends Screen {
         if (id > 0) number(tr("overall_scale") + " %", Math.round(this.mod.getHudPanelScale(id) * 100), 96, 60, 180, 5,
             value -> this.mod.setHudPanelLayout(id, this.mod.getHudPanelX(id), this.mod.getHudPanelY(id), value / 100F));
         if (picture != null) {
-            button(tr("pictures"), 230, 96, 195, () -> { page = 2; selectedPicture = id - 15; refresh(); });
+            button(tr("pictures"), 230, 96, 195, () -> { page = 2; selectedPicture = id - 16; refresh(); });
             return;
         }
         number(tr("text_size") + " %", Math.round(style.textScale * 100), 122, 60, 180, 5,
@@ -216,9 +216,9 @@ public final class AppearanceScreen extends Screen {
         button(tr("delete"), 357, 91, 73, () -> {
             if (current != null) { this.mod.getConfig().uiLoadouts.remove(current); save(); refresh(); }
         });
-        for (int id = 1; id <= 14; id++) {
+        for (int id = 1; id <= 15; id++) {
             int panel = id;
-            toggle(this.mod.getHudPanelName(id), id <= 7 ? 10 : 230, 132 + ((id - 1) % 7) * 18,
+            toggle(this.mod.getHudPanelName(id), id <= 8 ? 10 : 230, 132 + ((id - 1) % 8) * 18,
                 this.mod.isHudPanelVisible(id), value -> {
                     var hidden = this.mod.getConfig().appearance.hiddenPanels;
                     hidden.remove(Integer.valueOf(panel));
@@ -261,13 +261,26 @@ public final class AppearanceScreen extends Screen {
         selectedPicture = Math.floorMod(selectedPicture, pictures.size());
         var picture = pictures.get(selectedPicture);
         button("<", 10, 84, 22, () -> { selectedPicture--; refresh(); });
-        button(picture.name, 38, 84, 364, () -> { });
-        button(">", 408, 84, 22, () -> { selectedPicture++; refresh(); });
+        button(picture.name, 38, 84, 300, () -> { });
+        button(">", 344, 84, 22, () -> { selectedPicture++; refresh(); });
+        button(tr("delete"), 372, 84, 58, () -> {
+            pictures.remove(picture); this.mod.getCustomPictures().clear(); save(); refresh();
+        });
         toggle(tr("visible"), 10, 115, picture.visible, value -> picture.visible = value);
+        toggle(tr("fullscreen"), 110, 115, picture.fullscreen, value -> picture.fullscreen = value);
         number(tr("opacity"), picture.opacity, 145, 0, 100, 5, value -> picture.opacity = value);
+        button(tr("fade") + ": " + tr("fade_" + picture.fade), 10, 174, 114, () -> {
+            picture.fade = UiSettings.FADES.get((UiSettings.FADES.indexOf(picture.fade) + 1) % UiSettings.FADES.size());
+            save(); refresh();
+        });
+        if (!"none".equals(picture.fade)) {
+            button("−", 130, 174, 22, () -> { picture.fadePercent = Math.max(5, picture.fadePercent - 5); save(); refresh(); });
+            button(picture.fadePercent + "%", 154, 174, 26, () -> { });
+            button("+", 182, 174, 22, () -> { picture.fadePercent = Math.min(100, picture.fadePercent + 5); save(); refresh(); });
+        }
         if (!picture.rotationFiles.isEmpty()) {
-            button(tr("rotation_interval"), 10, 174, 114, () -> { });
-            EditBox interval = new EditBox(this.font, x + 130, y + 174, 74, 18,
+            button(tr("rotation_interval"), 10, 202, 114, () -> { });
+            EditBox interval = new EditBox(this.font, x + 130, y + 202, 74, 18,
                 Component.literal(tr("rotation_interval")));
             interval.setMaxLength(4);
             interval.setValue(Integer.toString(picture.intervalSeconds));
@@ -281,12 +294,9 @@ public final class AppearanceScreen extends Screen {
                 save();
             });
             addRenderableWidget(interval);
-            button("−", 210, 174, 22, () -> interval.setValue(Integer.toString(Math.max(1, picture.intervalSeconds - 1))));
-            button("+", 236, 174, 22, () -> interval.setValue(Integer.toString(Math.min(3600, picture.intervalSeconds + 1))));
+            button("−", 210, 202, 22, () -> interval.setValue(Integer.toString(Math.max(1, picture.intervalSeconds - 1))));
+            button("+", 236, 202, 22, () -> interval.setValue(Integer.toString(Math.min(3600, picture.intervalSeconds + 1))));
         }
-        button(tr("delete"), 10, picture.rotationFiles.isEmpty() ? 174 : 202, 194, () -> {
-            pictures.remove(picture); this.mod.getCustomPictures().clear(); save(); refresh();
-        });
     }
 
     private void importFile(Path source) {
@@ -360,6 +370,7 @@ public final class AppearanceScreen extends Screen {
                 picture.file = source.file; picture.name = source.name;
                 picture.rotationFiles = source.rotationFiles; picture.intervalSeconds = source.intervalSeconds;
                 picture.width = source.width; picture.height = source.height; picture.opacity = source.opacity;
+                picture.fade = source.fade; picture.fadePercent = source.fadePercent; // preview never goes full screen
                 picture.x = x + 270; picture.y = y + 114;
                 picture.scale = Math.min(1, 94F / Math.max(picture.width, picture.height));
                 this.mod.getCustomPictures().draw(context, picture, true);

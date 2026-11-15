@@ -24,7 +24,7 @@ public final class HudIcons {
 
     public static List<IconGridTooltipComponent.Row> rows(MinepieceQolClient mod, String title, List<BossTracker.HudLine> lines) {
         int id = 0;
-        for (int i = 1; i <= 14; i++) if (mod.getHudPanelName(i).equals(title)) { id = i; break; }
+        for (int i = 1; i <= 15; i++) if (mod.getHudPanelName(i).equals(title)) { id = i; break; }
         ItemStack header = switch (id) {
             case 1 -> new ItemStack(Items.IRON_PICKAXE);
             case 2 -> new ItemStack(Items.GOLD_NUGGET);
@@ -36,6 +36,7 @@ public final class HudIcons {
             case 12 -> new ItemStack(Items.CLOCK);
             case 13 -> new ItemStack(Items.BOOK);
             case 14 -> new ItemStack(Items.RABBIT_FOOT);
+            case 15 -> new ItemStack(Items.CHEST);
             default -> ItemStack.EMPTY;
         };
         int profileRows = id == 9 && mod.getConfig().profileXpHudEnabled
