@@ -8,6 +8,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minepiece.qol.parse.TooltipParsers;
+import net.minepiece.qol.state.AuctionHighlighter;
 
 public final class AuctionTooltipFormatter {
     private static final Pattern PRICE_SUFFIX_PATTERN =
@@ -33,8 +34,10 @@ public final class AuctionTooltipFormatter {
                 Component.literal(" (" + formatPrice(unitPrice) + perItemLabel + ")").withStyle(ChatFormatting.GRAY)
             );
             if (selling) {
-                updated.append(Component.literal(" " + formatDeltaPercent(result.delta()))
-                    .withStyle(deltaColor(result.delta())));
+                MutableComponent percent = Component.literal(" " + formatDeltaPercent(result.delta()));
+                updated.append(AuctionHighlighter.level(result.delta()) == 0
+                    ? percent.withStyle(ChatFormatting.GRAY)
+                    : percent.withColor(AuctionHighlighter.rgbForDelta(result.delta())));
             }
             lines.set(i, updated);
         }
@@ -61,24 +64,5 @@ public final class AuctionTooltipFormatter {
         BigDecimal percent = BigDecimal.valueOf(delta).movePointRight(2)
             .setScale(2, RoundingMode.HALF_UP).stripTrailingZeros();
         return (percent.signum() > 0 ? "+" : "") + percent.toPlainString() + "%";
-    }
-
-    static ChatFormatting deltaColor(double delta) {
-        if (delta <= -0.90D) {
-            return ChatFormatting.YELLOW;
-        }
-        if (delta <= -0.74D) {
-            return ChatFormatting.BLUE;
-        }
-        if (delta <= -0.50D) {
-            return ChatFormatting.LIGHT_PURPLE;
-        }
-        if (delta < 0.0D) {
-            return ChatFormatting.GREEN;
-        }
-        if (delta > 0.0D) {
-            return ChatFormatting.RED;
-        }
-        return ChatFormatting.GRAY;
     }
 }

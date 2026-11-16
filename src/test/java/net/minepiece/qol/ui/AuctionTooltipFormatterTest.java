@@ -33,16 +33,6 @@ class AuctionTooltipFormatterTest {
         assertEquals(expected, AuctionTooltipFormatter.formatPrice(value));
     }
 
-    @ParameterizedTest
-    @CsvSource({
-        "-0.49999, GREEN", "-0.50, LIGHT_PURPLE", "-0.73999, LIGHT_PURPLE",
-        "-0.74, BLUE", "-0.89999, BLUE", "-0.90, YELLOW",
-        "0.052631578947, RED", "0, GRAY"
-    })
-    void usesUnroundedColorThresholds(double delta, ChatFormatting expected) {
-        assertEquals(expected, AuctionTooltipFormatter.deltaColor(delta));
-    }
-
     @Test
     void appendsBothUnitPricesPreservesStylesAndDoesNotDuplicate() {
         Component selling = Component.literal("Selling price: 400").withStyle(ChatFormatting.GOLD);
@@ -57,7 +47,7 @@ class AuctionTooltipFormatterTest {
         assertEquals("Average price: 380 (38/item)", lines.get(1).getString());
         assertEquals(selling.getStyle(), lines.get(0).getStyle());
         assertEquals(average.getStyle(), lines.get(1).getStyle());
-        assertEquals(net.minecraft.network.chat.TextColor.RED, lines.get(0).getSiblings().getLast().getStyle().getColor());
+        assertEquals(net.minecraft.network.chat.TextColor.fromRgb(net.minepiece.qol.state.AuctionHighlighter.rgbForDelta(400.0 / 380 - 1)), lines.get(0).getSiblings().getLast().getStyle().getColor());
         assertSame(unrelated, lines.get(2));
         assertEquals("Selling price: 400", selling.getString());
 
