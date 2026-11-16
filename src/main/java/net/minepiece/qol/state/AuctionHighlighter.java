@@ -10,8 +10,8 @@ public final class AuctionHighlighter {
     private static final double DEAD_ZONE = 0.05D;
     private static final double STEP = 0.10D;
     public static final int MAX_LEVEL = 10;
-    private static final int MIN_ALPHA = 0x30;
-    private static final int MAX_ALPHA = 0xB8;
+    private static final int MIN_ALPHA = 0x99; // drawn behind the item, so it can be near-solid
+    private static final int MAX_ALPHA = 0xFF;
     /** Pale → deep green for cheaper, pale yellow → orange → red → crimson for pricier. */
     private static final int[] CHEAP = {0xC6FFB3, 0x2EE62E, 0x00995C};
     private static final int[] PRICEY = {0xFFF2A0, 0xFF9A1F, 0xFF2A2A, 0xB0001E};

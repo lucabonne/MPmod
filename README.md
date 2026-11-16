@@ -1,6 +1,6 @@
 # Minepiece QoL 2.1.1
 
-Auction house prices are now colored in **10% steps**: within ±5% of the average nothing is tinted; cheaper listings go from pale to deep green and pricier ones from pale yellow through orange and red to crimson, with the slot tint getting stronger each step (19% up to 72% at 95%+). The tooltip percentage uses the same color.
+Auction house prices are now colored in **10% steps**: within ±5% of the average nothing is tinted; cheaper listings go from pale to deep green and pricier ones from pale yellow through orange and red to crimson, with the slot background getting stronger each step (60% up to solid at 95%+). The tooltip percentage uses the same color.
 
 2.1.0: pictures now **zoom with the mouse wheel** in the HUD editor (10% per notch, around the picture's center) with no fixed size limit: from small up to the size that covers the whole screen, where they snap to center. The **Full screen** toggle still pins a picture to cover the screen.
 
