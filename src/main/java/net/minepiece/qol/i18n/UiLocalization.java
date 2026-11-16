@@ -31,6 +31,7 @@ public final class UiLocalization {
         add("hud.panel.active_pets", "Active pets", "Familiers actifs", "Mascotas activas", "Aktive Begleiter", "Pet attivi", "Mascotes ativos", "Aktywne zwierzaki", "Pet aktif", "Aktif evcil hayvanlar");
         add("hud.panel.safes", "Marineford safes", "Coffres de Marineford", "Cajas fuertes de Marineford", "Marineford-Tresore", "Casseforti di Marineford", "Cofres de Marineford", "Sejfy Marineford", "Brankas Marineford", "Marineford kasaları");
         add("extras.safes", "Marineford safes HUD", "HUD coffres de Marineford", "HUD cajas fuertes de Marineford", "Marineford-Tresore HUD", "HUD casseforti di Marineford", "HUD cofres de Marineford", "HUD sejfów Marineford", "HUD brankas Marineford", "Marineford kasa HUD");
+        add("extras.safes_reset", "Reset safe timers", "Réinitialiser les coffres", "Reiniciar cajas fuertes", "Tresore zurücksetzen", "Azzera casseforti", "Redefinir cofres", "Resetuj sejfy", "Atur ulang brankas", "Kasaları sıfırla");
         add("safes.ready", "Ready", "Prêt", "Listo", "Bereit", "Pronto", "Pronto", "Gotowy", "Siap", "Hazır");
         add("safes.picked", "Picked", "Crocheté", "Forzado", "Geknackt", "Scassinato", "Arrombado", "Otwarty", "Dibobol", "Açıldı");
         add("safes.purple", "Purple", "Violet", "Morado", "Lila", "Viola", "Roxo", "Fioletowy", "Ungu", "Mor");

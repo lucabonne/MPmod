@@ -62,4 +62,14 @@ class SafeChestTrackerTest {
         assertEquals("safes.orange: 10s", lines.get(17).text());
         assertEquals(SafeChestTracker.Status.UNKNOWN, tracker.status("2", 2, 0));
     }
+
+    @Test void resetForgetsSpawnsAndTimersUntilBackAtIsland() {
+        var tracker = new SafeChestTracker();
+        tracker.observe("3", 0, LOCKED, 0);
+        tracker.clear();
+        assertFalse(tracker.hasData());
+        assertTrue(tracker.lines(TR, 0, "3", false).isEmpty());
+        assertEquals(SafeChestTracker.Status.UNKNOWN, tracker.status("3", 0, 0));
+        assertEquals("safes.purple: ?", tracker.lines(TR, 0, "3", true).get(1).text()); // back at the island
+    }
 }

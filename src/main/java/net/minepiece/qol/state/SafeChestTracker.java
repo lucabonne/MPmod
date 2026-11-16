@@ -109,6 +109,11 @@ public final class SafeChestTracker {
         return safes == null ? 0 : Math.max(0, (safes.unlockAtMs[index] - now + 999) / 1000);
     }
 
+    /** Forget every spawn and timer; the panel hides until the player is back at the island. */
+    public void clear() {
+        spawns.clear();
+    }
+
     public boolean hasData() {
         return !spawns.isEmpty();
     }

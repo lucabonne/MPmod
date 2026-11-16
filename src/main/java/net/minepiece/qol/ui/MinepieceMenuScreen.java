@@ -345,6 +345,8 @@ public final class MinepieceMenuScreen extends Screen {
         featureToggle("extras.safes", cfg.safeChestsEnabled, 72, v -> cfg.safeChestsEnabled = v);
         addRenderableWidget(Button.builder(trText("extras.refresh"), b -> this.mod.getEssentials().refresh())
             .bounds(contentX, contentY + 104, 220, 18).build());
+        addRenderableWidget(Button.builder(trText("extras.safes_reset"), b -> this.mod.getSafeChests().clear())
+            .bounds(contentX, contentY + 128, 220, 18).build());
     }
 
     private void buildStatDisplay() {
