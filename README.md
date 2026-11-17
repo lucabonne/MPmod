@@ -1,6 +1,8 @@
-# Minepiece QoL 2.1.8
+# Minepiece QoL 2.2.0
 
-HUD panel bodies are darker so text and value colors stand out over bright skies and blocks: they are drawn 40% darker than your background color, and the default HUD opacity is now 88% (was 72%). If your HUD opacity was still on the old default it moves to 88% once; a value you picked yourself is kept. The menu keeps your exact background color.
+2.2.0 brings together the redesign from 2.1.4 to 2.1.8: a restyled menu with search, sections and setting descriptions; color ribbon HUD panels with darker bodies and colored values; a new HUD editor; and the auction house price key. The notes for each step follow.
+
+2.1.8: HUD panel bodies are darker so text and value colors stand out over bright skies and blocks: they are drawn 40% darker than your background color, and the default HUD opacity is now 88% (was 72%). If your HUD opacity was still on the old default it moves to 88% once; a value you picked yourself is kept. The menu keeps your exact background color.
 
 2.1.7: HUD values are colored by meaning: **green** for money and XP coming in (Made today, AH sold, Today XP/money, Money earned, XP gained, XP/h, Money/h, a Ready safe, Grinding: active), **red** for money going out (AH bought, negative values), **amber** for Grinding: paused, and **grey** for unknown or nothing yet (?, —, a picked safe, a 0 on a money line). Labels, totals, stats and timers stay as they were; it works in all 9 languages.
 
@@ -33,7 +35,7 @@ The 2.0.2 menus, HUD panels, trackers, translation, AH highlights, pet stats, ap
 
 ## Install
 
-Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.1.8+mc26.2.jar`; install only one version of this mod at a time.
+Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.2.0+mc26.2.jar`; install only one version of this mod at a time.
 
 ## Random picture rotation
 
@@ -50,7 +52,7 @@ Use JDK 25, Loom 1.17, and the included Gradle 9.5.1 wrapper:
 ./gradlew --no-daemon runClientGameTest
 ```
 
-The installable artifact is `build/libs/minepieceqol-2.1.8+mc26.2.jar`. The sources JAR is for developers.
+The installable artifact is `build/libs/minepieceqol-2.2.0+mc26.2.jar`. The sources JAR is for developers.
 
 Production source and assets were restored from `minepieceqol-2.0.2+mc26.2-sources.jar`. The client smoke test checks full-mod initialization, restored keybindings, menu rendering, and inventory rendering. Screenshots are saved under `build/run/clientGameTest/screenshots`.
 
