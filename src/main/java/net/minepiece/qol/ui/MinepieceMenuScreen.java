@@ -147,8 +147,17 @@ public final class MinepieceMenuScreen extends Screen {
     private static final int RESET_CONFIRM_BUTTON_SIZE = 18;
     private static final int RESET_CONFIRM_BUTTON_GAP = 14;
 
+    /** Minepiece gold, used for the title line, the active page and the version badge. */
+    private static final int GOLD = 0xFFDDBA6A;
+    private static final String VERSION = net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("minepiece-qol")
+        .map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("");
+    private static final int SIDEBAR_TABS_Y = 52;
+
     private final MinepieceQolClient mod;
     private Tab currentTab = Tab.MAIN;
+    private EditBox searchBox;
+    private String searchQuery = "";
+    private List<SearchEntry> searchIndex;
     private final Map<Group, Tab> selectedPages = new java.util.EnumMap<>(Group.class);
     private final Map<Tab, Integer> pageScroll = new java.util.EnumMap<>(Tab.class);
     private float menuScale = 1;
@@ -225,17 +234,26 @@ public final class MinepieceMenuScreen extends Screen {
         this.contentHeight = Math.max(260, contentBottom - contentTop);
 
         buildSidebar();
+        this.searchBox = new EditBox(this.font, this.panelX + 6, this.panelY + 30, SIDEBAR_WIDTH - 12, 16, Component.literal(tr("menu.search")));
+        this.searchBox.setHint(Component.literal(tr("menu.search")));
+        this.searchBox.setValue(this.searchQuery);
+        this.searchBox.setResponder(text -> {
+            if (text.equals(this.searchQuery)) return;
+            this.searchQuery = text;
+            rebuild();
+            setFocused(this.searchBox);
+        });
         buildTabContent();
     }
 
     private void buildSidebar() {
         this.tabButtons.clear();
         int sidebarX = this.panelX + 6;
-        int sidebarY = this.panelY + 30;
+        int sidebarY = this.panelY + SIDEBAR_TABS_Y;
         Group[] groups = Group.values();
         for (int i = 0; i < groups.length; i++) {
             Tab tab = groups[i].pages()[0];
-            int tabStep = Math.min(TAB_HEIGHT + TAB_SPACING, (panelHeight - 42) / groups.length);
+            int tabStep = Math.min(TAB_HEIGHT + TAB_SPACING, (panelHeight - SIDEBAR_TABS_Y - 20) / groups.length);
             int by = sidebarY + i * tabStep;
             TabButton button = new TabButton(sidebarX, by, SIDEBAR_WIDTH - 12, Math.min(TAB_HEIGHT, tabStep - 2), tab);
             this.tabButtons.add(button);
@@ -245,9 +263,99 @@ public final class MinepieceMenuScreen extends Screen {
     private void buildTabContent() {
         // Reset content widgets but preserve sidebar interaction (which we hand-draw, not as widgets)
         clearWidgets();
+        if (this.searchBox != null) addWidget(this.searchBox);
         this.contentY = contentTop - pageScroll.getOrDefault(currentTab, 0);
         this.removeActions.clear();
-        switch (this.currentTab) {
+        if (isSearching()) buildSearchResults();
+        else buildPage(this.currentTab);
+        List<net.minecraft.client.gui.components.AbstractWidget> built = new ArrayList<>();
+        for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget && child != this.searchBox) built.add(widget);
+        for (var child : List.copyOf(children())) {
+            if (child instanceof Button button) {
+                removeWidget(button);
+                addRenderableWidget(new ThemedButton(this.mod, button));
+            } else if (child instanceof Checkbox box) {
+                removeWidget(box);
+                int width = box.getMessage().getString().isEmpty() ? box.getWidth() : switchWidth(box, built);
+                addRenderableWidget(new ThemedSwitch(this.mod, box, width));
+            }
+        }
+        if (!isSearching()) selectedPages.put(groupFor(currentTab), currentTab);
+        finishTabContent();
+    }
+
+    /** Setting rows stretch to the next widget on the same row, or to the content edge. */
+    private int switchWidth(Checkbox box, List<net.minecraft.client.gui.components.AbstractWidget> built) {
+        int limit = this.contentX + this.contentWidth - 6;
+        for (var other : built) {
+            if (other == box || other.getX() <= box.getX()) continue;
+            boolean sameRow = other.getY() < box.getY() + box.getHeight() && other.getY() + other.getHeight() > box.getY();
+            if (sameRow) limit = Math.min(limit, other.getX() - 4);
+        }
+        return Math.max(40, limit - box.getX());
+    }
+
+    private boolean isSearching() {
+        return this.searchQuery != null && !this.searchQuery.isBlank();
+    }
+
+    private record SearchEntry(Tab tab, String label) { }
+
+    /** Every page's own widget labels, read by building each page once off-screen. */
+    private List<SearchEntry> searchIndex() {
+        if (this.searchIndex != null) return this.searchIndex;
+        Tab saved = this.currentTab;
+        List<SearchEntry> entries = new ArrayList<>();
+        for (Tab tab : Tab.values()) {
+            entries.add(new SearchEntry(tab, tab.label(this)));
+            this.currentTab = tab;
+            clearWidgets();
+            this.removeActions.clear();
+            try {
+                buildPage(tab);
+            } catch (RuntimeException ignored) {
+                // a page that cannot build off-screen is still found by its name
+            }
+            for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget && !(widget instanceof EditBox)) {
+                String label = widget.getMessage().getString().trim();
+                if (!label.isEmpty()) entries.add(new SearchEntry(tab, label));
+            }
+        }
+        this.currentTab = saved;
+        clearWidgets();
+        this.removeActions.clear();
+        if (this.searchBox != null) addWidget(this.searchBox);
+        this.searchIndex = entries;
+        return entries;
+    }
+
+    private List<SearchEntry> searchMatches() {
+        String query = this.searchQuery.trim().toLowerCase(Locale.ROOT);
+        java.util.LinkedHashSet<SearchEntry> found = new java.util.LinkedHashSet<>();
+        for (SearchEntry entry : searchIndex()) {
+            String group = tr(groupFor(entry.tab()).key);
+            if ((entry.label() + " " + entry.tab().label(this) + " " + group).toLowerCase(Locale.ROOT).contains(query)) found.add(entry);
+        }
+        return List.copyOf(found);
+    }
+
+    private void buildSearchResults() {
+        var matches = searchMatches();
+        for (int i = 0; i < matches.size(); i++) {
+            SearchEntry entry = matches.get(i);
+            String text = tr(groupFor(entry.tab()).key) + " › " + entry.tab().label(this)
+                + (entry.label().equals(entry.tab().label(this)) ? "" : ": " + entry.label());
+            addRenderableWidget(Button.builder(Component.literal(text), b -> {
+                this.currentTab = entry.tab();
+                this.searchQuery = "";
+                this.searchBox.setValue("");
+                rebuild();
+            }).bounds(this.contentX, this.contentY + i * 22, this.contentWidth - 6, 18).build());
+        }
+    }
+
+    private void buildPage(Tab tab) {
+        switch (tab) {
             case MAIN -> buildMainTab();
             case BOSSES -> buildBossesTab();
             case MONEY -> buildMoneyTab();
@@ -255,7 +363,10 @@ public final class MinepieceMenuScreen extends Screen {
             case EVENTS -> buildEventsTab();
             case PROFILE -> buildProfileTab();
             case LANGUAGE -> buildLanguageTab();
-            case AUCTION_HOUSE -> featureToggle("setting.auction_highlight", this.mod.getConfig().auctionHighlightEnabled, 0, v -> this.mod.setAuctionHighlightEnabled(v));
+            case AUCTION_HOUSE -> {
+                featureToggle("setting.auction_highlight", this.mod.getConfig().auctionHighlightEnabled, 0, v -> this.mod.setAuctionHighlightEnabled(v));
+                featureToggle("setting.auction_price_key", this.mod.getConfig().auctionPriceKeyEnabled, 24, v -> this.mod.getConfig().auctionPriceKeyEnabled = v);
+            }
             case PROGRESS -> buildProgressTab();
             case COOKING -> buildCookingTab();
             case EXTRAS -> buildExtrasTab();
@@ -280,21 +391,17 @@ public final class MinepieceMenuScreen extends Screen {
                     .bounds(this.contentX, this.contentY + 134, 220, 18).build());
             }
         }
-        for (var child : List.copyOf(children())) {
-            if (child instanceof Button button) {
-                removeWidget(button);
-                addRenderableWidget(new ThemedButton(this.mod, button));
-            }
-        }
-        selectedPages.put(groupFor(currentTab), currentTab);
-        int extent = switch (currentTab) {
+    }
+
+    private void finishTabContent() {
+        int extent = isSearching() ? 0 : switch (currentTab) {
             case PROGRESS -> 255; case COOKING -> 255; case MAIN -> 180;
             case AUCTION_HOUSE -> 100;
             case BOSSES -> BOSSES_ACTIVE_LIST_Y_OFFSET + BOSSES_ACTIVE_LIST_HEIGHT + BOSSES_REGISTRY_GAP + BOSSES_REGISTRY_LIST_HEIGHT;
             case MONEY, EVENTS, LANGUAGE -> contentHeight - 4;
             default -> 0;
         };
-        for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget)
+        for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget && child != this.searchBox)
             extent = Math.max(extent, widget.getY() + widget.getHeight() - contentY);
         for (var remove : removeActions) extent = Math.max(extent, remove.y() + REMOVE_BUTTON_SIZE - contentY);
         maxPageScroll = Math.max(0, extent - (contentBottom - contentTop));
@@ -1021,10 +1128,10 @@ public final class MinepieceMenuScreen extends Screen {
         drawContext.fill(this.panelX + 4, this.panelY + 28, this.panelX + SIDEBAR_WIDTH, this.panelY + this.panelHeight - 4, COLOR_SIDEBAR_BG);
         drawDivider(drawContext, this.panelX + SIDEBAR_WIDTH + 1, this.panelY + 28, this.panelX + SIDEBAR_WIDTH + 2, this.panelY + this.panelHeight - 4);
 
-        // Section title
-        drawContext.centeredText(this.font, tr(groupFor(currentTab).key), this.panelX + PANEL_WIDTH / 2, this.panelY + 10, COLOR_HEADER);
+        drawTitleBar(drawContext);
 
-        // Sidebar tabs
+        // Sidebar search and tabs
+        this.searchBox.extractRenderState(drawContext, mouseX, mouseY, deltaTicks);
         for (TabButton button : this.tabButtons) {
             button.extractRenderState(drawContext, mouseX, mouseY);
         }
@@ -1032,7 +1139,6 @@ public final class MinepieceMenuScreen extends Screen {
         // Close (X) button top-right
         drawCloseButton(drawContext, mouseX, mouseY);
 
-        drawContext.fill(this.contentX, this.panelY + 30, this.contentX + this.contentWidth, this.panelY + 31, COLOR_DIVIDER);
 
         drawSubpages(drawContext, mouseX, mouseY);
         drawContext.enableScissor(contentX, contentTop, contentX + contentWidth, contentBottom);
@@ -1053,10 +1159,7 @@ public final class MinepieceMenuScreen extends Screen {
             drawContext.fill(contentX + contentWidth - 2, top, contentX + contentWidth, top + thumb, COLOR_HEADER);
         }
 
-        // Credits bottom right
-        String credits = tr("menu.credits");
-        int cw = this.font.width(credits);
-        drawContext.text(this.font, credits, this.panelX + PANEL_WIDTH - cw - 8, this.panelY + this.panelHeight - 12, COLOR_TEXT_DIM);
+        drawFooter(drawContext);
 
         if (this.resetHudLayoutConfirmOpen) {
             drawResetHudConfirmPopup(drawContext, mouseX, mouseY);
@@ -1066,8 +1169,13 @@ public final class MinepieceMenuScreen extends Screen {
     private void renderTabDecorations(GuiGraphicsExtractor drawContext, int mouseX, int mouseY) {
         Font renderer = this.font;
         int x = this.contentX;
+        if (isSearching()) {
+            if (children().stream().noneMatch(child -> child instanceof ThemedButton))
+                drawFittedText(drawContext, tr("menu.search_none"), x, contentY + 4, contentWidth - 4, COLOR_TEXT_DIM);
+            return;
+        }
         switch (this.currentTab) {
-            case MAIN -> drawFittedText(drawContext, String.format(Locale.ROOT, tr("hud.layout.shortcut"), this.mod.getHudEditorShortcutName()), x, contentY + 162, contentWidth - 4, COLOR_TEXT_DIM);
+            case MAIN -> { } // the save shortcut is in the footer now
             case BOSSES -> {
                 drawFittedCenteredText(drawContext, this.tr("bosses.collapse_hint"), x, this.contentY + 35, this.contentWidth - 4, 10, COLOR_TEXT);
                 int activeListY = this.contentY + BOSSES_ACTIVE_LIST_Y_OFFSET;
@@ -1414,6 +1522,44 @@ public final class MinepieceMenuScreen extends Screen {
         this.removeActions.add(new RemoveAction(x, buttonY, onPress));
     }
 
+    private void drawTitleBar(GuiGraphicsExtractor drawContext) {
+        drawContext.fill(this.panelX + 1, this.panelY + 24, this.panelX + PANEL_WIDTH - 1, this.panelY + 25, GOLD);
+        String brand = "Minepiece QoL";
+        drawContext.text(this.font, brand, this.panelX + 8, this.panelY + 8, 0xFFFFFFFF);
+        int crumbX = this.panelX + 16 + this.font.width(brand);
+        String version = VERSION.isEmpty() ? "" : "v" + VERSION;
+        int versionWidth = this.font.width(version) + 8;
+        int versionX = closeButtonX() - versionWidth - 6;
+        String crumb = isSearching() ? tr("menu.search")
+            : tr(groupFor(currentTab).key) + "  ›  " + currentTab.label(this);
+        drawFittedText(drawContext, crumb, crumbX, this.panelY + 8, versionX - crumbX - 6, COLOR_TEXT_DIM);
+        if (!version.isEmpty()) {
+            drawOutline(drawContext, versionX, this.panelY + 5, versionWidth, 13, GOLD);
+            drawContext.text(this.font, version, versionX + 4, this.panelY + 8, GOLD);
+        }
+    }
+
+    private void drawFooter(GuiGraphicsExtractor drawContext) {
+        int y = this.panelY + this.panelHeight - 14;
+        int x = this.panelX + SIDEBAR_WIDTH + CONTENT_PADDING;
+        x = drawKeycap(drawContext, this.mod.getHudEditorShortcutName(), x, y);
+        drawContext.text(this.font, tr("menu.footer_save"), x + 4, y, COLOR_TEXT_DIM);
+        x += 4 + this.font.width(tr("menu.footer_save")) + 10;
+        x = drawKeycap(drawContext, "Esc", x, y);
+        drawContext.text(this.font, tr("menu.footer_back"), x + 4, y, COLOR_TEXT_DIM);
+        String credits = tr("menu.credits");
+        drawContext.text(this.font, credits, this.panelX + PANEL_WIDTH - this.font.width(credits) - 8, y, COLOR_TEXT_DIM);
+    }
+
+    /** Draws a small key label and returns the x just after it. */
+    private int drawKeycap(GuiGraphicsExtractor drawContext, String key, int x, int y) {
+        int width = this.font.width(key) + 6;
+        drawContext.fill(x, y - 2, x + width, y + 9, COLOR_ACTION_BUTTON);
+        drawOutline(drawContext, x, y - 2, width, 11, COLOR_PANEL_BORDER);
+        drawContext.text(this.font, key, x + 3, y, 0xFFFFFFFF);
+        return x + width;
+    }
+
     private void drawFittedText(GuiGraphicsExtractor drawContext, String raw, int x, int y, int maxWidth, int color) {
         String text = raw == null ? "" : raw;
         if (maxWidth <= 6) {
@@ -1514,14 +1660,21 @@ public final class MinepieceMenuScreen extends Screen {
     }
 
     private boolean clickMenu(net.minecraft.client.input.MouseButtonEvent click, boolean doubled) {
-        if (!this.resetHudLayoutConfirmOpen && click.button() == 0 && click.y() >= panelY + 32 && click.y() < contentTop - 3) {
+        if (!this.resetHudLayoutConfirmOpen && this.searchBox.isMouseOver(click.x(), click.y())) {
+            setFocused(this.searchBox);
+            this.searchBox.mouseClicked(click, doubled);
+            return true;
+        }
+        if (getFocused() == this.searchBox) setFocused(null);
+        if (!this.resetHudLayoutConfirmOpen && click.button() == 0 && !isSearching()) {
             Tab[] pages = groupFor(currentTab).pages();
-            int direction = click.x() >= contentX && click.x() < contentX + 22 ? -1
-                : click.x() >= contentX + contentWidth - 22 && click.x() < contentX + contentWidth ? 1 : 0;
-            if (direction != 0) {
-                int index = java.util.Arrays.asList(pages).indexOf(currentTab);
-                currentTab = pages[Math.floorMod(index + direction, pages.length)];
-                rebuild(); return true;
+            int[][] chips = subpageChips(pages);
+            for (int i = 0; i < pages.length; i++) {
+                int[] r = chips[i];
+                if (click.x() >= r[0] && click.x() < r[0] + r[2] && click.y() >= r[1] && click.y() < r[1] + r[3]) {
+                    if (currentTab != pages[i]) { currentTab = pages[i]; rebuild(); }
+                    return true;
+                }
             }
         }
         if (this.resetHudLayoutConfirmOpen) {
@@ -1553,9 +1706,11 @@ public final class MinepieceMenuScreen extends Screen {
         // Sidebar tab clicks
         for (TabButton button : this.tabButtons) {
             if (button.contains((int) click.x(), (int) click.y())) {
-                if (this.currentTab != button.tab) {
+                if (this.currentTab != button.tab || isSearching()) {
                     Group group = groupFor(button.tab);
                     this.currentTab = selectedPages.getOrDefault(group, button.tab);
+                    this.searchQuery = "";
+                    this.searchBox.setValue("");
                     rebuild();
                 }
                 return true;
@@ -1915,12 +2070,13 @@ public final class MinepieceMenuScreen extends Screen {
             boolean hover = contains(mouseX, mouseY);
             int bg = active ? COLOR_TAB_ACTIVE : (hover ? COLOR_TAB_HOVER : COLOR_TAB_NORMAL);
             drawContext.fill(this.x, this.y, this.x + this.width, this.y + this.height, bg);
-            if (active) {
-                drawContext.fill(this.x, this.y, this.x + 2, this.y + this.height, COLOR_TAB_ACCENT);
-            }
-            drawOutline(drawContext, this.x, this.y, this.width, this.height, COLOR_DIVIDER);
-            int textY = this.y + (this.height - 8) / 2;
-            drawFittedText(drawContext, tr(groupFor(this.tab).key), this.x + 8, textY, this.width - 12, COLOR_TEXT);
+            drawOutline(drawContext, this.x, this.y, this.width, this.height, active ? COLOR_TAB_ACCENT : COLOR_DIVIDER);
+            Group group = groupFor(this.tab);
+            boolean icon = this.height >= 18;
+            if (icon) drawContext.item(new net.minecraft.world.item.ItemStack(group.icon()), this.x + 4, this.y + (this.height - 16) / 2);
+            if (active) drawContext.fill(this.x + this.width - 7, this.y + this.height / 2 - 2, this.x + this.width - 3, this.y + this.height / 2 + 2, GOLD);
+            int textX = this.x + (icon ? 24 : 8);
+            drawFittedText(drawContext, tr(group.key), textX, this.y + (this.height - 8) / 2, this.x + this.width - 10 - textX, active ? 0xFFFFFFFF : COLOR_TEXT);
         }
     }
 
@@ -1963,19 +2119,38 @@ public final class MinepieceMenuScreen extends Screen {
     }
 
     private void updateContentVisibility() {
-        for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget)
+        for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget && child != this.searchBox)
             widget.visible = widget.getY() >= contentTop && widget.getY() + widget.getHeight() <= contentBottom;
     }
 
+    /** One {x, y, width, height} per page tab; they share the row and shrink evenly when the labels are long. */
+    private int[][] subpageChips(Tab[] pages) {
+        int gap = 4, y = panelY + 32, height = 16, available = contentWidth - 4;
+        int[] widths = new int[pages.length];
+        int total = gap * (pages.length - 1);
+        for (int i = 0; i < pages.length; i++) total += widths[i] = this.font.width(pages[i].label(this)) + 14;
+        if (total > available) java.util.Arrays.fill(widths, (available - gap * (pages.length - 1)) / pages.length);
+        int[][] chips = new int[pages.length][];
+        int x = contentX;
+        for (int i = 0; i < pages.length; i++) {
+            chips[i] = new int[]{x, y, widths[i], height};
+            x += widths[i] + gap;
+        }
+        return chips;
+    }
+
     private void drawSubpages(GuiGraphicsExtractor context, int mouseX, int mouseY) {
+        if (isSearching()) return;
         Tab[] pages = groupFor(currentTab).pages();
-        int index = java.util.Arrays.asList(pages).indexOf(currentTab);
-        int y = panelY + 32;
-        drawRowBox(context, contentX, y, contentWidth - 4, 18);
-        drawFittedCenteredText(context, currentTab.label(this) + "  " + (index + 1) + "/" + pages.length,
-            contentX + 24, y, contentWidth - 48, 18, COLOR_TEXT);
-        context.text(font, "<", contentX + 6, y + 5, COLOR_HEADER);
-        context.text(font, ">", contentX + contentWidth - 14, y + 5, COLOR_HEADER);
+        int[][] chips = subpageChips(pages);
+        for (int i = 0; i < pages.length; i++) {
+            int[] r = chips[i];
+            boolean active = pages[i] == currentTab;
+            boolean hover = mouseX >= r[0] && mouseX < r[0] + r[2] && mouseY >= r[1] && mouseY < r[1] + r[3];
+            context.fill(r[0], r[1], r[0] + r[2], r[1] + r[3], active ? COLOR_TAB_ACTIVE : hover ? COLOR_TAB_HOVER : COLOR_TAB_NORMAL);
+            drawOutline(context, r[0], r[1], r[2], r[3], active ? GOLD : COLOR_DIVIDER);
+            drawFittedCenteredText(context, pages[i].label(this), r[0] + 3, r[1], r[2] - 6, r[3], active ? 0xFFFFFFFF : COLOR_TEXT_DIM);
+        }
     }
 
     private enum Group {
@@ -1983,6 +2158,16 @@ public final class MinepieceMenuScreen extends Screen {
         PROGRESS("menu.group.progress"), ECONOMY("menu.group.economy"), TOOLS("menu.group.tools");
         final String key;
         Group(String key) { this.key = key; }
+        net.minecraft.world.item.Item icon() {
+            return switch (this) {
+                case GENERAL -> net.minecraft.world.item.Items.COMPASS;
+                case HUD -> net.minecraft.world.item.Items.PAINTING;
+                case COMBAT -> net.minecraft.world.item.Items.IRON_SWORD;
+                case PROGRESS -> net.minecraft.world.item.Items.EXPERIENCE_BOTTLE;
+                case ECONOMY -> net.minecraft.world.item.Items.GOLD_INGOT;
+                case TOOLS -> net.minecraft.world.item.Items.IRON_PICKAXE;
+            };
+        }
         Tab[] pages() {
             return switch (this) {
                 case GENERAL -> new Tab[]{Tab.MAIN, Tab.LANGUAGE};

@@ -28,7 +28,8 @@ public record HudPanelGeometry(int x, int y, int width, int height, int textX, i
         int row = style.iconRows ? IconGridTooltipComponent.rowHeight(style.compact) : 10;
         int step = Math.max(8, (int) Math.ceil(row * s));
         int column = style.iconRows ? IconGridTooltipComponent.iconColumn(style.compact) : 0;
-        int width = header > 0 ? (int) Math.ceil(textWidth.applyAsInt(title) * panel.textScale) : 0;
+        // + 8 leaves room for the colored square in front of the title
+        int width = header > 0 ? (int) Math.ceil((textWidth.applyAsInt(title) + 8) * panel.textScale) : 0;
         for (String line : lines) width = Math.max(width, (int) Math.ceil((textWidth.applyAsInt(line) + column) * s));
         int height = header + py * 2 + (style.iconRows ? (int) Math.ceil(lines.size() * row * s) : lines.size() * step);
         return new HudPanelGeometry(x, y, Math.max(width + px * 2, Math.round(panel.minWidth * overall)),

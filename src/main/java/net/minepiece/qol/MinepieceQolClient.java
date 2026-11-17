@@ -929,7 +929,17 @@ public final class MinepieceQolClient implements ClientModInitializer {
 
         AuctionHighlighter.ActiveHighlight activeHighlight = highlight.get();
         drawContext.fill(slotX, slotY, slotX + 16, slotY + 16, activeHighlight.argbColor());
+        this.auctionTintDrawnThisFrame = true;
         logAuctionHighlight(activeHighlight, slot, screenX, screenY);
+    }
+
+    private boolean auctionTintDrawnThisFrame;
+
+    /** Draws the price key beside a container whose slots were tinted this frame. */
+    public void renderAuctionPriceKey(GuiGraphicsExtractor drawContext, int leftPos, int topPos, int imageWidth, int screenWidth) {
+        boolean show = this.auctionTintDrawnThisFrame && this.config.auctionPriceKeyEnabled;
+        this.auctionTintDrawnThisFrame = false;
+        if (show) net.minepiece.qol.ui.AuctionPriceKey.draw(drawContext, Minecraft.getInstance().font, this::tr, leftPos, topPos, imageWidth, screenWidth);
     }
 
     public void clearAuctionTint() {
@@ -1442,7 +1452,10 @@ public final class MinepieceQolClient implements ClientModInitializer {
             return;
         }
         if (this.config.modEnabled && this.config.auctionHighlightEnabled) {
-            auctionResult.ifPresent(result -> AuctionTooltipFormatter.appendPrices(lines, normalizedLines, result, tr("auction.per_item")));
+            auctionResult.ifPresent(result -> {
+                AuctionTooltipFormatter.appendPrices(lines, normalizedLines, result, tr("auction.per_item"));
+                AuctionTooltipFormatter.appendDealLine(lines, result.delta(), this::tr);
+            });
         }
         for (TooltipParsers.PetStatLine petLine : this.config.petRollsEnabled ? petLines : List.<TooltipParsers.PetStatLine>of()) {
             long rounded = Math.round(petLine.percent());

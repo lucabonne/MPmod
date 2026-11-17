@@ -51,6 +51,17 @@ public final class FullModSmokeTest implements FabricClientGameTest {
             context.runOnClient(client -> client.gui.setScreen(null));
             context.waitTicks(5);
             context.takeScreenshot("2.0.5-hud");
+            context.runOnClient(client -> client.gui.setScreen(new net.minepiece.qol.ui.HudLayoutScreen(MinepieceQolClient.get())));
+            context.waitTicks(10);
+            context.runOnClient(client -> {
+                if (!(client.gui.screen() instanceof net.minepiece.qol.ui.HudLayoutScreen)) throw new AssertionError("HUD editor did not open");
+            });
+            context.takeScreenshot("2.1.4-hud-editor");
+            context.runOnClient(client -> ((net.minepiece.qol.ui.HudLayoutScreen) client.gui.screen()).autoArrange());
+            context.waitTicks(5);
+            context.takeScreenshot("2.1.4-auto-arranged");
+            context.runOnClient(client -> client.gui.setScreen(null));
+            context.waitTicks(5);
         }
     }
 

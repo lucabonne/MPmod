@@ -43,6 +43,22 @@ public final class AuctionTooltipFormatter {
         }
     }
 
+    /** Adds one line naming the deal, e.g. "Great deal · step 6 of 10", in the listing's color. */
+    public static void appendDealLine(List<Component> lines, double delta, java.util.function.Function<String, String> tr) {
+        int level = AuctionHighlighter.level(delta);
+        String key;
+        if (level == 0) key = "auction.fair";
+        else if (delta < 0) key = level >= 10 ? "auction.deal.steal" : level >= 6 ? "auction.deal.great" : level >= 3 ? "auction.deal.good" : "auction.deal.slight";
+        else key = level >= 10 ? "auction.price.way_over" : level >= 6 ? "auction.price.over" : level >= 3 ? "auction.price.pricey" : "auction.price.slight";
+        MutableComponent line = level == 0
+            ? Component.literal("■ " + tr.apply(key)).withStyle(ChatFormatting.GRAY)
+            : Component.literal("■ " + tr.apply(key)).withColor(AuctionHighlighter.rgbForDelta(delta));
+        if (level > 0) line.append(Component.literal(" · " + String.format(java.util.Locale.ROOT, tr.apply("auction.step"), level, AuctionHighlighter.MAX_LEVEL))
+            .withStyle(ChatFormatting.GRAY));
+        if (!lines.isEmpty() && lines.getLast().getString().equals(line.getString())) return;
+        lines.add(line);
+    }
+
     static String formatPrice(double value) {
         BigDecimal price = BigDecimal.valueOf(value);
         String suffix = "";

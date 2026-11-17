@@ -16,6 +16,8 @@ public final class IconGridTooltipComponent implements ClientTooltipComponent {
     private final int rowHeight;
     private final int iconSize;
     private final boolean shadow;
+    /** When above 0, "Label: value" rows put the value flush right inside this width. */
+    private int alignWidth;
 
     public IconGridTooltipComponent(List<Row> rows, boolean compact, boolean shadow) {
         this.rows = List.copyOf(rows);
@@ -23,6 +25,18 @@ public final class IconGridTooltipComponent implements ClientTooltipComponent {
         this.iconSize = compact ? 10 : 16;
         this.shadow = shadow;
     }
+    public IconGridTooltipComponent alignValues(int width) {
+        this.alignWidth = width;
+        return this;
+    }
+
+    /** Splits "Label: value" at its last ": ", or returns null when the row has no value. */
+    public static String[] splitValue(String text) {
+        int at = text == null ? -1 : text.lastIndexOf(": ");
+        if (at <= 0 || at + 2 >= text.length()) return null;
+        return new String[]{text.substring(0, at), text.substring(at + 2)};
+    }
+
     public static int rowHeight(boolean compact) { return compact ? 12 : 18; }
     public static int iconColumn(boolean compact) { return compact ? 14 : 20; }
     private int column() { return this.iconSize + 4; }
@@ -33,8 +47,14 @@ public final class IconGridTooltipComponent implements ClientTooltipComponent {
     @Override public void extractText(GuiGraphicsExtractor context, Font renderer, int x, int y) {
         for (int i = 0; i < this.rows.size(); i++) {
             Row row = this.rows.get(i);
-            context.text(renderer, row.text(), x + column(), y + i * this.rowHeight + (this.rowHeight - 9) / 2,
-                row.color(), this.shadow);
+            int textY = y + i * this.rowHeight + (this.rowHeight - 9) / 2;
+            String[] parts = this.alignWidth > 0 ? splitValue(row.text()) : null;
+            if (parts == null) {
+                context.text(renderer, row.text(), x + column(), textY, row.color(), this.shadow);
+                continue;
+            }
+            context.text(renderer, parts[0], x + column(), textY, row.color(), this.shadow);
+            context.text(renderer, parts[1], x + this.alignWidth - renderer.width(parts[1]), textY, row.color(), this.shadow);
         }
     }
     @Override public void extractImage(Font renderer, int x, int y, int width, int height, GuiGraphicsExtractor context) {

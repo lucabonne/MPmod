@@ -1,6 +1,13 @@
-# Minepiece QoL 2.1.3
+# Minepiece QoL 2.1.4
 
-Marineford safe timers are now **saved**: they stay on screen after you leave the island, reconnect or restart the game, until you press **Reset safe timers** (Progress → Pass and pets).
+A cleaner, easier menu and HUD in the same Minepiece navy and gold:
+
+- **Menu:** a title bar with where you are (group › page) and the version, icons on the sidebar groups, a **Find a setting** search box, page tabs instead of ‹ › arrows, on/off switches on the right of each setting, and a footer with the save and back keys.
+- **Auction house:** each listing's tooltip names the deal (for example *Great deal · step 6 of 10*), and a **Price key** box beside the auction house lists every color (turn it off under Economy › Auction house).
+- **HUD panels:** a colored square in each header and values lined up on the right.
+- **HUD editor:** snap to a grid with center guides (hold Shift to move freely), a toolbar with Auto-arrange, Undo (also Ctrl+Z), Reset all, a Panels list and Done, and a label showing the selected panel's position and size.
+
+2.1.3: Marineford safe timers are **saved**: they stay on screen after you leave the island, reconnect or restart the game, until you press **Reset safe timers** (Progress → Pass and pets).
 
 2.1.2: auction house slot colors are much stronger (60% up to solid; they sit behind the item, so it stays readable). A **Reset safe timers** button that clears every Marineford safe spawn and timer; the safes panel hides until you are back near the safes.
 
@@ -18,7 +25,7 @@ The 2.0.2 menus, HUD panels, trackers, translation, AH highlights, pet stats, ap
 
 ## Install
 
-Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.1.3+mc26.2.jar`; install only one version of this mod at a time.
+Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.1.4+mc26.2.jar`; install only one version of this mod at a time.
 
 ## Random picture rotation
 
@@ -35,8 +42,8 @@ Use JDK 25, Loom 1.17, and the included Gradle 9.5.1 wrapper:
 ./gradlew --no-daemon runClientGameTest
 ```
 
-The installable artifact is `build/libs/minepieceqol-2.1.3+mc26.2.jar`. The sources JAR is for developers.
+The installable artifact is `build/libs/minepieceqol-2.1.4+mc26.2.jar`. The sources JAR is for developers.
 
 Production source and assets were restored from `minepieceqol-2.0.2+mc26.2-sources.jar`. The client smoke test checks full-mod initialization, restored keybindings, menu rendering, and inventory rendering. Screenshots are saved under `build/run/clientGameTest/screenshots`.
 
-The regression suite has 180 passing tests. The package and client smoke test can be run separately with `./gradlew --no-daemon build runClientGameTest -x test`.
+The regression suite has 182 passing tests. The package and client smoke test can be run separately with `./gradlew --no-daemon build runClientGameTest -x test`.

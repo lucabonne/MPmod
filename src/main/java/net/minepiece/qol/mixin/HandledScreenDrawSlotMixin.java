@@ -86,6 +86,7 @@ public abstract class HandledScreenDrawSlotMixin extends Screen {
         var mod = MinepieceQolClient.get();
         net.minepiece.qol.ui.RarityInventoryTools.draw(mod, (AbstractContainerScreen<?>)(Object)this, graphics,
             this.leftPos, this.topPos, this.imageWidth, mouseX, mouseY);
+        if (mod != null) mod.renderAuctionPriceKey(graphics, this.leftPos, this.topPos, this.imageWidth, this.width);
     }
 
     @Inject(method = "extractTooltip", at = @At("HEAD"))

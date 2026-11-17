@@ -352,6 +352,9 @@ public final class HudOverlay {
         drawPanelFrame(drawContext, textRenderer, title, x, y, panelWidth, panelHeight, theme, geometry);
 
         int textX = geometry.textX();
+        // inner width in unscaled text units, so values line up on the right edge
+        int alignWidth = (int) Math.floor((panelWidth - (textX - x) * 2) / geometry.scale());
+        if (component != null) component.alignValues(alignWidth);
         int textY = geometry.textY();
         int offsetY = 0;
         boolean customTheme = isCustomTheme(theme);
@@ -367,7 +370,14 @@ public final class HudOverlay {
             int lineColor = customTheme
                 ? ensureReadableColor(line.color(), theme.backgroundColor(), theme.textColor())
                 : line.color();
-            drawScaledText(drawContext, textRenderer, line.text(), textX, textY + offsetY, lineColor, geometry.scale());
+            String[] parts = IconGridTooltipComponent.splitValue(line.text());
+            if (parts == null) {
+                drawScaledText(drawContext, textRenderer, line.text(), textX, textY + offsetY, lineColor, geometry.scale());
+            } else {
+                drawScaledText(drawContext, textRenderer, parts[0], textX, textY + offsetY, lineColor, geometry.scale());
+                int valueX = textX + Math.round((alignWidth - textRenderer.width(parts[1])) * geometry.scale());
+                drawScaledText(drawContext, textRenderer, parts[1], valueX, textY + offsetY, lineColor, geometry.scale());
+            }
             offsetY += lineStep;
         }
 
@@ -414,8 +424,13 @@ public final class HudOverlay {
         var appearance = this.mod.getConfig().appearance;
         drawContext.fill(x, y, x + width, y + height, theme.backgroundColor());
         if (geometry.headerHeight() > 0) {
-            drawContext.fill(x, y, x + width, y + geometry.headerHeight(), theme.headerColor());
-            drawScaledText(drawContext, textRenderer, title, x + 4, y + 2, theme.titleColor(), geometry.titleScale());
+            int header = geometry.headerHeight();
+            drawContext.fill(x, y, x + width, y + header, theme.headerColor());
+            drawContext.fill(x, y + header - 1, x + width, y + header, theme.borderOuterColor());
+            int square = Math.max(3, Math.round(4 * geometry.titleScale()));
+            int squareY = y + (header - square) / 2;
+            drawContext.fill(x + 4, squareY, x + 4 + square, squareY + square, theme.borderOuterColor() | 0xFF000000);
+            drawScaledText(drawContext, textRenderer, title, x + 6 + square, y + 2, theme.titleColor(), geometry.titleScale());
         }
         for (int i = 0; i < appearance.borderWidth; i++) {
             drawOutline(drawContext, x + i, y + i, width - i * 2, height - i * 2, theme.borderOuterColor());

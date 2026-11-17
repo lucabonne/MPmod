@@ -85,4 +85,31 @@ class AuctionTooltipFormatterTest {
         assertEquals("· Prezzo di vendita: 10 (3.33/oggetto) -50%", lines.get(0).getString());
         assertEquals("· Prezzo medio: 20 (6.67/oggetto)", lines.get(1).getString());
     }
+
+    @Test
+    void addsOneDealLineNamingTheStep() {
+        List<Component> lines = new ArrayList<>(List.of(Component.literal("Selling price: 400")));
+        AuctionTooltipFormatter.appendDealLine(lines, -0.62, key -> key);
+        AuctionTooltipFormatter.appendDealLine(lines, -0.62, key -> key); // repeated frames add nothing
+        assertEquals(2, lines.size());
+        assertEquals("■ auction.deal.great · auction.step", lines.get(1).getString());
+        List<Component> fair = new ArrayList<>();
+        AuctionTooltipFormatter.appendDealLine(fair, 0.03, key -> key);
+        assertEquals("■ auction.fair", fair.getFirst().getString());
+        List<Component> pricey = new ArrayList<>();
+        AuctionTooltipFormatter.appendDealLine(pricey, 1.5, key -> key.equals("auction.step") ? "step %d of %d" : key);
+        assertEquals("■ auction.price.way_over · step 10 of 10", pricey.getFirst().getString());
+    }
+
+    @Test
+    void priceKeyRangesAndHudValueSplitting() {
+        assertEquals("5-15%", AuctionPriceKey.range(1));
+        assertEquals("85-95%", AuctionPriceKey.range(9));
+        assertEquals("95%+", AuctionPriceKey.range(10));
+        assertEquals(List.of("Made today", "+84.2K"), List.of(IconGridTooltipComponent.splitValue("Made today: +84.2K")));
+        assertEquals(List.of("Next", "Pumpkin Hunt (5:14:55)"), List.of(IconGridTooltipComponent.splitValue("Next: Pumpkin Hunt (5:14:55)")));
+        assertEquals(null, IconGridTooltipComponent.splitValue("09:45"));
+        assertEquals(null, IconGridTooltipComponent.splitValue("Spawn 3"));
+        assertEquals(null, IconGridTooltipComponent.splitValue("Total: "));
+    }
 }

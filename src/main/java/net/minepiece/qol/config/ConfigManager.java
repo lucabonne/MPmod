@@ -239,6 +239,7 @@ public final class ConfigManager {
         public boolean eventsEnabled = true;
         public boolean profileStatsEnabled = true;
         public boolean auctionHighlightEnabled = true;
+        public boolean auctionPriceKeyEnabled = true;
         public boolean hakiEnabled = true;
         public Boolean scrollsEnabled = true;
         public boolean inventoryXpHudEnabled = true;
