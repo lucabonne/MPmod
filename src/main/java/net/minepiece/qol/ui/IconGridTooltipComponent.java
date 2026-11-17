@@ -18,6 +18,17 @@ public final class IconGridTooltipComponent implements ClientTooltipComponent {
     private final boolean shadow;
     /** When above 0, "Label: value" rows put the value flush right inside this width. */
     private int alignWidth;
+    /** Chooses the value's color from (label, value, row color); null keeps the row color. */
+    private ValueColor valueColor;
+
+    public interface ValueColor {
+        int color(String label, String value, int fallback);
+    }
+
+    public IconGridTooltipComponent colorValues(ValueColor valueColor) {
+        this.valueColor = valueColor;
+        return this;
+    }
 
     public IconGridTooltipComponent(List<Row> rows, boolean compact, boolean shadow) {
         this.rows = List.copyOf(rows);
@@ -54,7 +65,8 @@ public final class IconGridTooltipComponent implements ClientTooltipComponent {
                 continue;
             }
             context.text(renderer, parts[0], x + column(), textY, row.color(), this.shadow);
-            context.text(renderer, parts[1], x + this.alignWidth - renderer.width(parts[1]), textY, row.color(), this.shadow);
+            int valueColor = this.valueColor == null ? row.color() : this.valueColor.color(parts[0], parts[1], row.color());
+            context.text(renderer, parts[1], x + this.alignWidth - renderer.width(parts[1]), textY, valueColor, this.shadow);
         }
     }
     @Override public void extractImage(Font renderer, int x, int y, int width, int height, GuiGraphicsExtractor context) {

@@ -354,7 +354,8 @@ public final class HudOverlay {
         int textX = geometry.textX();
         // inner width in unscaled text units, so values line up on the right edge
         int alignWidth = (int) Math.floor((panelWidth - (textX - x) * 2) / geometry.scale());
-        if (component != null) component.alignValues(alignWidth);
+        if (component != null) component.alignValues(alignWidth)
+            .colorValues((label, value, fallback) -> HudValueColors.color(label, value, this.mod::tr, fallback));
         int textY = geometry.textY();
         int offsetY = 0;
         boolean customTheme = isCustomTheme(theme);
@@ -376,7 +377,8 @@ public final class HudOverlay {
             } else {
                 drawScaledText(drawContext, textRenderer, parts[0], textX, textY + offsetY, lineColor, geometry.scale());
                 int valueX = textX + Math.round((alignWidth - textRenderer.width(parts[1])) * geometry.scale());
-                drawScaledText(drawContext, textRenderer, parts[1], valueX, textY + offsetY, lineColor, geometry.scale());
+                drawScaledText(drawContext, textRenderer, parts[1], valueX, textY + offsetY,
+                    HudValueColors.color(parts[0], parts[1], this.mod::tr, lineColor), geometry.scale());
             }
             offsetY += lineStep;
         }
