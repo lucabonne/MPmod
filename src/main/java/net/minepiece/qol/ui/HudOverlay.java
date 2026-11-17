@@ -349,7 +349,7 @@ public final class HudOverlay {
             if (!renderLines.get(i).islandId().isBlank()) this.islandHits.add(new IslandHit(renderLines.get(i).islandId(), geometry.row(i)));
         }
 
-        drawPanelFrame(drawContext, textRenderer, title, x, y, panelWidth, panelHeight, theme, geometry);
+        drawPanelFrame(drawContext, textRenderer, title, x, y, panelWidth, panelHeight, theme, geometry, ribbonColor(panelId));
 
         int textX = geometry.textX();
         // inner width in unscaled text units, so values line up on the right edge
@@ -410,6 +410,25 @@ public final class HudOverlay {
         return renderColoredPanel(drawContext, textRenderer, panelId, title, renderLines, x, y, scale, theme, editMode, selected);
     }
 
+    /** Each panel's own color, used for its header ribbon. */
+    private static final Map<Integer, Integer> DEFAULT_RIBBONS = Map.ofEntries(
+        Map.entry(1, 0x7A5BC0), Map.entry(2, 0xD49A49), Map.entry(3, 0x3D78E0), Map.entry(4, 0xD9534F),
+        Map.entry(5, 0xE07B39), Map.entry(8, 0x4FB3A9), Map.entry(9, 0x5CC05C), Map.entry(10, 0x3D78E0),
+        Map.entry(11, 0xE8A33D), Map.entry(12, 0x6FA8FF), Map.entry(13, 0x9B7CE0), Map.entry(14, 0xE07BB0),
+        Map.entry(15, 0xDDBA6A));
+
+    /** The panel's chosen HUD color when set, otherwise its default ribbon color, otherwise the border color. */
+    private int ribbonColor(int panelId) {
+        String color = MinepieceQolClient.normalizeHudColorName(this.mod.getHudPanelColor(panelId));
+        if (color.startsWith("#")) return 0xFF000000 | Integer.parseInt(color.substring(1), 16);
+        Integer named = COLOR_RGB.get(color);
+        if (named != null) return 0xFF000000 | named;
+        Integer fallback = DEFAULT_RIBBONS.get(panelId);
+        return fallback != null ? 0xFF000000 | fallback
+            : 0xFF000000 | Integer.parseInt(this.mod.getConfig().appearance.border, 16);
+    }
+
+    /** "Color ribbon" frame: dark body, a solid header strip in the panel's color, title text that stays readable on it. */
     private void drawPanelFrame(
         GuiGraphicsExtractor drawContext,
         Font textRenderer,
@@ -419,21 +438,26 @@ public final class HudOverlay {
         int width,
         int height,
         PanelTheme theme,
-        HudPanelGeometry geometry
+        HudPanelGeometry geometry,
+        int ribbon
     ) {
         var appearance = this.mod.getConfig().appearance;
         drawContext.fill(x, y, x + width, y + height, theme.backgroundColor());
-        if (geometry.headerHeight() > 0) {
-            int header = geometry.headerHeight();
-            drawContext.fill(x, y, x + width, y + header, theme.headerColor());
-            drawContext.fill(x, y + header - 1, x + width, y + header, theme.borderOuterColor());
+        int header = geometry.headerHeight();
+        if (header > 0) {
+            drawContext.fill(x, y, x + width, y + header, ribbon);
             int square = Math.max(3, Math.round(4 * geometry.titleScale()));
             int squareY = y + (header - square) / 2;
-            drawContext.fill(x + 4, squareY, x + 4 + square, squareY + square, theme.borderOuterColor() | 0xFF000000);
-            drawScaledText(drawContext, textRenderer, title, x + 6 + square, y + 2, theme.titleColor(), geometry.titleScale());
+            drawContext.fill(x + 4, squareY, x + 4 + square, squareY + square, 0x59000000);
+            int titleColor = luma(ribbon & 0xFFFFFF) > 140 ? 0xFF0B1020 : 0xFFFFFFFF;
+            boolean shadow = titleColor == 0xFFFFFFFF && appearance.shadows; // dark text on a light ribbon reads better without a shadow
+            drawScaledText(drawContext, textRenderer, title, x + 6 + square, y + 2, titleColor, geometry.titleScale(), shadow);
+        } else {
+            drawContext.fill(x, y, x + width, y + 2, ribbon); // headers off: keep a thin strip of the panel's color
         }
+        int outline = withAlpha(ribbon & 0xFFFFFF, 0x55);
         for (int i = 0; i < appearance.borderWidth; i++) {
-            drawOutline(drawContext, x + i, y + i, width - i * 2, height - i * 2, theme.borderOuterColor());
+            drawOutline(drawContext, x + i, y + i, width - i * 2, height - i * 2, outline);
         }
         if (appearance.decorations) {
             drawCornerOrnaments(drawContext, x, y, width, height, theme);
@@ -491,10 +515,14 @@ public final class HudOverlay {
         int color,
         float scale
     ) {
+        drawScaledText(drawContext, textRenderer, text, x, y, color, scale, this.mod.getConfig().appearance.shadows);
+    }
+
+    private void drawScaledText(GuiGraphicsExtractor drawContext, Font textRenderer, String text, int x, int y, int color, float scale, boolean shadow) {
         drawContext.pose().pushMatrix();
         drawContext.pose().translate((float) x, (float) y);
         drawContext.pose().scale(scale, scale);
-        drawContext.text(textRenderer, text, 0, 0, color, this.mod.getConfig().appearance.shadows);
+        drawContext.text(textRenderer, text, 0, 0, color, shadow);
         drawContext.pose().popMatrix();
     }
 
