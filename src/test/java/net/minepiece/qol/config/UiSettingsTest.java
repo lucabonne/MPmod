@@ -155,4 +155,16 @@ class UiSettingsTest {
         settings.normalize();
         assertEquals(12F, picture.scale); // no longer clamped to 1.8
     }
+
+    @Test void oldDefaultHudOpacityMovesToNewDefaultOnceButChosenValuesStay() {
+        var old = new com.google.gson.Gson().fromJson("{\"hudOpacity\":72}", UiSettings.class);
+        old.normalize();
+        assertEquals(88, old.hudOpacity);
+        old.hudOpacity = 72; // chosen again after the update: kept
+        old.normalize();
+        assertEquals(72, old.hudOpacity);
+        var custom = new com.google.gson.Gson().fromJson("{\"hudOpacity\":40}", UiSettings.class);
+        custom.normalize();
+        assertEquals(40, custom.hudOpacity);
+    }
 }

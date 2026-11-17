@@ -14,7 +14,9 @@ public final class UiSettings {
     public String text = "EAF1FF";
     public String chatPanelColor = "default";
     public int menuOpacity = 94;
-    public int hudOpacity = 72;
+    public int hudOpacity = 88;
+    /** 1 once the 2.1.8 default change (HUD opacity 72 -> 88) has been applied to this config. */
+    public int hudDefaultsVersion = 0;
     public int borderWidth = 1;
     public boolean compact = true;
     public boolean iconRows = true;
@@ -101,6 +103,10 @@ public final class UiSettings {
         border = validHex(border) ? border : "59677C";
         text = validHex(text) ? text : "EAF1FF";
         menuOpacity = Math.clamp(menuOpacity, 0, 100);
+        if (hudDefaultsVersion < 1) {
+            if (hudOpacity == 72) hudOpacity = 88; // still the old default: move to the new one, keep chosen values
+            hudDefaultsVersion = 1;
+        }
         hudOpacity = Math.clamp(hudOpacity, 0, 100);
         borderWidth = Math.clamp(borderWidth, 0, 3);
         if (panelStyles == null) panelStyles = new LinkedHashMap<>();

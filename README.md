@@ -1,6 +1,8 @@
-# Minepiece QoL 2.1.7
+# Minepiece QoL 2.1.8
 
-HUD values are colored by meaning: **green** for money and XP coming in (Made today, AH sold, Today XP/money, Money earned, XP gained, XP/h, Money/h, a Ready safe, Grinding: active), **red** for money going out (AH bought, negative values), **amber** for Grinding: paused, and **grey** for unknown or nothing yet (?, —, a picked safe, a 0 on a money line). Labels, totals, stats and timers stay as they were; it works in all 9 languages.
+HUD panel bodies are darker so text and value colors stand out over bright skies and blocks: they are drawn 40% darker than your background color, and the default HUD opacity is now 88% (was 72%). If your HUD opacity was still on the old default it moves to 88% once; a value you picked yourself is kept. The menu keeps your exact background color.
+
+2.1.7: HUD values are colored by meaning: **green** for money and XP coming in (Made today, AH sold, Today XP/money, Money earned, XP gained, XP/h, Money/h, a Ready safe, Grinding: active), **red** for money going out (AH bought, negative values), **amber** for Grinding: paused, and **grey** for unknown or nothing yet (?, —, a picked safe, a 0 on a money line). Labels, totals, stats and timers stay as they were; it works in all 9 languages.
 
 2.1.6: HUD panels use the new **color ribbon** style: each panel's header is a solid strip in that panel's own color (Stats blue, Jobs purple, Money orange, Bosses red, Marineford safes gold, and so on) over a dark body, with the title switching to dark text on light colors so it stays readable. Ribbons follow each panel's color from the HUD color settings, so they can still be changed per panel; the body still follows the HUD background and opacity settings.
 
@@ -31,7 +33,7 @@ The 2.0.2 menus, HUD panels, trackers, translation, AH highlights, pet stats, ap
 
 ## Install
 
-Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.1.7+mc26.2.jar`; install only one version of this mod at a time.
+Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.1.8+mc26.2.jar`; install only one version of this mod at a time.
 
 ## Random picture rotation
 
@@ -48,8 +50,8 @@ Use JDK 25, Loom 1.17, and the included Gradle 9.5.1 wrapper:
 ./gradlew --no-daemon runClientGameTest
 ```
 
-The installable artifact is `build/libs/minepieceqol-2.1.7+mc26.2.jar`. The sources JAR is for developers.
+The installable artifact is `build/libs/minepieceqol-2.1.8+mc26.2.jar`. The sources JAR is for developers.
 
 Production source and assets were restored from `minepieceqol-2.0.2+mc26.2-sources.jar`. The client smoke test checks full-mod initialization, restored keybindings, menu rendering, and inventory rendering. Screenshots are saved under `build/run/clientGameTest/screenshots`.
 
-The regression suite has 185 passing tests. The package and client smoke test can be run separately with `./gradlew --no-daemon build runClientGameTest -x test`.
+The regression suite has 186 passing tests. The package and client smoke test can be run separately with `./gradlew --no-daemon build runClientGameTest -x test`.

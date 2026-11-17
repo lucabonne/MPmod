@@ -594,7 +594,8 @@ public final class HudOverlay {
 
     private PanelTheme resolveThemedPanel(PanelTheme fallbackTheme, String configuredColor) {
         var a = this.mod.getConfig().appearance;
-        int background = panelBackground(configuredColor, a);
+        // HUD bodies are 40% darker than the chosen background so text and value colors stand out over the world
+        int background = darkenRgb(panelBackground(configuredColor, a) & 0xFFFFFF, 0.6F);
         int opacity = Math.round(a.hudOpacity * 2.55F);
         return new PanelTheme(withAlpha(background, opacity), UiSettings.color(a.border, a.hudOpacity),
             UiSettings.color(a.border, a.hudOpacity), withAlpha(background, opacity),
