@@ -72,4 +72,35 @@ class SafeChestTrackerTest {
         assertEquals(SafeChestTracker.Status.UNKNOWN, tracker.status("3", 0, 0));
         assertEquals("safes.purple: ?", tracker.lines(TR, 0, "3", true).get(1).text()); // back at the island
     }
+
+    @Test void timersSurviveSaveAndReloadUntilReset() {
+        var state = new PersistentState();
+        int[] saves = {0};
+        var tracker = new SafeChestTracker();
+        tracker.attachPersistence(state.safeChests, () -> saves[0]++);
+        tracker.observe("3", 0, LOCKED, 1_000);
+        tracker.observe("3", 0, "Lock Time: 1m 49s", 2_000); // same countdown a second later: no extra save
+        tracker.observe("3", 1, "Status • Awaiting lockpicking •", 1_000);
+        assertEquals(2, saves[0]);
+
+        var gson = new com.google.gson.Gson();
+        var reloaded = gson.fromJson(gson.toJson(state), PersistentState.class);
+        var afterRestart = new SafeChestTracker();
+        afterRestart.attachPersistence(reloaded.safeChests, () -> { });
+        assertEquals("safes.purple: 1m 40s", afterRestart.lines(TR, 11_000, "3", false).get(1).text()); // away from the island
+        assertEquals(SafeChestTracker.Status.READY, afterRestart.status("3", 1, 11_000));
+
+        afterRestart.clear();
+        assertTrue(reloaded.safeChests.isEmpty());
+        assertFalse(afterRestart.hasData());
+    }
+
+    @Test void repairsBrokenSavedEntries() {
+        var saved = new com.google.gson.Gson().fromJson("{\"safeChests\":{\"3\":{\"status\":[\"LOCKED\"],\"unlockAtMs\":[5000]},\"4\":{}}}", PersistentState.class);
+        var tracker = new SafeChestTracker();
+        tracker.attachPersistence(saved.safeChests, () -> { });
+        assertEquals(SafeChestTracker.Status.LOCKED, tracker.status("3", 0, 0));
+        assertEquals(SafeChestTracker.Status.UNKNOWN, tracker.status("3", 5, 0));
+        assertEquals(SafeChestTracker.Status.UNKNOWN, tracker.status("4", 0, 0));
+    }
 }

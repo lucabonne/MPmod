@@ -1,6 +1,8 @@
-# Minepiece QoL 2.1.2
+# Minepiece QoL 2.1.3
 
-Auction house slot colors are much stronger (60% up to solid; they sit behind the item, so it stays readable). Extras has a **Reset safe timers** button that clears every Marineford safe spawn and timer; the safes panel hides until you are back near the safes.
+Marineford safe timers are now **saved**: they stay on screen after you leave the island, reconnect or restart the game, until you press **Reset safe timers** (Progress → Pass and pets).
+
+2.1.2: auction house slot colors are much stronger (60% up to solid; they sit behind the item, so it stays readable). A **Reset safe timers** button that clears every Marineford safe spawn and timer; the safes panel hides until you are back near the safes.
 
 2.1.1: auction house prices are colored in **10% steps**: within ±5% of the average nothing is tinted; cheaper listings go from pale to deep green and pricier ones from pale yellow through orange and red to crimson, with the slot tint getting stronger each step. The tooltip percentage uses the same color.
 
@@ -16,7 +18,7 @@ The 2.0.2 menus, HUD panels, trackers, translation, AH highlights, pet stats, ap
 
 ## Install
 
-Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.1.2+mc26.2.jar`; install only one version of this mod at a time.
+Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.1.3+mc26.2.jar`; install only one version of this mod at a time.
 
 ## Random picture rotation
 
@@ -33,8 +35,8 @@ Use JDK 25, Loom 1.17, and the included Gradle 9.5.1 wrapper:
 ./gradlew --no-daemon runClientGameTest
 ```
 
-The installable artifact is `build/libs/minepieceqol-2.1.2+mc26.2.jar`. The sources JAR is for developers.
+The installable artifact is `build/libs/minepieceqol-2.1.3+mc26.2.jar`. The sources JAR is for developers.
 
 Production source and assets were restored from `minepieceqol-2.0.2+mc26.2-sources.jar`. The client smoke test checks full-mod initialization, restored keybindings, menu rendering, and inventory rendering. Screenshots are saved under `build/run/clientGameTest/screenshots`.
 
-The regression suite has 178 passing tests. The package and client smoke test can be run separately with `./gradlew --no-daemon build runClientGameTest -x test`.
+The regression suite has 180 passing tests. The package and client smoke test can be run separately with `./gradlew --no-daemon build runClientGameTest -x test`.

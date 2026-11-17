@@ -18,6 +18,8 @@ public final class PersistentState {
     public Set<String> bossRegistry = new LinkedHashSet<>();
     public Set<String> ignoredBosses = new LinkedHashSet<>();
     public Map<String, Double> minionResourceXp = new LinkedHashMap<>();
+    /** Marineford safe timers per spawn; kept until the player resets them. */
+    public Map<String, SafeChestTracker.SpawnSafes> safeChests = new LinkedHashMap<>();
     public Map<String, ProgressRecord> playerProgress = new LinkedHashMap<>();
 
     public static final class ProgressRecord {

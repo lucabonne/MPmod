@@ -31,11 +31,25 @@ public final class SafeChestTracker {
     private static final int SPAWN_HEADER_COLOR = 0xFF97B9EA;
     private static final String UNKNOWN_SPAWN = "";
 
-    private static final class SpawnSafes {
-        final Status[] status = new Status[SAFES.size()];
-        final long[] unlockAtMs = new long[SAFES.size()];
+    /** Saved as-is in {@link PersistentState#safeChests}. */
+    public static final class SpawnSafes {
+        Status[] status = new Status[SAFES.size()];
+        long[] unlockAtMs = new long[SAFES.size()];
         SpawnSafes() { java.util.Arrays.fill(status, Status.UNKNOWN); }
+
+        /** Repairs a saved entry with missing or wrong-length arrays. */
+        private SpawnSafes repaired() {
+            SpawnSafes fixed = new SpawnSafes();
+            for (int i = 0; i < SAFES.size(); i++) {
+                if (status != null && i < status.length && status[i] != null) fixed.status[i] = status[i];
+                if (unlockAtMs != null && i < unlockAtMs.length) fixed.unlockAtMs[i] = unlockAtMs[i];
+            }
+            return fixed;
+        }
     }
+
+    private java.util.Map<String, SpawnSafes> saved;
+    private Runnable save = () -> { };
 
     // Unknown spawn ("") sorts last, like the bosses panel.
     private final java.util.TreeMap<String, SpawnSafes> spawns = new java.util.TreeMap<>(
@@ -43,6 +57,20 @@ public final class SafeChestTracker {
 
     private SpawnSafes spawn(String spawnId) {
         return spawns.computeIfAbsent(spawnId == null ? UNKNOWN_SPAWN : spawnId.trim(), ignored -> new SpawnSafes());
+    }
+
+    /** Loads saved timers and writes every later change back to {@code saved}. */
+    public void attachPersistence(java.util.Map<String, SpawnSafes> saved, Runnable save) {
+        this.saved = saved;
+        this.save = save;
+        saved.forEach((id, safes) -> { if (id != null && safes != null) spawns.put(id.trim(), safes.repaired()); });
+    }
+
+    private void persist() {
+        if (saved == null) return;
+        saved.clear();
+        saved.putAll(spawns);
+        save.run();
     }
 
     public static OptionalLong parseLockSeconds(String text) {
@@ -87,15 +115,23 @@ public final class SafeChestTracker {
         OptionalLong seconds = parseLockSeconds(text);
         if (!ready && seconds.isEmpty()) return;
         SpawnSafes safes = spawn(spawnId);
-        safes.status[index] = ready ? Status.READY : Status.LOCKED;
-        if (!ready) safes.unlockAtMs[index] = now + seconds.getAsLong() * 1000;
+        Status status = ready ? Status.READY : Status.LOCKED;
+        long unlockAt = ready ? safes.unlockAtMs[index] : now + seconds.getAsLong() * 1000;
+        // Scans repeat every half second; only save when something really changed (not the countdown ticking).
+        boolean changed = safes.status[index] != status || Math.abs(safes.unlockAtMs[index] - unlockAt) > 5_000;
+        safes.status[index] = status;
+        safes.unlockAtMs[index] = unlockAt;
+        if (changed) persist();
     }
 
     /** Chat message; a successful pick marks the safe nearest to the player. */
     public void onChatMessage(String spawnId, String message, double px, double py, double pz) {
         if (message == null || !message.toLowerCase(Locale.ROOT).contains("lock picking successful")) return;
         int index = nearest(px, py, pz, PICK_RANGE);
-        if (index >= 0) spawn(spawnId).status[index] = Status.PICKED;
+        if (index >= 0) {
+            spawn(spawnId).status[index] = Status.PICKED;
+            persist();
+        }
     }
 
     public Status status(String spawnId, int index, long now) {
@@ -112,6 +148,7 @@ public final class SafeChestTracker {
     /** Forget every spawn and timer; the panel hides until the player is back at the island. */
     public void clear() {
         spawns.clear();
+        persist();
     }
 
     public boolean hasData() {

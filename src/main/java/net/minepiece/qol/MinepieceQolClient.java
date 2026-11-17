@@ -225,6 +225,8 @@ public final class MinepieceQolClient implements ClientModInitializer {
         this.jobsTracker = new JobsTracker(this.persistentState, this::savePersistentState, this.debugLogManager);
         this.moneyTracker = new MoneyTracker(this.persistentState, this::savePersistentState, this.configManager.getBaseDir());
         this.eventCountdownTracker = new EventCountdownTracker(this.persistentState, this::savePersistentState);
+        if (this.persistentState.safeChests == null) this.persistentState.safeChests = new java.util.LinkedHashMap<>();
+        this.safeChests.attachPersistence(this.persistentState.safeChests, () -> savePersistentState(this.persistentState));
         this.scrollTracker = new ScrollTracker(this.debugLogManager);
         this.inventoryXpTracker = new InventoryXpTracker(this.debugLogManager);
         this.hudOverlay = new HudOverlay(this);
