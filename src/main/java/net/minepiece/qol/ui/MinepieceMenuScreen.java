@@ -8,6 +8,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Checkbox;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 import net.minepiece.qol.MinepieceQolClient;
 import net.minepiece.qol.config.ConfigManager;
 import net.minepiece.qol.i18n.UiLocalization;
@@ -15,23 +23,14 @@ import net.minepiece.qol.state.BossTracker;
 import net.minepiece.qol.state.ChatTranslationManager;
 import net.minepiece.qol.state.JobsTracker;
 import net.minepiece.qol.state.PersistentState;
-import net.minepiece.qol.telemetry.TelemetryConfig;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.CheckboxWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.text.Text;
 
 public final class MinepieceMenuScreen extends Screen {
-    private static final int PANEL_WIDTH = 480;
+    private static final int PANEL_WIDTH = 468;
     private static final int PANEL_HEIGHT = 320;
-    private static final int SIDEBAR_WIDTH = 110;
+    private static final int SIDEBAR_WIDTH = 100;
     private static final int TAB_HEIGHT = 26;
     private static final int TAB_SPACING = 4;
-    private static final int CONTENT_PADDING = 12;
+    private static final int CONTENT_PADDING = 10;
     private static final int LIST_ROW_HEIGHT = 18;
     private static final int LIST_ROW_GAP = 4;
     private static final int LIST_ROW_STEP = LIST_ROW_HEIGHT + LIST_ROW_GAP;
@@ -96,19 +95,6 @@ public final class MinepieceMenuScreen extends Screen {
     private static final int LANGUAGE_RULE_ROW_STEP = 18;
     private static final int LANGUAGE_RULE_TOGGLE_WIDTH = 32;
     private static final int LANGUAGE_RULE_TOGGLE_HEIGHT = 14;
-    private static final int[] HUD_COLOR_PANEL_IDS = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-    private static final int MAIN_COLOR_ROW_HEIGHT = 14;
-    private static final int MAIN_COLOR_ROW_STEP = 14;
-    private static final int MAIN_COLOR_LEFT_BUTTON_X_OFFSET = 132;
-    private static final int MAIN_COLOR_RIGHT_BUTTON_X_OFFSET = 220;
-    private static final int MAIN_COLOR_BUTTON_WIDTH = 16;
-    private static final int MAIN_COLOR_BUTTON_HEIGHT = 14;
-    private static final int MAIN_CHECKBOX_ROW_STEP = 22;
-    private static final int MAIN_COMPACT_SHIFT_NO_DEBUG = -22;
-    private static final int MAIN_LANGUAGE_ROW_Y_OFFSET = 72;
-    private static final int MAIN_EDIT_HUD_BUTTON_Y_OFFSET = 96;
-    private static final int MAIN_HUD_BUTTON_GAP = 8;
-    private static final int MAIN_PANEL_COLORS_Y_OFFSET = 118;
     private static final int BOSSES_MINIBOSS_PANEL_Y_OFFSET = 20;
     private static final int BOSSES_ACTIVE_LABEL_Y_OFFSET = 48;
     private static final int BOSSES_ACTIVE_LIST_Y_OFFSET = 58;
@@ -136,25 +122,24 @@ public final class MinepieceMenuScreen extends Screen {
     };
 
     // Sapphire palette
-    private static final int COLOR_BG_OVERLAY = 0xC0050818;
-    private static final int COLOR_PANEL_BG = 0xEE0B1838;
-    private static final int COLOR_PANEL_BORDER = 0xFF3D78E0;
-    private static final int COLOR_PANEL_BORDER_DARK = 0xFF0E2A6E;
-    private static final int COLOR_SIDEBAR_BG = 0xEE091434;
-    private static final int COLOR_TAB_NORMAL = 0xCC0E2150;
-    private static final int COLOR_TAB_HOVER = 0xDD13347A;
-    private static final int COLOR_TAB_ACTIVE = 0xFF1F4FB8;
-    private static final int COLOR_TAB_ACCENT = 0xFF6FA8FF;
-    private static final int COLOR_TEXT = 0xFFEAF1FF;
-    private static final int COLOR_TEXT_DIM = 0xFF89A8DA;
-    private static final int COLOR_HEADER = 0xFFAFD0FF;
-    private static final int COLOR_DIVIDER = 0x553D78E0;
-    private static final int COLOR_ACTION_BUTTON = 0xFF16396E;
-    private static final int COLOR_ACTION_BUTTON_HOVER = 0xFF1F4A8C;
-    private static final int COLOR_ACTION_BUTTON_DISABLED = 0xFF1A2B49;
-    private static final int COLOR_ACTION_BORDER = 0xFFDDBA6A;
-    private static final int COLOR_ROW_BOX = 0x66112A52;
-    private static final int COLOR_ROW_BOX_BORDER = 0x88649CE4;
+    private int COLOR_BG_OVERLAY = 0xC0050818;
+    private int COLOR_PANEL_BG = 0xEE0B1838;
+    private int COLOR_PANEL_BORDER = 0xFF3D78E0;
+    private int COLOR_SIDEBAR_BG = 0xEE091434;
+    private int COLOR_TAB_NORMAL = 0xCC0E2150;
+    private int COLOR_TAB_HOVER = 0xDD13347A;
+    private int COLOR_TAB_ACTIVE = 0xFF1F4FB8;
+    private int COLOR_TAB_ACCENT = 0xFF6FA8FF;
+    private int COLOR_TEXT = 0xFFEAF1FF;
+    private int COLOR_TEXT_DIM = 0xFF89A8DA;
+    private int COLOR_HEADER = 0xFFAFD0FF;
+    private int COLOR_DIVIDER = 0x553D78E0;
+    private int COLOR_ACTION_BUTTON = 0xFF16396E;
+    private int COLOR_ACTION_BUTTON_HOVER = 0xFF1F4A8C;
+    private int COLOR_ACTION_BUTTON_DISABLED = 0xFF1A2B49;
+    private int COLOR_ACTION_BORDER = 0xFFDDBA6A;
+    private int COLOR_ROW_BOX = 0x66112A52;
+    private int COLOR_ROW_BOX_BORDER = 0x88649CE4;
     private static final int CLOSE_BUTTON_SIZE = 16;
     private static final int CLOSE_BUTTON_INSET = 4;
     private static final int RESET_CONFIRM_WIDTH = 260;
@@ -162,8 +147,34 @@ public final class MinepieceMenuScreen extends Screen {
     private static final int RESET_CONFIRM_BUTTON_SIZE = 18;
     private static final int RESET_CONFIRM_BUTTON_GAP = 14;
 
+    /** Minepiece gold, used for the title line, the active page and the version badge. */
+    private static final int GOLD = 0xFFDDBA6A;
+    private static final String VERSION = net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("minepiece-qol")
+        .map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("");
+    private static final int SIDEBAR_TABS_Y = 52;
+
     private final MinepieceQolClient mod;
     private Tab currentTab = Tab.MAIN;
+    private EditBox searchBox;
+    // Section layout for the simple settings pages: a running y offset and the boxes to draw behind the rows.
+    private static final int SECTION_HEADER = 14, SECTION_GAP = 6, SECTION_INSET = 4;
+    private record Section(String title, int top, int bottom) { }
+    private record SectionText(String text, int y) { }
+    private final List<Section> sections = new ArrayList<>();
+    private final List<SectionText> sectionTexts = new ArrayList<>();
+    private final Map<Checkbox, String> switchDescriptions = new java.util.IdentityHashMap<>();
+    private int layoutY;
+    private String openSection;
+    private int openSectionTop;
+    private String searchQuery = "";
+    private List<SearchEntry> searchIndex;
+    private final Map<Group, Tab> selectedPages = new java.util.EnumMap<>(Group.class);
+    private final Map<Tab, Integer> pageScroll = new java.util.EnumMap<>(Tab.class);
+    private float menuScale = 1;
+    private int panelHeight = PANEL_HEIGHT;
+    private int contentTop;
+    private int contentBottom;
+    private int maxPageScroll;
     private int panelX;
     private int panelY;
     private int contentX;
@@ -173,23 +184,23 @@ public final class MinepieceMenuScreen extends Screen {
     private final List<TabButton> tabButtons = new ArrayList<>();
 
     // Money widgets
-    private TextFieldWidget moneyTotalField;
-    private TextFieldWidget moneyMadeTodayField;
-    private TextFieldWidget moneyAhSoldField;
-    private TextFieldWidget moneyAhBoughtField;
+    private EditBox moneyTotalField;
+    private EditBox moneyMadeTodayField;
+    private EditBox moneyAhSoldField;
+    private EditBox moneyAhBoughtField;
     private int moneyHistoryOffset;
 
     // Jobs widgets
-    private final TextFieldWidget[] jobLevelFields = new TextFieldWidget[4];
-    private final TextFieldWidget[] jobCurrentXpFields = new TextFieldWidget[4];
-    private final TextFieldWidget[] jobNeededXpFields = new TextFieldWidget[4];
+    private final EditBox[] jobLevelFields = new EditBox[4];
+    private final EditBox[] jobCurrentXpFields = new EditBox[4];
+    private final EditBox[] jobNeededXpFields = new EditBox[4];
 
     // Profile widgets
-    private final TextFieldWidget[] profileStatFields = new TextFieldWidget[PROFILE_FIELD_KEYS.length];
+    private final EditBox[] profileStatFields = new EditBox[PROFILE_FIELD_KEYS.length];
 
     // Events widgets
-    private TextFieldWidget eventNameField;
-    private TextFieldWidget eventTimeField;
+    private EditBox eventNameField;
+    private EditBox eventTimeField;
     private int eventsOffset;
     private int translationRulesOffset;
     private int translationSourceIndex = 1;
@@ -204,50 +215,170 @@ public final class MinepieceMenuScreen extends Screen {
     private int bossRegistryOffset;
     private final List<RemoveAction> removeActions = new ArrayList<>();
     private boolean resetHudLayoutConfirmOpen;
-    private TextFieldWidget telemetryWebhookField;
 
     public MinepieceMenuScreen(MinepieceQolClient mod) {
-        super(Text.literal(mod == null ? "Minepiece QoL" : mod.tr("menu.title")));
+        super(Component.literal(mod == null ? "Minepiece QoL" : mod.tr("menu.title")));
         this.mod = mod;
     }
 
+    /** Opens on a named page, e.g. "EXTRAS" (used by the client smoke test). */
+    public MinepieceMenuScreen(MinepieceQolClient mod, String page) {
+        this(mod);
+        this.currentTab = Tab.valueOf(page);
+    }
+
     @Override
-    public boolean shouldPause() {
+    public boolean isPauseScreen() {
         return false;
     }
 
     @Override
     protected void init() {
         super.init();
-        this.panelX = (this.width - PANEL_WIDTH) / 2;
-        this.panelY = (this.height - PANEL_HEIGHT) / 2;
+        refreshPalette();
+        this.menuScale = Math.min(1F, Math.min(this.width / 484F, this.height / 220F));
+        int logicalWidth = Math.round(this.width / menuScale);
+        int logicalHeight = Math.round(this.height / menuScale);
+        this.panelHeight = Math.min(PANEL_HEIGHT, logicalHeight - 16);
+        this.panelX = (logicalWidth - PANEL_WIDTH) / 2;
+        this.panelY = (logicalHeight - panelHeight) / 2;
         this.contentX = this.panelX + SIDEBAR_WIDTH + CONTENT_PADDING;
-        this.contentY = this.panelY + 40;
+        this.contentTop = this.panelY + 58;
+        this.contentBottom = this.panelY + this.panelHeight - 20;
+        this.contentY = contentTop - pageScroll.getOrDefault(currentTab, 0);
         this.contentWidth = PANEL_WIDTH - SIDEBAR_WIDTH - CONTENT_PADDING * 2;
-        this.contentHeight = this.panelY + PANEL_HEIGHT - CONTENT_PADDING - this.contentY;
+        this.contentHeight = Math.max(260, contentBottom - contentTop);
 
         buildSidebar();
+        this.searchBox = new EditBox(this.font, this.panelX + 6, this.panelY + 30, SIDEBAR_WIDTH - 12, 16, Component.literal(tr("menu.search")));
+        this.searchBox.setHint(Component.literal(tr("menu.search")));
+        this.searchBox.setValue(this.searchQuery);
+        this.searchBox.setResponder(text -> {
+            if (text.equals(this.searchQuery)) return;
+            this.searchQuery = text;
+            rebuild();
+            setFocused(this.searchBox);
+        });
         buildTabContent();
     }
 
     private void buildSidebar() {
         this.tabButtons.clear();
         int sidebarX = this.panelX + 6;
-        int sidebarY = this.panelY + 30;
-        Tab[] tabs = Tab.values();
-        for (int i = 0; i < tabs.length; i++) {
-            Tab tab = tabs[i];
-            int by = sidebarY + i * (TAB_HEIGHT + TAB_SPACING);
-            TabButton button = new TabButton(sidebarX, by, SIDEBAR_WIDTH - 12, TAB_HEIGHT, tab);
+        int sidebarY = this.panelY + SIDEBAR_TABS_Y;
+        Group[] groups = Group.values();
+        for (int i = 0; i < groups.length; i++) {
+            Tab tab = groups[i].pages()[0];
+            int tabStep = Math.min(TAB_HEIGHT + TAB_SPACING, (panelHeight - SIDEBAR_TABS_Y - 20) / groups.length);
+            int by = sidebarY + i * tabStep;
+            TabButton button = new TabButton(sidebarX, by, SIDEBAR_WIDTH - 12, Math.min(TAB_HEIGHT, tabStep - 2), tab);
             this.tabButtons.add(button);
         }
     }
 
     private void buildTabContent() {
         // Reset content widgets but preserve sidebar interaction (which we hand-draw, not as widgets)
-        clearChildren();
+        clearWidgets();
+        if (this.searchBox != null) addWidget(this.searchBox);
+        this.contentY = contentTop - pageScroll.getOrDefault(currentTab, 0);
         this.removeActions.clear();
-        switch (this.currentTab) {
+        resetSections();
+        if (isSearching()) buildSearchResults();
+        else buildPage(this.currentTab);
+        endSection();
+        List<net.minecraft.client.gui.components.AbstractWidget> built = new ArrayList<>();
+        for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget && child != this.searchBox) built.add(widget);
+        for (var child : List.copyOf(children())) {
+            if (child instanceof Button button) {
+                removeWidget(button);
+                addRenderableWidget(new ThemedButton(this.mod, button));
+            } else if (child instanceof Checkbox box) {
+                removeWidget(box);
+                boolean inSection = box.getX() == this.contentX + SECTION_INSET;
+                int width = box.getMessage().getString().isEmpty() ? box.getWidth()
+                    : inSection ? this.contentWidth - 6 - SECTION_INSET * 2 : switchWidth(box, built);
+                addRenderableWidget(new ThemedSwitch(this.mod, box, width, this.switchDescriptions.get(box)));
+            }
+        }
+        if (!isSearching()) selectedPages.put(groupFor(currentTab), currentTab);
+        finishTabContent();
+    }
+
+    /** Setting rows stretch to the next widget on the same row, or to the content edge. */
+    private int switchWidth(Checkbox box, List<net.minecraft.client.gui.components.AbstractWidget> built) {
+        int limit = this.contentX + this.contentWidth - 6;
+        for (var other : built) {
+            if (other == box || other.getX() <= box.getX()) continue;
+            boolean sameRow = other.getY() < box.getY() + box.getHeight() && other.getY() + other.getHeight() > box.getY();
+            if (sameRow) limit = Math.min(limit, other.getX() - 4);
+        }
+        return Math.max(40, limit - box.getX());
+    }
+
+    private boolean isSearching() {
+        return this.searchQuery != null && !this.searchQuery.isBlank();
+    }
+
+    private record SearchEntry(Tab tab, String label) { }
+
+    /** Every page's own widget labels, read by building each page once off-screen. */
+    private List<SearchEntry> searchIndex() {
+        if (this.searchIndex != null) return this.searchIndex;
+        Tab saved = this.currentTab;
+        List<SearchEntry> entries = new ArrayList<>();
+        for (Tab tab : Tab.values()) {
+            entries.add(new SearchEntry(tab, tab.label(this)));
+            this.currentTab = tab;
+            clearWidgets();
+            this.removeActions.clear();
+            resetSections();
+            try {
+                buildPage(tab);
+                endSection();
+            } catch (RuntimeException ignored) {
+                // a page that cannot build off-screen is still found by its name
+            }
+            for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget && !(widget instanceof EditBox)) {
+                String label = widget.getMessage().getString().trim();
+                if (!label.isEmpty()) entries.add(new SearchEntry(tab, label));
+            }
+        }
+        this.currentTab = saved;
+        clearWidgets();
+        this.removeActions.clear();
+        resetSections();
+        if (this.searchBox != null) addWidget(this.searchBox);
+        this.searchIndex = entries;
+        return entries;
+    }
+
+    private List<SearchEntry> searchMatches() {
+        String query = this.searchQuery.trim().toLowerCase(Locale.ROOT);
+        java.util.LinkedHashSet<SearchEntry> found = new java.util.LinkedHashSet<>();
+        for (SearchEntry entry : searchIndex()) {
+            String group = tr(groupFor(entry.tab()).key);
+            if ((entry.label() + " " + entry.tab().label(this) + " " + group).toLowerCase(Locale.ROOT).contains(query)) found.add(entry);
+        }
+        return List.copyOf(found);
+    }
+
+    private void buildSearchResults() {
+        var matches = searchMatches();
+        for (int i = 0; i < matches.size(); i++) {
+            SearchEntry entry = matches.get(i);
+            String text = tr(groupFor(entry.tab()).key) + " › " + entry.tab().label(this)
+                + (entry.label().equals(entry.tab().label(this)) ? "" : ": " + entry.label());
+            addRenderableWidget(Button.builder(Component.literal(text), b -> {
+                this.currentTab = entry.tab();
+                this.searchQuery = "";
+                this.searchBox.setValue("");
+                rebuild();
+            }).bounds(this.contentX, this.contentY + i * 22, this.contentWidth - 6, 18).build());
+        }
+    }
+
+    private void buildPage(Tab tab) {
+        switch (tab) {
             case MAIN -> buildMainTab();
             case BOSSES -> buildBossesTab();
             case MONEY -> buildMoneyTab();
@@ -255,140 +386,137 @@ public final class MinepieceMenuScreen extends Screen {
             case EVENTS -> buildEventsTab();
             case PROFILE -> buildProfileTab();
             case LANGUAGE -> buildLanguageTab();
-            case AUCTION_HOUSE -> buildOtherTab();
-            case TELEMETRY -> buildTelemetryTab();
+            case AUCTION_HOUSE -> {
+                section("menu.section.colors");
+                describedSwitch("setting.auction_highlight", this.mod.getConfig().auctionHighlightEnabled, v -> this.mod.setAuctionHighlightEnabled(v));
+                describedSwitch("setting.auction_price_key", this.mod.getConfig().auctionPriceKeyEnabled, v -> this.mod.getConfig().auctionPriceKeyEnabled = v);
+                section("menu.section.how_it_works");
+                sectionText(tr("auction.how1"));
+                sectionText(tr("auction.how2"));
+                sectionText(tr("auction.how3"));
+            }
+            case PROGRESS -> buildProgressTab();
+            case COOKING -> buildCookingTab();
+            case EXTRAS -> buildExtrasTab();
+            case COMBAT_SETTINGS -> buildCombatSettings();
+            case STAT_DISPLAY -> buildStatDisplay();
+            case PASS_PETS -> buildPassPets();
+            case SCROLLS -> {
+                section("menu.section.panels");
+                describedSwitch("setting.scrolls_hud", this.mod.getConfig().scrollsEnabled, v -> this.mod.setScrollsEnabled(v));
+            }
+            case HELP -> addRenderableWidget(Button.builder(trText("extras.help"), b -> this.minecraft.gui.setScreen(new HelpScreen(this.mod, this)))
+                .bounds(this.contentX, this.contentY, 220, 18).build());
+            case APPEARANCE -> {
+                section("menu.section.customize");
+                String[] labels = {"ui.panels", "ui.appearance", "ui.loadouts", "ui.pictures"};
+                int[] pages = {3, 0, 1, 2};
+                for (int i = 0; i < pages.length; i++) {
+                    final int page = pages[i];
+                    sectionButton(trText(labels[i]), button -> this.minecraft.gui.setScreen(new AppearanceScreen(this.mod, this, page)));
+                }
+                section("menu.section.layout");
+                sectionButton(trText("button.edit_hud_layout"), b -> this.mod.openHudLayoutEditor());
+                sectionButton(trText("button.reset_hud_layout"), b -> this.resetHudLayoutConfirmOpen = true);
+            }
         }
     }
 
-    private void buildTelemetryTab() {
-        TelemetryConfig cfg = this.mod.getTelemetryManager().config();
-        int x = this.contentX;
-        int y = this.contentY;
-        int right = x + 178;
-
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Enable telemetry"), this.textRenderer)
-            .pos(x, y).checked(cfg.enabled).callback((box, checked) -> this.mod.getTelemetryManager().setEnabled(checked, MinecraftClient.getInstance())).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Discord output"), this.textRenderer)
-            .pos(right, y).checked(cfg.discordEnabled).callback((box, checked) -> { cfg.discordEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Inventory"), this.textRenderer)
-            .pos(x, y + 22).checked(cfg.inventoryEnabled).callback((box, checked) -> { cfg.inventoryEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Economy"), this.textRenderer)
-            .pos(right, y + 22).checked(cfg.economyEnabled).callback((box, checked) -> { cfg.economyEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Combat"), this.textRenderer)
-            .pos(x, y + 44).checked(cfg.combatEnabled).callback((box, checked) -> { cfg.combatEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Chat & commands"), this.textRenderer)
-            .pos(right, y + 44).checked(cfg.chatCommandsEnabled).callback((box, checked) -> { cfg.chatCommandsEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Interactions"), this.textRenderer)
-            .pos(x, y + 66).checked(cfg.interactionsEnabled).callback((box, checked) -> { cfg.interactionsEnabled = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Session alerts"), this.textRenderer)
-            .pos(x, y + 94).checked(cfg.sessionAlerts).callback((box, checked) -> { cfg.sessionAlerts = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Death alerts"), this.textRenderer)
-            .pos(right, y + 94).checked(cfg.deathAlerts).callback((box, checked) -> { cfg.deathAlerts = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Failure alerts"), this.textRenderer)
-            .pos(x, y + 116).checked(cfg.failureAlerts).callback((box, checked) -> { cfg.failureAlerts = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-        addDrawableChild(CheckboxWidget.builder(Text.literal("Overflow alerts"), this.textRenderer)
-            .pos(right, y + 116).checked(cfg.overflowAlerts).callback((box, checked) -> { cfg.overflowAlerts = checked; this.mod.getTelemetryManager().saveConfig(); }).build());
-
-        this.telemetryWebhookField = new TextFieldWidget(this.textRenderer, x, y + 152, 230, 18, Text.literal("Discord webhook"));
-        this.telemetryWebhookField.setMaxLength(2_048);
-        this.telemetryWebhookField.setPlaceholder(Text.literal(cfg.webhookUrl == null || cfg.webhookUrl.isBlank()
-            ? "Paste Discord webhook" : "•••••••• (configured; paste to replace)"));
-        addDrawableChild(this.telemetryWebhookField);
-        addDrawableChild(ButtonWidget.builder(Text.literal("Save"), button -> {
-            String replacement = this.telemetryWebhookField.getText().trim();
-            if (!replacement.isBlank()) {
-                cfg.webhookUrl = replacement;
-                this.telemetryWebhookField.setText("");
-                this.telemetryWebhookField.setPlaceholder(Text.literal("•••••••• (configured; paste to replace)"));
-            }
-            this.mod.getTelemetryManager().saveConfig();
-        }).dimensions(x + 236, y + 152, 48, 18).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Test"), button -> this.mod.getTelemetryManager().testDiscord())
-            .dimensions(x + 290, y + 152, 48, 18).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Export session"), button -> this.mod.getTelemetryManager().exportCurrentSession())
-            .dimensions(x, y + 180, 106, 18).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Export all history"), button -> this.mod.getTelemetryManager().exportAllHistory())
-            .dimensions(x + 112, y + 180, 126, 18).build());
+    private void finishTabContent() {
+        int extent = isSearching() ? 0 : switch (currentTab) {
+            case COOKING -> 255;
+            case BOSSES -> BOSSES_ACTIVE_LIST_Y_OFFSET + BOSSES_ACTIVE_LIST_HEIGHT + BOSSES_REGISTRY_GAP + BOSSES_REGISTRY_LIST_HEIGHT;
+            case MONEY, EVENTS, LANGUAGE -> contentHeight - 4;
+            default -> 0;
+        };
+        for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget && child != this.searchBox)
+            extent = Math.max(extent, widget.getY() + widget.getHeight() - contentY);
+        for (var remove : removeActions) extent = Math.max(extent, remove.y() + REMOVE_BUTTON_SIZE - contentY);
+        for (var section : sections) extent = Math.max(extent, section.bottom());
+        maxPageScroll = Math.max(0, extent - (contentBottom - contentTop));
+        int offset = pageScroll.getOrDefault(currentTab, 0);
+        if (offset > maxPageScroll) { pageScroll.put(currentTab, maxPageScroll); buildTabContent(); }
+        updateContentVisibility();
     }
 
     private void buildMainTab() {
-        ConfigManager.ModConfig cfg = this.mod.getConfig();
-        int x = this.contentX;
-        int y = this.contentY + 8;
-        boolean showDebugControls = this.mod.isDebugToolsAvailable();
-        int compactShift = showDebugControls ? 0 : MAIN_COMPACT_SHIFT_NO_DEBUG;
-        List<UiLocalization.LanguageOption> uiLanguages = this.mod.getSupportedUiLanguages();
-        this.uiLanguageIndex = findUiLanguageIndex(uiLanguages, this.mod.getUiLanguage());
-        int languageRowY = y + MAIN_LANGUAGE_ROW_Y_OFFSET + compactShift;
-        int languageButtonY = languageRowY + (LIST_ROW_HEIGHT - MAIN_COLOR_BUTTON_HEIGHT) / 2;
-        int editHudButtonY = y + MAIN_EDIT_HUD_BUTTON_Y_OFFSET + compactShift;
-        int panelSectionY = y + MAIN_PANEL_COLORS_Y_OFFSET + compactShift;
-
-        addDrawableChild(CheckboxWidget.builder(trText("setting.mod_enabled"), this.textRenderer)
-            .pos(x, y).checked(cfg.modEnabled)
-            .callback((box, checked) -> this.mod.setModEnabled(checked))
-            .build());
-
-        addDrawableChild(CheckboxWidget.builder(trText("setting.show_all_features"), this.textRenderer)
-            .pos(x, y + MAIN_CHECKBOX_ROW_STEP).checked(cfg.allFeaturesVisible)
-            .callback((box, checked) -> this.mod.setAllFeaturesVisible(checked))
-            .build());
-
-        if (showDebugControls) {
-            addDrawableChild(CheckboxWidget.builder(trText("setting.debug_logging"), this.textRenderer)
-                .pos(x, y + MAIN_CHECKBOX_ROW_STEP * 2).checked(cfg.debugEnabled)
-                .callback((box, checked) -> this.mod.setDebugEnabled(checked))
-                .build());
+        var cfg = this.mod.getConfig();
+        section("menu.section.core");
+        describedSwitch("setting.mod_enabled", cfg.modEnabled, this.mod::setModEnabled);
+        describedSwitch("setting.show_all_features", cfg.allFeaturesVisible, this.mod::setAllFeaturesVisible);
+        section("menu.section.language_updates");
+        var languages = this.mod.getSupportedUiLanguages();
+        uiLanguageIndex = findUiLanguageIndex(languages, this.mod.getUiLanguage());
+        sectionButton(Component.literal(tr("main.mod_language") + ": " + languages.get(uiLanguageIndex).label()), b -> {
+            uiLanguageIndex = (uiLanguageIndex + 1) % languages.size();
+            this.mod.setUiLanguage(languages.get(uiLanguageIndex).code()); rebuild();
+        });
+        describedSwitch("extras.updates", cfg.updateCheckEnabled, v -> cfg.updateCheckEnabled = v);
+        section("menu.section.layout");
+        sectionButton(trText("button.edit_hud_layout"), b -> this.mod.openHudLayoutEditor());
+        if (this.mod.isDebugToolsAvailable()) {
+            section("menu.section.developer");
+            describedSwitch("setting.debug_logging", cfg.debugEnabled, this.mod::setDebugEnabled);
         }
+    }
 
-        int hudButtonsTotalWidth = this.contentWidth - 4;
-        int hudButtonWidth = (hudButtonsTotalWidth - MAIN_HUD_BUTTON_GAP) / 2;
-        addDrawableChild(ButtonWidget.builder(trText("button.edit_hud_layout"), button -> {
-                this.mod.openHudLayoutEditor();
-            })
-            .dimensions(x, editHudButtonY, hudButtonWidth, 20)
-            .build());
-        addDrawableChild(ButtonWidget.builder(trText("button.reset_hud_layout"), button -> {
-                this.resetHudLayoutConfirmOpen = true;
-            })
-            .dimensions(x + hudButtonWidth + MAIN_HUD_BUTTON_GAP, editHudButtonY, hudButtonWidth, 20)
-            .build());
+    private void featureToggle(String label, boolean value, int dy, java.util.function.Consumer<Boolean> setter) {
+        addRenderableWidget(Checkbox.builder(trText(label), this.font).pos(contentX, contentY + dy).selected(value)
+            .onValueChange((box, checked) -> { setter.accept(checked); this.mod.saveConfig(); }).build());
+    }
 
-        if (!uiLanguages.isEmpty()) {
-            addDrawableChild(ButtonWidget.builder(Text.literal("<"), b -> {
-                    this.uiLanguageIndex = Math.floorMod(this.uiLanguageIndex - 1, uiLanguages.size());
-                    this.mod.setUiLanguage(uiLanguages.get(this.uiLanguageIndex).code());
-                    rebuild();
-                })
-                .dimensions(x + MAIN_COLOR_LEFT_BUTTON_X_OFFSET, languageButtonY, MAIN_COLOR_BUTTON_WIDTH, MAIN_COLOR_BUTTON_HEIGHT)
-                .build());
-            addDrawableChild(ButtonWidget.builder(Text.literal(">"), b -> {
-                    this.uiLanguageIndex = Math.floorMod(this.uiLanguageIndex + 1, uiLanguages.size());
-                    this.mod.setUiLanguage(uiLanguages.get(this.uiLanguageIndex).code());
-                    rebuild();
-                })
-                .dimensions(x + MAIN_COLOR_RIGHT_BUTTON_X_OFFSET, languageButtonY, MAIN_COLOR_BUTTON_WIDTH, MAIN_COLOR_BUTTON_HEIGHT)
-                .build());
+    private void buildCombatSettings() {
+        var cfg = this.mod.getConfig();
+        section("menu.section.boss_timers");
+        describedSwitch("bosses.automatic_reads", cfg.automaticBossReads, v -> cfg.automaticBossReads = v);
+        describedSwitch("extras.boss_alerts", cfg.bossAlertsEnabled, v -> cfg.bossAlertsEnabled = v);
+        sectionButton(Component.literal(tr("bosses.order") + ": " + tr(cfg.appearance.bossesByTime ? "bosses.by_time" : "bosses.by_island")), b -> {
+            cfg.appearance.bossesByTime = !cfg.appearance.bossesByTime;
+            this.mod.saveConfig(); rebuild();
+        });
+        sectionButton(trText("extras.refresh"), b -> this.mod.getEssentials().refresh());
+        section("menu.section.cooldowns");
+        describedSwitch("setting.haki_cooldown", cfg.hakiEnabled, this.mod::setHakiEnabled);
+    }
+
+    private void buildPassPets() {
+        var cfg = this.mod.getConfig();
+        section("menu.section.panels");
+        describedSwitch("extras.daily_quests", cfg.dailyQuestsEnabled, v -> cfg.dailyQuestsEnabled = v);
+        describedSwitch("extras.active_pets", cfg.activePetsEnabled, v -> cfg.activePetsEnabled = v);
+        describedSwitch("extras.safes", cfg.safeChestsEnabled, v -> cfg.safeChestsEnabled = v);
+        section("menu.section.background");
+        describedSwitch("extras.background", cfg.backgroundRefreshEnabled, v -> cfg.backgroundRefreshEnabled = v);
+        sectionButton(trText("extras.refresh"), b -> this.mod.getEssentials().refresh());
+        section("menu.section.safes");
+        sectionButton(trText("extras.safes_reset"), b -> this.mod.getSafeChests().clear());
+    }
+
+    private void buildStatDisplay() {
+        var selected = this.mod.getConfig().appearance.profileStats;
+        var keys = net.minepiece.qol.state.ProfileStatsTracker.STAT_KEYS;
+        for (int i = 0; i < keys.size(); i++) {
+            String key = keys.get(i);
+            int index = selected.indexOf(key);
+            String label = (index < 0 ? "" : (index + 1) + ". ") + tr("profile." + key);
+            addRenderableWidget(Checkbox.builder(Component.literal(label), this.font).pos(contentX, contentY + i * 22)
+                .selected(index >= 0).onValueChange((box, checked) -> {
+                    selected.remove(key); if (checked) selected.add(key);
+                    this.mod.saveConfig(); rebuild();
+                }).build());
+            if (index >= 0) for (int direction : new int[]{-1, 1}) {
+                var button = Button.builder(Component.literal(direction < 0 ? "↑" : "↓"), b -> {
+                    java.util.Collections.swap(selected, index, index + direction);
+                    this.mod.saveConfig(); rebuild();
+                }).bounds(contentX + 270 + (direction > 0 ? 28 : 0), contentY + i * 22, 24, 18).build();
+                button.active = index + direction >= 0 && index + direction < selected.size();
+                addRenderableWidget(button);
+            }
         }
-
-        for (int i = 0; i < HUD_COLOR_PANEL_IDS.length; i++) {
-            int panelId = HUD_COLOR_PANEL_IDS[i];
-            int rowY = panelSectionY + 16 + i * MAIN_COLOR_ROW_STEP;
-            int buttonY = rowY + (MAIN_COLOR_ROW_HEIGHT - MAIN_COLOR_BUTTON_HEIGHT) / 2;
-            addDrawableChild(ButtonWidget.builder(Text.literal("<"), b -> {
-                    this.mod.cycleHudPanelColor(panelId, -1);
-                    this.mod.saveConfig();
-                })
-                .dimensions(x + MAIN_COLOR_LEFT_BUTTON_X_OFFSET, buttonY, MAIN_COLOR_BUTTON_WIDTH, MAIN_COLOR_BUTTON_HEIGHT)
-                .build());
-            addDrawableChild(ButtonWidget.builder(Text.literal(">"), b -> {
-                    this.mod.cycleHudPanelColor(panelId, 1);
-                    this.mod.saveConfig();
-                })
-                .dimensions(x + MAIN_COLOR_RIGHT_BUTTON_X_OFFSET, buttonY, MAIN_COLOR_BUTTON_WIDTH, MAIN_COLOR_BUTTON_HEIGHT)
-                .build());
-        }
+        addRenderableWidget(Button.builder(trText("ui.reset_stats"), b -> {
+            selected.clear(); selected.addAll(List.of("power", "strength", "speed"));
+            this.mod.saveConfig(); rebuild();
+        }).bounds(contentX, contentY + 272, 220, 18).build());
     }
 
     private void buildBossesTab() {
@@ -396,19 +524,19 @@ public final class MinepieceMenuScreen extends Screen {
         int x = this.contentX;
         int y = this.contentY;
 
-        addDrawableChild(CheckboxWidget.builder(trText("setting.boss_tracking"), this.textRenderer)
-            .pos(x, y).checked(this.mod.isBossTrackingEnabled())
-            .callback((box, checked) -> this.mod.setBossTrackingEnabled(checked))
+        addRenderableWidget(Checkbox.builder(trText("setting.boss_tracking"), this.font)
+            .pos(x, y).selected(this.mod.isBossTrackingEnabled())
+            .onValueChange((box, checked) -> this.mod.setBossTrackingEnabled(checked))
             .build());
 
-        addDrawableChild(CheckboxWidget.builder(trText("setting.miniboss_waypoints"), this.textRenderer)
-            .pos(x + 130, y).checked(cfg.minibossTrackingEnabled)
-            .callback((box, checked) -> this.mod.setMinibossTrackingEnabled(checked))
+        addRenderableWidget(Checkbox.builder(trText("setting.miniboss_waypoints"), this.font)
+            .pos(x + 130, y).selected(cfg.minibossTrackingEnabled)
+            .onValueChange((box, checked) -> this.mod.setMinibossTrackingEnabled(checked))
             .build());
 
-        addDrawableChild(CheckboxWidget.builder(trText("setting.miniboss_panel"), this.textRenderer)
-            .pos(x, y + BOSSES_MINIBOSS_PANEL_Y_OFFSET).checked(this.mod.isMinibossHudEnabled())
-            .callback((box, checked) -> this.mod.setMinibossHudEnabled(checked))
+        addRenderableWidget(Checkbox.builder(trText("setting.miniboss_panel"), this.font)
+            .pos(x, y + BOSSES_MINIBOSS_PANEL_Y_OFFSET).selected(this.mod.isMinibossHudEnabled())
+            .onValueChange((box, checked) -> this.mod.setMinibossHudEnabled(checked))
             .build());
 
         // Active bosses list
@@ -463,8 +591,8 @@ public final class MinepieceMenuScreen extends Screen {
             int neverX = removeX - 4 - neverWidth;
             int plusWidth = 40;
             int plusX = neverX - 4 - plusWidth;
-            addDrawableChild(ButtonWidget.builder(Text.literal("+15m"), b -> {
-                    MinecraftClient client = MinecraftClient.getInstance();
+            addRenderableWidget(Button.builder(Component.literal("+15m"), b -> {
+                    Minecraft client = Minecraft.getInstance();
                     int px = 0, py = 0, pz = 0;
                     if (client != null && client.player != null) {
                         px = (int) Math.floor(client.player.getX());
@@ -474,13 +602,13 @@ public final class MinepieceMenuScreen extends Screen {
                     this.mod.getBossTracker().addBossFromRegistry(name, px, py, pz);
                     rebuild();
                 })
-                .dimensions(plusX, rowY, plusWidth, rowHeight)
+                .bounds(plusX, rowY, plusWidth, rowHeight)
                 .build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("Never"), b -> {
+            addRenderableWidget(Button.builder(Component.literal("Never"), b -> {
                     this.mod.getBossTracker().ignoreBossForever(name);
                     rebuild();
                 })
-                .dimensions(neverX, rowY, neverWidth, rowHeight)
+                .bounds(neverX, rowY, neverWidth, rowHeight)
                 .build());
             addRemoveButton(removeX, rowY, rowHeight, () -> {
                     this.mod.getBossTracker().removeFromRegistry(name);
@@ -495,43 +623,43 @@ public final class MinepieceMenuScreen extends Screen {
         int x = this.contentX;
         int y = this.contentY;
 
-        addDrawableChild(CheckboxWidget.builder(trText("setting.money_tracking"), this.textRenderer)
-            .pos(x, y).checked(cfg.moneyTrackingEnabled)
-            .callback((box, checked) -> this.mod.setMoneyTrackingEnabled(checked))
+        addRenderableWidget(Checkbox.builder(trText("setting.money_tracking"), this.font)
+            .pos(x, y).selected(cfg.moneyTrackingEnabled)
+            .onValueChange((box, checked) -> this.mod.setMoneyTrackingEnabled(checked))
             .build());
 
         int fy = y + 26;
-        this.moneyTotalField = new TextFieldWidget(this.textRenderer, x + MONEY_VALUE_FIELD_X_OFFSET, fy, MONEY_VALUE_FIELD_WIDTH, 16, Text.literal(""));
-        this.moneyTotalField.setText(Long.toString(this.mod.getMoneyTracker().getCurrentBalance()));
-        addDrawableChild(this.moneyTotalField);
+        this.moneyTotalField = new EditBox(this.font, x + MONEY_VALUE_FIELD_X_OFFSET, fy, MONEY_VALUE_FIELD_WIDTH, 16, Component.literal(""));
+        this.moneyTotalField.setValue(Long.toString(this.mod.getMoneyTracker().getCurrentBalance()));
+        addRenderableWidget(this.moneyTotalField);
 
-        this.moneyMadeTodayField = new TextFieldWidget(this.textRenderer, x + MONEY_VALUE_FIELD_X_OFFSET, fy + 22, MONEY_VALUE_FIELD_WIDTH, 16, Text.literal(""));
-        this.moneyMadeTodayField.setText(Long.toString(this.mod.getMoneyTracker().getMadeToday()));
-        addDrawableChild(this.moneyMadeTodayField);
+        this.moneyMadeTodayField = new EditBox(this.font, x + MONEY_VALUE_FIELD_X_OFFSET, fy + 22, MONEY_VALUE_FIELD_WIDTH, 16, Component.literal(""));
+        this.moneyMadeTodayField.setValue(Long.toString(this.mod.getMoneyTracker().getMadeToday()));
+        addRenderableWidget(this.moneyMadeTodayField);
 
-        this.moneyAhSoldField = new TextFieldWidget(this.textRenderer, x + MONEY_VALUE_FIELD_X_OFFSET, fy + 44, MONEY_VALUE_FIELD_WIDTH, 16, Text.literal(""));
-        this.moneyAhSoldField.setText(Long.toString(this.mod.getMoneyTracker().getAhMadeToday()));
-        addDrawableChild(this.moneyAhSoldField);
+        this.moneyAhSoldField = new EditBox(this.font, x + MONEY_VALUE_FIELD_X_OFFSET, fy + 44, MONEY_VALUE_FIELD_WIDTH, 16, Component.literal(""));
+        this.moneyAhSoldField.setValue(Long.toString(this.mod.getMoneyTracker().getAhMadeToday()));
+        addRenderableWidget(this.moneyAhSoldField);
 
-        this.moneyAhBoughtField = new TextFieldWidget(this.textRenderer, x + MONEY_VALUE_FIELD_X_OFFSET, fy + 66, MONEY_VALUE_FIELD_WIDTH, 16, Text.literal(""));
-        this.moneyAhBoughtField.setText(Long.toString(this.mod.getMoneyTracker().getAhSpentToday()));
-        addDrawableChild(this.moneyAhBoughtField);
+        this.moneyAhBoughtField = new EditBox(this.font, x + MONEY_VALUE_FIELD_X_OFFSET, fy + 66, MONEY_VALUE_FIELD_WIDTH, 16, Component.literal(""));
+        this.moneyAhBoughtField.setValue(Long.toString(this.mod.getMoneyTracker().getAhSpentToday()));
+        addRenderableWidget(this.moneyAhBoughtField);
 
-        addDrawableChild(ButtonWidget.builder(trText("button.save"), b -> {
-                long total = parseLongSafe(this.moneyTotalField.getText());
-                long madeToday = parseLongSafe(this.moneyMadeTodayField.getText());
-                long ahSold = parseLongSafe(this.moneyAhSoldField.getText());
-                long ahBought = parseLongSafe(this.moneyAhBoughtField.getText());
+        addRenderableWidget(Button.builder(trText("button.save"), b -> {
+                long total = parseLongSafe(this.moneyTotalField.getValue());
+                long madeToday = parseLongSafe(this.moneyMadeTodayField.getValue());
+                long ahSold = parseLongSafe(this.moneyAhSoldField.getValue());
+                long ahBought = parseLongSafe(this.moneyAhBoughtField.getValue());
                 this.mod.getMoneyTracker().setAhMadeToday(ahSold);
                 this.mod.getMoneyTracker().setAhSpentToday(ahBought);
                 this.mod.getMoneyTracker().setMadeToday(madeToday);
                 this.mod.getMoneyTracker().setCurrentBalance(total);
             })
-            .dimensions(x + 178, y + 1, 46, 16)
+            .bounds(x + 178, y + 1, 46, 16)
             .build());
 
-        addDrawableChild(ButtonWidget.builder(trText("button.run_balance"), b -> this.mod.runBalanceCommand())
-            .dimensions(x + 228, y + 1, 90, 16)
+        addRenderableWidget(Button.builder(trText("button.run_balance"), b -> this.mod.runBalanceCommand())
+            .bounds(x + 228, y + 1, 90, 16)
             .build());
 
         // Receipts list
@@ -561,9 +689,9 @@ public final class MinepieceMenuScreen extends Screen {
         int x = this.contentX;
         int y = this.contentY;
 
-        addDrawableChild(CheckboxWidget.builder(trText("setting.jobs_stats"), this.textRenderer)
-            .pos(x, y).checked(cfg.jobsTrackingEnabled)
-            .callback((box, checked) -> this.mod.setJobsTrackingEnabled(checked))
+        addRenderableWidget(Checkbox.builder(trText("setting.jobs_stats"), this.font)
+            .pos(x, y).selected(cfg.jobsTrackingEnabled)
+            .onValueChange((box, checked) -> this.mod.setJobsTrackingEnabled(checked))
             .build());
 
         int rowY = y + JOBS_TABLE_Y_OFFSET;
@@ -574,32 +702,34 @@ public final class MinepieceMenuScreen extends Screen {
             int by = rowY + i * JOBS_ROW_STEP;
             int fieldY = by + (JOBS_ROW_HEIGHT - JOBS_FIELD_HEIGHT) / 2;
 
-            this.jobLevelFields[i] = new TextFieldWidget(this.textRenderer, x + JOBS_LEVEL_X_OFFSET, fieldY, JOBS_LEVEL_WIDTH, JOBS_FIELD_HEIGHT, Text.literal(""));
+            this.jobLevelFields[i] = new EditBox(this.font, x + JOBS_LEVEL_X_OFFSET, fieldY, JOBS_LEVEL_WIDTH, JOBS_FIELD_HEIGHT, Component.literal(""));
             this.jobLevelFields[i].setCentered(true);
-            this.jobLevelFields[i].setText(info == null ? "0" : Integer.toString(info.level));
-            addDrawableChild(this.jobLevelFields[i]);
+            if (info != null && info.levelEstimated) this.jobLevelFields[i].setTooltip(
+                net.minecraft.client.gui.components.Tooltip.create(trText("jobs.estimated_hint")));
+            this.jobLevelFields[i].setValue(info == null ? "0" : Integer.toString(info.level));
+            addRenderableWidget(this.jobLevelFields[i]);
 
-            this.jobCurrentXpFields[i] = new TextFieldWidget(this.textRenderer, x + JOBS_CUR_X_OFFSET, fieldY, JOBS_CUR_WIDTH, JOBS_FIELD_HEIGHT, Text.literal(""));
+            this.jobCurrentXpFields[i] = new EditBox(this.font, x + JOBS_CUR_X_OFFSET, fieldY, JOBS_CUR_WIDTH, JOBS_FIELD_HEIGHT, Component.literal(""));
             this.jobCurrentXpFields[i].setCentered(true);
-            this.jobCurrentXpFields[i].setText(info == null || info.currentXp < 0 ? "0" : formatDouble(info.currentXp));
-            addDrawableChild(this.jobCurrentXpFields[i]);
+            this.jobCurrentXpFields[i].setValue(info == null || info.currentXp < 0 ? "0" : formatDouble(info.currentXp));
+            addRenderableWidget(this.jobCurrentXpFields[i]);
 
-            this.jobNeededXpFields[i] = new TextFieldWidget(this.textRenderer, x + JOBS_NEED_X_OFFSET, fieldY, JOBS_NEED_WIDTH, JOBS_FIELD_HEIGHT, Text.literal(""));
+            this.jobNeededXpFields[i] = new EditBox(this.font, x + JOBS_NEED_X_OFFSET, fieldY, JOBS_NEED_WIDTH, JOBS_FIELD_HEIGHT, Component.literal(""));
             this.jobNeededXpFields[i].setCentered(true);
-            this.jobNeededXpFields[i].setText(info == null ? "0" : formatDouble(info.neededXp));
-            addDrawableChild(this.jobNeededXpFields[i]);
+            this.jobNeededXpFields[i].setValue(info == null ? "0" : formatDouble(info.neededXp));
+            addRenderableWidget(this.jobNeededXpFields[i]);
         }
 
-        addDrawableChild(ButtonWidget.builder(trText("button.save_jobs"), b -> {
+        addRenderableWidget(Button.builder(trText("button.save_jobs"), b -> {
                 for (int i = 0; i < JobsTracker.HUD_JOB_ORDER.size(); i++) {
                     String jobName = JobsTracker.HUD_JOB_ORDER.get(i);
-                    int level = (int) parseLongSafe(this.jobLevelFields[i].getText());
-                    double cur = parseDoubleSafe(this.jobCurrentXpFields[i].getText());
-                    double need = parseDoubleSafe(this.jobNeededXpFields[i].getText());
+                    int level = (int) parseLongSafe(this.jobLevelFields[i].getValue());
+                    double cur = parseDoubleSafe(this.jobCurrentXpFields[i].getValue());
+                    double need = parseDoubleSafe(this.jobNeededXpFields[i].getValue());
                     this.mod.getJobsTracker().setJobValues(jobName, level, cur, need);
                 }
             })
-            .dimensions(x, rowY + 4 * JOBS_ROW_STEP + 6, 90, 18)
+            .bounds(x, rowY + 4 * JOBS_ROW_STEP + 6, 90, 18)
             .build());
     }
 
@@ -608,52 +738,52 @@ public final class MinepieceMenuScreen extends Screen {
         int x = this.contentX;
         int y = this.contentY;
 
-        addDrawableChild(CheckboxWidget.builder(trText("setting.events_enabled"), this.textRenderer)
-            .pos(x, y).checked(cfg.eventsEnabled)
-            .callback((box, checked) -> this.mod.setEventsEnabled(checked))
+        addRenderableWidget(Checkbox.builder(trText("setting.events_enabled"), this.font)
+            .pos(x, y).selected(cfg.eventsEnabled)
+            .onValueChange((box, checked) -> this.mod.setEventsEnabled(checked))
             .build());
 
         int formY = y + 26;
-        this.eventNameField = new TextFieldWidget(this.textRenderer, x, formY, 130, 16, Text.literal(""));
+        this.eventNameField = new EditBox(this.font, x, formY, 130, 16, Component.literal(""));
         this.eventNameField.setMaxLength(64);
-        this.eventNameField.setPlaceholder(trText("events.name_placeholder"));
-        addDrawableChild(this.eventNameField);
+        this.eventNameField.setHint(trText("events.name_placeholder"));
+        addRenderableWidget(this.eventNameField);
 
-        this.eventTimeField = new TextFieldWidget(this.textRenderer, x + 138, formY, 60, 16, Text.literal(""));
+        this.eventTimeField = new EditBox(this.font, x + 138, formY, 60, 16, Component.literal(""));
         this.eventTimeField.setMaxLength(5);
-        this.eventTimeField.setPlaceholder(Text.literal("HH:mm"));
-        addDrawableChild(this.eventTimeField);
+        this.eventTimeField.setHint(Component.literal("HH:mm"));
+        addRenderableWidget(this.eventTimeField);
 
         if (isEditingEvent()) {
-            this.eventNameField.setText(this.editingEventOriginalName);
-            this.eventTimeField.setText(this.editingEventOriginalTime);
+            this.eventNameField.setValue(this.editingEventOriginalName);
+            this.eventTimeField.setValue(this.editingEventOriginalTime);
         }
 
-        addDrawableChild(ButtonWidget.builder(Text.literal(isEditingEvent() ? tr("button.save") : tr("button.add")), b -> {
+        addRenderableWidget(Button.builder(Component.literal(isEditingEvent() ? tr("button.save") : tr("button.add")), b -> {
                 if (isEditingEvent()) {
                     this.mod.getEventCountdownTracker().editEvent(
                         this.editingEventOriginalName,
                         this.editingEventOriginalTime,
-                        this.eventNameField.getText(),
-                        this.eventTimeField.getText()
+                        this.eventNameField.getValue(),
+                        this.eventTimeField.getValue()
                     );
                 } else {
-                    this.mod.getEventCountdownTracker().addEvent(this.eventNameField.getText(), this.eventTimeField.getText());
+                    this.mod.getEventCountdownTracker().addEvent(this.eventNameField.getValue(), this.eventTimeField.getValue());
                 }
                 clearEventEditState();
-                this.eventNameField.setText("");
-                this.eventTimeField.setText("");
+                this.eventNameField.setValue("");
+                this.eventTimeField.setValue("");
                 rebuild();
             })
-            .dimensions(x + 206, formY, 58, 18)
+            .bounds(x + 206, formY, 58, 18)
             .build());
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("Cancel"), b -> {
+        addRenderableWidget(Button.builder(Component.literal("Cancel"), b -> {
                 clearEventEditState();
-                this.eventNameField.setText("");
-                this.eventTimeField.setText("");
+                this.eventNameField.setValue("");
+                this.eventTimeField.setValue("");
             })
-            .dimensions(x + 268, formY, 46, 18)
+            .bounds(x + 268, formY, 46, 18)
             .build());
 
         // Existing events list
@@ -675,10 +805,10 @@ public final class MinepieceMenuScreen extends Screen {
             int removeX = x + this.contentWidth - REMOVE_BUTTON_SIZE - REMOVE_BUTTON_GAP_RIGHT;
             int editX = removeX - 4 - EVENTS_EDIT_BUTTON_WIDTH;
             int editY = rowY + (rowHeight - EVENTS_EDIT_BUTTON_HEIGHT) / 2;
-            addDrawableChild(ButtonWidget.builder(Text.literal("Edit"), b -> {
+            addRenderableWidget(Button.builder(Component.literal("Edit"), b -> {
                     beginEventEdit(name, time);
                 })
-                .dimensions(editX, editY, EVENTS_EDIT_BUTTON_WIDTH, EVENTS_EDIT_BUTTON_HEIGHT)
+                .bounds(editX, editY, EVENTS_EDIT_BUTTON_WIDTH, EVENTS_EDIT_BUTTON_HEIGHT)
                 .build());
             addRemoveButton(removeX, rowY, rowHeight, () -> {
                     this.mod.getEventCountdownTracker().removeEvent(name, time);
@@ -697,9 +827,9 @@ public final class MinepieceMenuScreen extends Screen {
         int x = this.contentX;
         int y = this.contentY;
 
-        addDrawableChild(CheckboxWidget.builder(trText("setting.profile_stats"), this.textRenderer)
-            .pos(x, y).checked(cfg.profileStatsEnabled)
-            .callback((box, checked) -> this.mod.setProfileStatsEnabled(checked))
+        addRenderableWidget(Checkbox.builder(trText("setting.profile_stats"), this.font)
+            .pos(x, y).selected(cfg.profileStatsEnabled)
+            .onValueChange((box, checked) -> this.mod.setProfileStatsEnabled(checked))
             .build());
 
         int rowsY = y + PROFILE_ROWS_Y_OFFSET;
@@ -721,25 +851,25 @@ public final class MinepieceMenuScreen extends Screen {
         for (int i = 0; i < PROFILE_FIELD_KEYS.length; i++) {
             int rowY = rowsY + i * PROFILE_ROW_STEP;
             int fieldY = rowY + (PROFILE_ROW_HEIGHT - PROFILE_FIELD_HEIGHT) / 2;
-            this.profileStatFields[i] = new TextFieldWidget(this.textRenderer, x + PROFILE_FIELD_X_OFFSET, fieldY, PROFILE_FIELD_WIDTH, PROFILE_FIELD_HEIGHT, Text.literal(""));
+            this.profileStatFields[i] = new EditBox(this.font, x + PROFILE_FIELD_X_OFFSET, fieldY, PROFILE_FIELD_WIDTH, PROFILE_FIELD_HEIGHT, Component.literal(""));
             this.profileStatFields[i].setCentered(true);
-            this.profileStatFields[i].setText(values[i] == null ? "0" : formatDouble(values[i]));
-            addDrawableChild(this.profileStatFields[i]);
+            this.profileStatFields[i].setValue(values[i] == null ? "0" : formatDouble(values[i]));
+            addRenderableWidget(this.profileStatFields[i]);
         }
 
-        addDrawableChild(ButtonWidget.builder(trText("button.save"), b -> {
-                double health = parseDoubleSafe(this.profileStatFields[0].getText());
-                double strength = parseDoubleSafe(this.profileStatFields[1].getText());
-                double damage = parseDoubleSafe(this.profileStatFields[2].getText());
-                double criticalChance = parseDoubleSafe(this.profileStatFields[3].getText());
-                double criticalDamage = parseDoubleSafe(this.profileStatFields[4].getText());
-                double power = parseDoubleSafe(this.profileStatFields[5].getText());
-                double energy = parseDoubleSafe(this.profileStatFields[6].getText());
-                double energyRegeneration = parseDoubleSafe(this.profileStatFields[7].getText());
-                double speed = parseDoubleSafe(this.profileStatFields[8].getText());
-                double dexterity = parseDoubleSafe(this.profileStatFields[9].getText());
-                double defense = parseDoubleSafe(this.profileStatFields[10].getText());
-                double regeneration = parseDoubleSafe(this.profileStatFields[11].getText());
+        addRenderableWidget(Button.builder(trText("button.save"), b -> {
+                double health = parseDoubleSafe(this.profileStatFields[0].getValue());
+                double strength = parseDoubleSafe(this.profileStatFields[1].getValue());
+                double damage = parseDoubleSafe(this.profileStatFields[2].getValue());
+                double criticalChance = parseDoubleSafe(this.profileStatFields[3].getValue());
+                double criticalDamage = parseDoubleSafe(this.profileStatFields[4].getValue());
+                double power = parseDoubleSafe(this.profileStatFields[5].getValue());
+                double energy = parseDoubleSafe(this.profileStatFields[6].getValue());
+                double energyRegeneration = parseDoubleSafe(this.profileStatFields[7].getValue());
+                double speed = parseDoubleSafe(this.profileStatFields[8].getValue());
+                double dexterity = parseDoubleSafe(this.profileStatFields[9].getValue());
+                double defense = parseDoubleSafe(this.profileStatFields[10].getValue());
+                double regeneration = parseDoubleSafe(this.profileStatFields[11].getValue());
                 this.mod.getProfileStatsTracker().setStats(
                     health,
                     strength,
@@ -755,13 +885,13 @@ public final class MinepieceMenuScreen extends Screen {
                     regeneration
                 );
             })
-            .dimensions(x + PROFILE_SAVE_BUTTON_X_OFFSET, y + 1, PROFILE_SAVE_BUTTON_WIDTH, 18)
+            .bounds(x + PROFILE_SAVE_BUTTON_X_OFFSET, y + 1, PROFILE_SAVE_BUTTON_WIDTH, 18)
             .build());
 
-        addDrawableChild(ButtonWidget.builder(trText("button.sync_profile"), b -> {
+        addRenderableWidget(Button.builder(trText("button.sync_profile"), b -> {
                 this.mod.runProfileCommand();
             })
-            .dimensions(x + PROFILE_SYNC_BUTTON_X_OFFSET, y + 1, PROFILE_SYNC_BUTTON_WIDTH, 18)
+            .bounds(x + PROFILE_SYNC_BUTTON_X_OFFSET, y + 1, PROFILE_SYNC_BUTTON_WIDTH, 18)
             .build());
     }
 
@@ -776,42 +906,42 @@ public final class MinepieceMenuScreen extends Screen {
         int x = this.contentX;
         int y = this.contentY;
 
-        addDrawableChild(CheckboxWidget.builder(Text.empty(), this.textRenderer)
-            .pos(x + LANGUAGE_MASTER_CHECKBOX_X_OFFSET, y + LANGUAGE_MASTER_CHECKBOX_Y_OFFSET).checked(cfg.chatTranslationEnabled)
-            .callback((box, checked) -> {
+        addRenderableWidget(Checkbox.builder(Component.empty(), this.font)
+            .pos(x + LANGUAGE_MASTER_CHECKBOX_X_OFFSET, y + LANGUAGE_MASTER_CHECKBOX_Y_OFFSET).selected(cfg.chatTranslationEnabled)
+            .onValueChange((box, checked) -> {
                 this.mod.setChatTranslationEnabled(checked);
                 enforceTranslationRouteGuard();
                 rebuild();
             })
             .build());
 
-        addDrawableChild(CheckboxWidget.builder(Text.empty(), this.textRenderer)
-            .pos(x + LANGUAGE_AGGRESSIVE_CHECKBOX_X_OFFSET, y + LANGUAGE_MASTER_CHECKBOX_Y_OFFSET).checked(cfg.chatTranslationAggressiveEnabled)
-            .callback((box, checked) -> {
+        addRenderableWidget(Checkbox.builder(Component.empty(), this.font)
+            .pos(x + LANGUAGE_AGGRESSIVE_CHECKBOX_X_OFFSET, y + LANGUAGE_MASTER_CHECKBOX_Y_OFFSET).selected(cfg.chatTranslationAggressiveEnabled)
+            .onValueChange((box, checked) -> {
                 this.mod.setChatTranslationAggressiveEnabled(checked);
                 rebuild();
             })
             .build());
 
-        addDrawableChild(CheckboxWidget.builder(Text.empty(), this.textRenderer)
-            .pos(x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET, y + LANGUAGE_PUBLIC_CHECKBOX_Y_OFFSET).checked(cfg.chatTranslationPublicEnabled)
-            .callback((box, checked) -> {
+        addRenderableWidget(Checkbox.builder(Component.empty(), this.font)
+            .pos(x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET, y + LANGUAGE_PUBLIC_CHECKBOX_Y_OFFSET).selected(cfg.chatTranslationPublicEnabled)
+            .onValueChange((box, checked) -> {
                 this.mod.setChatTranslationPublicEnabled(checked);
                 enforceTranslationRouteGuard();
                 rebuild();
             })
             .build());
-        addDrawableChild(CheckboxWidget.builder(Text.empty(), this.textRenderer)
-            .pos(x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET, y + LANGUAGE_PRIVATE_CHECKBOX_Y_OFFSET).checked(cfg.chatTranslationPrivateEnabled)
-            .callback((box, checked) -> {
+        addRenderableWidget(Checkbox.builder(Component.empty(), this.font)
+            .pos(x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET, y + LANGUAGE_PRIVATE_CHECKBOX_Y_OFFSET).selected(cfg.chatTranslationPrivateEnabled)
+            .onValueChange((box, checked) -> {
                 this.mod.setChatTranslationPrivateEnabled(checked);
                 enforceTranslationRouteGuard();
                 rebuild();
             })
             .build());
-        addDrawableChild(CheckboxWidget.builder(Text.empty(), this.textRenderer)
-            .pos(x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET, y + LANGUAGE_SYSTEM_CHECKBOX_Y_OFFSET).checked(cfg.chatTranslationSystemEnabled)
-            .callback((box, checked) -> {
+        addRenderableWidget(Checkbox.builder(Component.empty(), this.font)
+            .pos(x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET, y + LANGUAGE_SYSTEM_CHECKBOX_Y_OFFSET).selected(cfg.chatTranslationSystemEnabled)
+            .onValueChange((box, checked) -> {
                 this.mod.setChatTranslationSystemEnabled(checked);
                 enforceTranslationRouteGuard();
                 rebuild();
@@ -823,39 +953,39 @@ public final class MinepieceMenuScreen extends Screen {
         int fromArrowY = fromRowY + (LANGUAGE_SELECTOR_ROW_HEIGHT - LANGUAGE_SELECTOR_BUTTON_HEIGHT) / 2;
         int toArrowY = toRowY + (LANGUAGE_SELECTOR_ROW_HEIGHT - LANGUAGE_SELECTOR_BUTTON_HEIGHT) / 2;
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("<"), b -> {
+        addRenderableWidget(Button.builder(Component.literal("<"), b -> {
                 this.translationSourceIndex = Math.floorMod(this.translationSourceIndex - 1, languages.size());
                 rebuild();
             })
-            .dimensions(x + LANGUAGE_SELECTOR_LEFT_BUTTON_X_OFFSET, fromArrowY, LANGUAGE_SELECTOR_BUTTON_WIDTH, LANGUAGE_SELECTOR_BUTTON_HEIGHT)
+            .bounds(x + LANGUAGE_SELECTOR_LEFT_BUTTON_X_OFFSET, fromArrowY, LANGUAGE_SELECTOR_BUTTON_WIDTH, LANGUAGE_SELECTOR_BUTTON_HEIGHT)
             .build());
-        addDrawableChild(ButtonWidget.builder(Text.literal(">"), b -> {
+        addRenderableWidget(Button.builder(Component.literal(">"), b -> {
                 this.translationSourceIndex = Math.floorMod(this.translationSourceIndex + 1, languages.size());
                 rebuild();
             })
-            .dimensions(x + LANGUAGE_SELECTOR_RIGHT_BUTTON_X_OFFSET, fromArrowY, LANGUAGE_SELECTOR_BUTTON_WIDTH, LANGUAGE_SELECTOR_BUTTON_HEIGHT)
+            .bounds(x + LANGUAGE_SELECTOR_RIGHT_BUTTON_X_OFFSET, fromArrowY, LANGUAGE_SELECTOR_BUTTON_WIDTH, LANGUAGE_SELECTOR_BUTTON_HEIGHT)
             .build());
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("<"), b -> {
+        addRenderableWidget(Button.builder(Component.literal("<"), b -> {
                 this.translationTargetIndex = Math.floorMod(this.translationTargetIndex - 1, languages.size());
                 rebuild();
             })
-            .dimensions(x + LANGUAGE_SELECTOR_LEFT_BUTTON_X_OFFSET, toArrowY, LANGUAGE_SELECTOR_BUTTON_WIDTH, LANGUAGE_SELECTOR_BUTTON_HEIGHT)
+            .bounds(x + LANGUAGE_SELECTOR_LEFT_BUTTON_X_OFFSET, toArrowY, LANGUAGE_SELECTOR_BUTTON_WIDTH, LANGUAGE_SELECTOR_BUTTON_HEIGHT)
             .build());
-        addDrawableChild(ButtonWidget.builder(Text.literal(">"), b -> {
+        addRenderableWidget(Button.builder(Component.literal(">"), b -> {
                 this.translationTargetIndex = Math.floorMod(this.translationTargetIndex + 1, languages.size());
                 rebuild();
             })
-            .dimensions(x + LANGUAGE_SELECTOR_RIGHT_BUTTON_X_OFFSET, toArrowY, LANGUAGE_SELECTOR_BUTTON_WIDTH, LANGUAGE_SELECTOR_BUTTON_HEIGHT)
+            .bounds(x + LANGUAGE_SELECTOR_RIGHT_BUTTON_X_OFFSET, toArrowY, LANGUAGE_SELECTOR_BUTTON_WIDTH, LANGUAGE_SELECTOR_BUTTON_HEIGHT)
             .build());
 
-        addDrawableChild(ButtonWidget.builder(trText("button.add_rule"), b -> {
+        addRenderableWidget(Button.builder(trText("button.add_rule"), b -> {
                 ChatTranslationManager.LanguageOption source = languages.get(this.translationSourceIndex);
                 ChatTranslationManager.LanguageOption target = languages.get(this.translationTargetIndex);
                 this.mod.addChatTranslationRule(source.code(), target.code());
                 rebuild();
             })
-            .dimensions(x + this.contentWidth - LANGUAGE_ADD_RULE_WIDTH, y + LANGUAGE_ADD_RULE_Y_OFFSET, LANGUAGE_ADD_RULE_WIDTH, LANGUAGE_ADD_RULE_HEIGHT)
+            .bounds(x + this.contentWidth - LANGUAGE_ADD_RULE_WIDTH, y + LANGUAGE_ADD_RULE_Y_OFFSET, LANGUAGE_ADD_RULE_WIDTH, LANGUAGE_ADD_RULE_HEIGHT)
             .build());
 
         int listY = y + LANGUAGE_RULES_LIST_Y_OFFSET;
@@ -871,11 +1001,11 @@ public final class MinepieceMenuScreen extends Screen {
             int rowY = listY + (i - this.translationRulesOffset) * LANGUAGE_RULE_ROW_STEP;
             int index = i;
             int toggleY = rowY + (LANGUAGE_RULE_ROW_HEIGHT - LANGUAGE_RULE_TOGGLE_HEIGHT) / 2;
-            addDrawableChild(ButtonWidget.builder(Text.literal(rule.enabled ? tr("button.on") : tr("button.off")), b -> {
+            addRenderableWidget(Button.builder(Component.literal(rule.enabled ? tr("button.on") : tr("button.off")), b -> {
                     this.mod.setChatTranslationRuleEnabled(index, !rule.enabled);
                     rebuild();
                 })
-                .dimensions(x + this.contentWidth - 64, toggleY, LANGUAGE_RULE_TOGGLE_WIDTH, LANGUAGE_RULE_TOGGLE_HEIGHT)
+                .bounds(x + this.contentWidth - 64, toggleY, LANGUAGE_RULE_TOGGLE_WIDTH, LANGUAGE_RULE_TOGGLE_HEIGHT)
                 .build());
             addRemoveButton(x + this.contentWidth - REMOVE_BUTTON_SIZE - REMOVE_BUTTON_GAP_RIGHT, rowY, LANGUAGE_RULE_ROW_HEIGHT, () -> {
                     this.mod.removeChatTranslationRule(index);
@@ -884,19 +1014,19 @@ public final class MinepieceMenuScreen extends Screen {
         }
 
         if (totalSize > maxRows) {
-            addDrawableChild(ButtonWidget.builder(Text.literal("^"), b -> {
+            addRenderableWidget(Button.builder(Component.literal("^"), b -> {
                     this.translationRulesOffset = Math.max(0, this.translationRulesOffset - maxRows);
                     rebuild();
                 })
-                .dimensions(x + this.contentWidth - 96, listY, 20, 12)
+                .bounds(x + this.contentWidth - 96, listY, 20, 12)
                 .build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("v"), b -> {
+            addRenderableWidget(Button.builder(Component.literal("v"), b -> {
                     if (this.translationRulesOffset + maxRows < totalSize) {
                         this.translationRulesOffset += maxRows;
                     }
                     rebuild();
                 })
-                .dimensions(x + this.contentWidth - 96, listY + 14, 20, 12)
+                .bounds(x + this.contentWidth - 96, listY + 14, 20, 12)
                 .build());
         }
     }
@@ -942,40 +1072,138 @@ public final class MinepieceMenuScreen extends Screen {
         return -1;
     }
 
-    private void buildOtherTab() {
+    private void buildExtrasTab() {
+        var cfg = this.mod.getConfig();
+        section("menu.section.item_icons");
+        describedSwitch("setting.rarity_icons", cfg.rarityIconsEnabled, this.mod::setRarityIconsEnabled);
+        describedSwitch("setting.pet_icons", cfg.petStatIconsEnabled, this.mod::setPetStatIconsEnabled);
+        describedSwitch("extras.hotbar", cfg.hotbarRarityEnabled, v -> cfg.hotbarRarityEnabled = v);
+        section("menu.section.tooltips");
+        describedSwitch("extras.minion", cfg.minionCalculatorEnabled, v -> cfg.minionCalculatorEnabled = v);
+        describedSwitch("extras.pet_rolls", cfg.petRollsEnabled, v -> cfg.petRollsEnabled = v);
+        section("menu.section.storage");
+        describedSwitch("extras.rarity_filter", cfg.rarityFilterEnabled, v -> cfg.rarityFilterEnabled = v);
+        describedSwitch("extras.sorting", cfg.inventorySortingEnabled, v -> cfg.inventorySortingEnabled = v);
+        section("menu.section.help");
+        sectionButton(trText("extras.help"), b -> this.minecraft.gui.setScreen(new HelpScreen(this.mod, this)));
+    }
+
+    private void buildCookingTab() {
         ConfigManager.ModConfig cfg = this.mod.getConfig();
         int x = this.contentX;
-        int y = this.contentY;
+        int y = this.contentY + 8;
+        addRenderableWidget(Checkbox.builder(trText("hud.panel.cooking"), this.font)
+            .pos(x, y).selected(cfg.cookingHudEnabled)
+            .onValueChange((box, checked) -> { cfg.cookingHudEnabled = checked; this.mod.saveConfig(); }).build());
+        addRenderableWidget(Button.builder(Component.literal("−"), button -> {
+            cfg.cookingQuantity = Math.max(1, cfg.cookingQuantity - 1);
+            this.mod.saveConfig();
+            rebuild();
+        }).bounds(x, y + 30, 24, 20).build());
+        EditBox quantity = new EditBox(this.font, x + 32, y + 30, 48, 20, trText("cooking.quantity"));
+        quantity.setMaxLength(2);
+        quantity.setValue(Integer.toString(cfg.cookingQuantity));
+        quantity.setResponder(value -> {
+            if (value.matches("[0-9]{1,2}") && Integer.parseInt(value) >= 1 && Integer.parseInt(value) <= 64) {
+                cfg.cookingQuantity = Integer.parseInt(value);
+                this.mod.saveConfig();
+            }
+        });
+        addRenderableWidget(quantity);
+        addRenderableWidget(Button.builder(Component.literal("+"), button -> {
+            cfg.cookingQuantity = Math.min(64, cfg.cookingQuantity + 1);
+            this.mod.saveConfig();
+            rebuild();
+        }).bounds(x + 88, y + 30, 24, 20).build());
+        addRenderableWidget(Button.builder(trText("cooking.clear"), button -> this.mod.getCookingTracker().clear())
+            .bounds(x, y + 60, 158, 20).build());
+        addRenderableWidget(Button.builder(trText("button.edit_hud_layout"), button -> this.mod.openHudLayoutEditor())
+            .bounds(x + 166, y + 60, 162, 20).build());
+    }
 
-        addDrawableChild(CheckboxWidget.builder(trText("setting.auction_highlight"), this.textRenderer)
-            .pos(x, y).checked(cfg.auctionHighlightEnabled)
-            .callback((box, checked) -> this.mod.setAuctionHighlightEnabled(checked))
-            .build());
+    private void buildProgressTab() {
+        ConfigManager.ModConfig cfg = this.mod.getConfig();
+        section("menu.section.panels");
+        describedSwitch("hud.panel.profile_xp", cfg.profileXpHudEnabled, v -> cfg.profileXpHudEnabled = v);
+        describedSwitch("setting.xp_hud", cfg.inventoryXpHudEnabled, this.mod::setInventoryXpHudEnabled);
+        describedSwitch("hud.panel.grinding", cfg.grindingHudEnabled, v -> cfg.grindingHudEnabled = v);
+        section("menu.section.actions");
+        sectionButtons(trText("button.sync_profile"), button -> this.mod.runProfileCommand(),
+            trText("grinding.reset"), button -> {
+                this.mod.getProgressHudController().grinding().reset();
+                this.mod.getProgressHudController().grinding().observeProfileXp(
+                    this.mod.getProgressHudController().profile().getGainedXp(), System.currentTimeMillis());
+            });
+        sectionButton(trText("button.edit_hud_layout"), button -> this.mod.openHudLayoutEditor());
+        section("menu.section.tips");
+        sectionText(tr("progress.sync_hint"));
+        sectionText(tr("grinding.pause_hint"));
+        sectionText(tr("progress.estimate_hint"));
+    }
 
-        addDrawableChild(CheckboxWidget.builder(trText("setting.haki_cooldown"), this.textRenderer)
-            .pos(x, y + 24).checked(cfg.hakiEnabled)
-            .callback((box, checked) -> this.mod.setHakiEnabled(checked))
-            .build());
+    private void resetSections() {
+        this.sections.clear();
+        this.sectionTexts.clear();
+        this.switchDescriptions.clear();
+        this.layoutY = 0;
+        this.openSection = null;
+    }
 
-        addDrawableChild(CheckboxWidget.builder(trText("setting.rarity_icons"), this.textRenderer)
-            .pos(x, y + 48).checked(cfg.rarityIconsEnabled)
-            .callback((box, checked) -> this.mod.setRarityIconsEnabled(checked))
-            .build());
+    /** Starts a titled box; rows added after it stack inside until the next section. */
+    private void section(String titleKey) {
+        endSection();
+        this.openSection = tr(titleKey);
+        this.openSectionTop = this.layoutY;
+        this.layoutY += SECTION_HEADER + 2;
+    }
 
-        addDrawableChild(CheckboxWidget.builder(trText("setting.pet_icons"), this.textRenderer)
-            .pos(x, y + 72).checked(cfg.petStatIconsEnabled)
-            .callback((box, checked) -> this.mod.setPetStatIconsEnabled(checked))
-            .build());
+    private void endSection() {
+        if (this.openSection == null) return;
+        this.layoutY += 2;
+        this.sections.add(new Section(this.openSection, this.openSectionTop, this.layoutY));
+        this.layoutY += SECTION_GAP;
+        this.openSection = null;
+    }
 
-        addDrawableChild(CheckboxWidget.builder(trText("setting.scrolls_hud"), this.textRenderer)
-            .pos(x, y + 96).checked(cfg.scrollsEnabled)
-            .callback((box, checked) -> this.mod.setScrollsEnabled(checked))
-            .build());
+    /** A switch row; its description is the label key + ".desc" when that text exists. */
+    private void describedSwitch(String labelKey, boolean value, java.util.function.Consumer<Boolean> setter) {
+        Checkbox box = Checkbox.builder(trText(labelKey), this.font).pos(this.contentX + SECTION_INSET, this.contentY + this.layoutY)
+            .selected(value).onValueChange((b, checked) -> { setter.accept(checked); this.mod.saveConfig(); }).build();
+        addRenderableWidget(box);
+        boolean described = UiLocalization.has(labelKey + ".desc");
+        if (described) this.switchDescriptions.put(box, tr(labelKey + ".desc"));
+        this.layoutY += described ? 23 : 16;
+    }
 
-        addDrawableChild(CheckboxWidget.builder(trText("setting.xp_hud"), this.textRenderer)
-            .pos(x, y + 120).checked(cfg.inventoryXpHudEnabled)
-            .callback((box, checked) -> this.mod.setInventoryXpHudEnabled(checked))
-            .build());
+    private void sectionButton(Component label, Button.OnPress onPress) {
+        addRenderableWidget(Button.builder(label, onPress).bounds(this.contentX + SECTION_INSET, this.contentY + this.layoutY + 2,
+            this.contentWidth - 6 - SECTION_INSET * 2, 16).build());
+        this.layoutY += 20;
+    }
+
+    private void sectionButtons(Component left, Button.OnPress onLeft, Component right, Button.OnPress onRight) {
+        int width = (this.contentWidth - 6 - SECTION_INSET * 2 - 4) / 2;
+        addRenderableWidget(Button.builder(left, onLeft).bounds(this.contentX + SECTION_INSET, this.contentY + this.layoutY + 2, width, 16).build());
+        addRenderableWidget(Button.builder(right, onRight).bounds(this.contentX + SECTION_INSET + width + 4, this.contentY + this.layoutY + 2, width, 16).build());
+        this.layoutY += 20;
+    }
+
+    private void sectionText(String text) {
+        this.sectionTexts.add(new SectionText(text, this.layoutY + 2));
+        this.layoutY += 11;
+    }
+
+    private void drawSections(GuiGraphicsExtractor drawContext) {
+        int x = this.contentX, width = this.contentWidth - 6;
+        for (Section section : this.sections) {
+            int top = this.contentY + section.top(), bottom = this.contentY + section.bottom();
+            drawContext.fill(x, top, x + width, bottom, COLOR_ROW_BOX);
+            drawOutline(drawContext, x, top, width, bottom - top, COLOR_DIVIDER);
+            drawFittedText(drawContext, section.title().toUpperCase(Locale.ROOT), x + 5, top + 4, width - 10, GOLD);
+            drawContext.fill(x + 1, top + SECTION_HEADER, x + width - 1, top + SECTION_HEADER + 1, COLOR_DIVIDER);
+        }
+        for (SectionText text : this.sectionTexts)
+            drawFittedText(drawContext, text.text(), x + SECTION_INSET + 2, this.contentY + text.y(), width - SECTION_INSET * 2 - 4, COLOR_TEXT_DIM);
     }
 
     private void rebuild() {
@@ -983,76 +1211,82 @@ public final class MinepieceMenuScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext drawContext, int mouseX, int mouseY, float deltaTicks) {
+    public void extractRenderState(GuiGraphicsExtractor drawContext, int mouseX, int mouseY, float deltaTicks) {
+        drawContext.pose().pushMatrix();
+        drawContext.pose().scale(menuScale, menuScale);
+        extractMenuState(drawContext, (int) (mouseX / menuScale), (int) (mouseY / menuScale), deltaTicks);
+        drawContext.pose().popMatrix();
+    }
+
+    private void extractMenuState(GuiGraphicsExtractor drawContext, int mouseX, int mouseY, float deltaTicks) {
+        refreshPalette();
         // Dark transparent overlay
-        drawContext.fill(0, 0, this.width, this.height, COLOR_BG_OVERLAY);
+        drawContext.fill(0, 0, Math.round(this.width / menuScale), Math.round(this.height / menuScale), COLOR_BG_OVERLAY);
 
         // Sapphire panel
         drawSapphirePanel(drawContext);
 
         // Sidebar background
-        drawContext.fill(this.panelX + 4, this.panelY + 28, this.panelX + SIDEBAR_WIDTH, this.panelY + PANEL_HEIGHT - 4, COLOR_SIDEBAR_BG);
-        drawDivider(drawContext, this.panelX + SIDEBAR_WIDTH + 1, this.panelY + 28, this.panelX + SIDEBAR_WIDTH + 2, this.panelY + PANEL_HEIGHT - 4);
+        drawContext.fill(this.panelX + 4, this.panelY + 28, this.panelX + SIDEBAR_WIDTH, this.panelY + this.panelHeight - 4, COLOR_SIDEBAR_BG);
+        drawDivider(drawContext, this.panelX + SIDEBAR_WIDTH + 1, this.panelY + 28, this.panelX + SIDEBAR_WIDTH + 2, this.panelY + this.panelHeight - 4);
 
-        // Section title
-        drawContext.drawCenteredTextWithShadow(this.textRenderer, this.currentTab.label(this), this.panelX + PANEL_WIDTH / 2, this.panelY + 10, COLOR_HEADER);
+        drawTitleBar(drawContext);
 
-        // Sidebar tabs
+        // Sidebar search and tabs
+        this.searchBox.extractRenderState(drawContext, mouseX, mouseY, deltaTicks);
         for (TabButton button : this.tabButtons) {
-            button.render(drawContext, mouseX, mouseY);
+            button.extractRenderState(drawContext, mouseX, mouseY);
         }
 
         // Close (X) button top-right
         drawCloseButton(drawContext, mouseX, mouseY);
 
-        drawContext.fill(this.contentX, this.panelY + 30, this.contentX + this.contentWidth, this.panelY + 31, COLOR_DIVIDER);
 
+        drawSubpages(drawContext, mouseX, mouseY);
+        drawContext.enableScissor(contentX, contentTop, contentX + contentWidth, contentBottom);
+        updateContentVisibility();
         // Render tab-specific decorations (labels for fields, etc.) before widgets
         renderTabDecorations(drawContext, mouseX, mouseY);
 
         // Widgets
-        super.render(drawContext, mouseX, mouseY, deltaTicks);
+        super.extractRenderState(drawContext, mouseX, mouseY, deltaTicks);
 
         // Restyle default buttons and then custom remove buttons
-        drawStyledVanillaButtons(drawContext, mouseX, mouseY);
         drawRemoveButtons(drawContext, mouseX, mouseY);
+        drawContext.disableScissor();
+        if (maxPageScroll > 0) {
+            int viewport = contentBottom - contentTop;
+            int thumb = Math.max(12, viewport * viewport / (viewport + maxPageScroll));
+            int top = contentTop + (viewport - thumb) * pageScroll.getOrDefault(currentTab, 0) / maxPageScroll;
+            drawContext.fill(contentX + contentWidth - 2, top, contentX + contentWidth, top + thumb, COLOR_HEADER);
+        }
 
-        // Credits bottom right
-        String credits = tr("menu.credits");
-        int cw = this.textRenderer.getWidth(credits);
-        drawContext.drawTextWithShadow(this.textRenderer, credits, this.panelX + PANEL_WIDTH - cw - 8, this.panelY + PANEL_HEIGHT - 12, COLOR_TEXT_DIM);
+        drawFooter(drawContext);
 
         if (this.resetHudLayoutConfirmOpen) {
             drawResetHudConfirmPopup(drawContext, mouseX, mouseY);
         }
     }
 
-    private void renderTabDecorations(DrawContext drawContext, int mouseX, int mouseY) {
-        TextRenderer renderer = this.textRenderer;
+    private void renderTabDecorations(GuiGraphicsExtractor drawContext, int mouseX, int mouseY) {
+        Font renderer = this.font;
         int x = this.contentX;
+        if (isSearching()) {
+            if (children().stream().noneMatch(child -> child instanceof ThemedButton))
+                drawFittedText(drawContext, tr("menu.search_none"), x, contentY + 4, contentWidth - 4, COLOR_TEXT_DIM);
+            return;
+        }
+        drawSections(drawContext);
         switch (this.currentTab) {
-            case MAIN -> {
-                int compactShift = this.mod.isDebugToolsAvailable() ? 0 : MAIN_COMPACT_SHIFT_NO_DEBUG;
-                int languageRowY = this.contentY + 8 + MAIN_LANGUAGE_ROW_Y_OFFSET + compactShift;
-                List<UiLocalization.LanguageOption> uiLanguages = this.mod.getSupportedUiLanguages();
-                if (!uiLanguages.isEmpty()) {
-                    int idx = clampLanguageIndex(this.uiLanguageIndex, uiLanguages.size());
-                    int labelBoxWidth = MAIN_COLOR_LEFT_BUTTON_X_OFFSET - 8;
-                    int valueBoxX = x + MAIN_COLOR_LEFT_BUTTON_X_OFFSET + MAIN_COLOR_BUTTON_WIDTH + 4;
-                    int valueBoxWidth = MAIN_COLOR_RIGHT_BUTTON_X_OFFSET - (MAIN_COLOR_LEFT_BUTTON_X_OFFSET + MAIN_COLOR_BUTTON_WIDTH) - 8;
-                    drawRowBox(drawContext, x, languageRowY, this.contentWidth - 4, LIST_ROW_HEIGHT);
-                    drawFittedCenteredText(drawContext, this.tr("main.mod_language"), x + 2, languageRowY, labelBoxWidth, LIST_ROW_HEIGHT, COLOR_TEXT);
-                    drawFittedCenteredText(drawContext, uiLanguages.get(idx).label(), valueBoxX, languageRowY, valueBoxWidth, LIST_ROW_HEIGHT, COLOR_HEADER);
-                }
-                drawHudColorSection(drawContext, x, this.contentY + 8 + MAIN_PANEL_COLORS_Y_OFFSET + compactShift);
-            }
+            case MAIN -> { } // the save shortcut is in the footer now
             case BOSSES -> {
+                drawFittedCenteredText(drawContext, this.tr("bosses.collapse_hint"), x, this.contentY + 35, this.contentWidth - 4, 10, COLOR_TEXT);
                 int activeListY = this.contentY + BOSSES_ACTIVE_LIST_Y_OFFSET;
                 int activeListBottom = activeListY + BOSSES_ACTIVE_LIST_HEIGHT;
                 int registryListY = activeListBottom + BOSSES_REGISTRY_GAP;
-                drawContext.drawTextWithShadow(renderer, this.tr("bosses.tracked_by_spawn"), x, this.contentY + BOSSES_ACTIVE_LABEL_Y_OFFSET, COLOR_TEXT);
+                drawContext.text(renderer, this.tr("bosses.tracked_by_spawn"), x, this.contentY + BOSSES_ACTIVE_LABEL_Y_OFFSET, COLOR_TEXT);
                 drawBossActiveLabels(drawContext, x, activeListY);
-                drawContext.drawTextWithShadow(renderer, this.tr("bosses.registry"), x, registryListY - BOSSES_REGISTRY_LABEL_OFFSET, COLOR_TEXT);
+                drawContext.text(renderer, this.tr("bosses.registry"), x, registryListY - BOSSES_REGISTRY_LABEL_OFFSET, COLOR_TEXT);
                 drawBossRegistryLabels(drawContext, x, registryListY);
             }
             case MONEY -> {
@@ -1066,10 +1300,12 @@ public final class MinepieceMenuScreen extends Screen {
                 drawFittedCenteredText(drawContext, this.tr("money.made_today"), x + 2, fy + LIST_ROW_STEP, labelBoxWidth, LIST_ROW_HEIGHT, COLOR_TEXT);
                 drawFittedCenteredText(drawContext, this.tr("money.ah_sold"), x + 2, fy + LIST_ROW_STEP * 2, labelBoxWidth, LIST_ROW_HEIGHT, COLOR_TEXT);
                 drawFittedCenteredText(drawContext, this.tr("money.ah_bought"), x + 2, fy + LIST_ROW_STEP * 3, labelBoxWidth, LIST_ROW_HEIGHT, COLOR_TEXT);
-                drawContext.drawTextWithShadow(renderer, this.tr("money.receipts_latest"), x, fy + MONEY_RECEIPTS_TITLE_Y_OFFSET, COLOR_HEADER);
+                drawContext.text(renderer, this.tr("money.receipts_latest"), x, fy + MONEY_RECEIPTS_TITLE_Y_OFFSET, COLOR_HEADER);
                 drawMoneyHistoryLabels(drawContext, x, fy + MONEY_RECEIPTS_LIST_Y_OFFSET);
             }
             case JOBS -> {
+                drawFittedCenteredText(drawContext, this.tr("jobs.estimated_hint"), x,
+                    this.contentY + JOBS_TABLE_Y_OFFSET + 4 * JOBS_ROW_STEP + 30, this.contentWidth - 4, 10, COLOR_TEXT);
                 int rowY = this.contentY + JOBS_TABLE_Y_OFFSET;
                 int headerY = rowY - JOBS_ROW_STEP;
                 int jobColWidth = JOBS_LEVEL_X_OFFSET - 6;
@@ -1088,7 +1324,7 @@ public final class MinepieceMenuScreen extends Screen {
             case EVENTS -> {
                 int formY = this.contentY + 26;
                 drawRowBox(drawContext, x, formY, this.contentWidth - 4, LIST_ROW_HEIGHT);
-                drawContext.drawTextWithShadow(renderer, this.tr("events.existing"), x, formY + EVENTS_LIST_TITLE_Y_OFFSET, COLOR_HEADER);
+                drawContext.text(renderer, this.tr("events.existing"), x, formY + EVENTS_LIST_TITLE_Y_OFFSET, COLOR_HEADER);
                 drawEventsLabels(drawContext, x, formY + EVENTS_LIST_START_Y_OFFSET);
             }
             case PROFILE -> {
@@ -1103,13 +1339,13 @@ public final class MinepieceMenuScreen extends Screen {
             case LANGUAGE -> {
                 List<ChatTranslationManager.LanguageOption> languages = this.mod.getSupportedChatLanguages();
                 if (languages.isEmpty()) {
-                    drawContext.drawTextWithShadow(renderer, this.tr("language.no_languages"), x, this.contentY + 24, COLOR_TEXT_DIM);
+                    drawContext.text(renderer, this.tr("language.no_languages"), x, this.contentY + 24, COLOR_TEXT_DIM);
                 } else {
-                    drawContext.drawTextWithShadow(renderer, this.tr("setting.chat_translate"), x + LANGUAGE_MASTER_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_MASTER_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
-                    drawContext.drawTextWithShadow(renderer, this.tr("setting.translate_aggressive"), x + LANGUAGE_AGGRESSIVE_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_MASTER_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
-                    drawContext.drawTextWithShadow(renderer, this.tr("setting.translate_public"), x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_PUBLIC_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
-                    drawContext.drawTextWithShadow(renderer, this.tr("setting.translate_private"), x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_PRIVATE_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
-                    drawContext.drawTextWithShadow(renderer, this.tr("setting.translate_system"), x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_SYSTEM_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
+                    drawContext.text(renderer, this.tr("setting.chat_translate"), x + LANGUAGE_MASTER_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_MASTER_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
+                    drawContext.text(renderer, this.tr("setting.translate_aggressive"), x + LANGUAGE_AGGRESSIVE_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_MASTER_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
+                    drawContext.text(renderer, this.tr("setting.translate_public"), x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_PUBLIC_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
+                    drawContext.text(renderer, this.tr("setting.translate_private"), x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_PRIVATE_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
+                    drawContext.text(renderer, this.tr("setting.translate_system"), x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_SYSTEM_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
                     ConfigManager.ModConfig cfg = this.mod.getConfig();
                     if (!hasAnyTranslationRoutesEnabled(cfg)) {
                         drawFittedText(
@@ -1133,29 +1369,21 @@ public final class MinepieceMenuScreen extends Screen {
                     drawFittedCenteredText(drawContext, languages.get(source).label(), x + LANGUAGE_SELECTOR_VALUE_X_OFFSET, fromRowY, selectorValueBoxWidth, LANGUAGE_SELECTOR_ROW_HEIGHT, COLOR_HEADER);
                     drawFittedCenteredText(drawContext, this.tr("language.to"), x + 2, toRowY, selectorLabelBoxWidth, LANGUAGE_SELECTOR_ROW_HEIGHT, COLOR_TEXT);
                     drawFittedCenteredText(drawContext, languages.get(target).label(), x + LANGUAGE_SELECTOR_VALUE_X_OFFSET, toRowY, selectorValueBoxWidth, LANGUAGE_SELECTOR_ROW_HEIGHT, COLOR_HEADER);
-                    drawContext.drawTextWithShadow(renderer, this.tr("language.active_rules"), x, this.contentY + LANGUAGE_RULES_TITLE_Y_OFFSET, COLOR_HEADER);
+                    drawContext.text(renderer, this.tr("language.active_rules"), x, this.contentY + LANGUAGE_RULES_TITLE_Y_OFFSET, COLOR_HEADER);
                     drawTranslationRuleLabels(drawContext, x, this.contentY + LANGUAGE_RULES_LIST_Y_OFFSET);
                 }
             }
-            case AUCTION_HOUSE -> {
-                int boxY = this.contentY + 154;
-                drawRowBox(drawContext, x, boxY, this.contentWidth - 4, LIST_ROW_HEIGHT);
-                drawRowBox(drawContext, x, boxY + LIST_ROW_STEP, this.contentWidth - 4, LIST_ROW_HEIGHT);
-                drawRowBox(drawContext, x, boxY + LIST_ROW_STEP * 2, this.contentWidth - 4, LIST_ROW_HEIGHT);
-                drawFittedText(drawContext, this.tr("other.desc1"), x + LIST_TEXT_INSET, boxY + LIST_TEXT_BASELINE_OFFSET, this.contentWidth - 10, COLOR_TEXT_DIM);
-                drawFittedText(drawContext, this.tr("other.desc2"), x + LIST_TEXT_INSET, boxY + LIST_ROW_STEP + LIST_TEXT_BASELINE_OFFSET, this.contentWidth - 10, COLOR_TEXT_DIM);
-                drawFittedText(drawContext, this.tr("other.desc3"), x + LIST_TEXT_INSET, boxY + LIST_ROW_STEP * 2 + LIST_TEXT_BASELINE_OFFSET, this.contentWidth - 10, COLOR_TEXT_DIM);
-            }
-            case TELEMETRY -> {
-                drawContext.drawTextWithShadow(renderer, "Alerts", x, this.contentY + 82, COLOR_HEADER);
-                drawContext.drawTextWithShadow(renderer, "Discord webhook (stored locally, value hidden)", x, this.contentY + 162, COLOR_HEADER);
-                drawFittedText(drawContext, this.mod.getTelemetryManager().status(), x, this.contentY + 230, this.contentWidth - 6, COLOR_TEXT_DIM);
-                drawFittedText(drawContext, "Position and location tracking are disabled.", x, this.contentY + 246, this.contentWidth - 6, COLOR_TEXT_DIM);
+            case COOKING -> {
+                drawFittedText(drawContext, tr("cooking.quantity"), x + 124, this.contentY + 44, 204, COLOR_TEXT);
+                List<String> lines = this.mod.getCookingTracker().getHudLines(this.mod::tr, this.mod.getConfig().cookingQuantity);
+                for (int i = 0; i < Math.min(10, lines.size()); i++) {
+                    drawFittedText(drawContext, lines.get(i), x, this.contentY + 108 + i * 14, this.contentWidth - 4, COLOR_TEXT);
+                }
             }
         }
     }
 
-    private void drawBossActiveLabels(DrawContext drawContext, int x, int y) {
+    private void drawBossActiveLabels(GuiGraphicsExtractor drawContext, int x, int y) {
         List<TrackedBossRow> rows = buildTrackedBossRows();
         int maxRows = Math.max(1, BOSSES_ACTIVE_LIST_HEIGHT / BOSSES_ACTIVE_ROW_STEP);
         if (rows.isEmpty()) {
@@ -1288,7 +1516,7 @@ public final class MinepieceMenuScreen extends Screen {
         return remain <= 0L ? tr("common.ready") : formatTimer(remain);
     }
 
-    private void drawBossRegistryLabels(DrawContext drawContext, int x, int y) {
+    private void drawBossRegistryLabels(GuiGraphicsExtractor drawContext, int x, int y) {
         List<String> registry = new ArrayList<>(this.mod.getBossTracker().getBossRegistry());
         int maxRows = Math.max(1, BOSSES_REGISTRY_LIST_HEIGHT / BOSSES_REGISTRY_ROW_STEP);
         if (registry.isEmpty()) {
@@ -1305,7 +1533,7 @@ public final class MinepieceMenuScreen extends Screen {
         }
     }
 
-    private void drawMoneyHistoryLabels(DrawContext drawContext, int x, int y) {
+    private void drawMoneyHistoryLabels(GuiGraphicsExtractor drawContext, int x, int y) {
         List<PersistentState.Transaction> history = this.mod.getMoneyTracker().getHistory();
         int receiptsHeight = this.contentHeight - (y - this.contentY) - 4;
         int maxRows = Math.max(1, receiptsHeight / MONEY_RECEIPT_ROW_STEP);
@@ -1329,30 +1557,15 @@ public final class MinepieceMenuScreen extends Screen {
         }
     }
 
-    private void drawHudColorSection(DrawContext drawContext, int x, int y) {
-        drawContext.drawTextWithShadow(this.textRenderer, tr("main.panel_colors"), x, y, COLOR_HEADER);
-        int labelBoxWidth = MAIN_COLOR_LEFT_BUTTON_X_OFFSET - 8;
-        int valueBoxX = x + MAIN_COLOR_LEFT_BUTTON_X_OFFSET + MAIN_COLOR_BUTTON_WIDTH + 4;
-        int valueBoxWidth = MAIN_COLOR_RIGHT_BUTTON_X_OFFSET - (MAIN_COLOR_LEFT_BUTTON_X_OFFSET + MAIN_COLOR_BUTTON_WIDTH) - 8;
-        for (int i = 0; i < HUD_COLOR_PANEL_IDS.length; i++) {
-            int panelId = HUD_COLOR_PANEL_IDS[i];
-            int rowY = y + 16 + i * MAIN_COLOR_ROW_STEP;
-            drawRowBox(drawContext, x, rowY, this.contentWidth - 4, MAIN_COLOR_ROW_HEIGHT);
-            String panelName = this.mod.getHudPanelName(panelId);
-            String color = prettyColorName(this.mod.getHudPanelColor(panelId));
-            drawFittedCenteredText(drawContext, panelName, x + 2, rowY, labelBoxWidth, MAIN_COLOR_ROW_HEIGHT, COLOR_TEXT);
-            drawFittedCenteredText(drawContext, color, valueBoxX, rowY, valueBoxWidth, MAIN_COLOR_ROW_HEIGHT, COLOR_HEADER);
-        }
-    }
 
-    private void drawEventsLabels(DrawContext drawContext, int x, int y) {
+    private void drawEventsLabels(GuiGraphicsExtractor drawContext, int x, int y) {
         List<PersistentState.ScheduledEvent> events = this.mod.getEventCountdownTracker().getRawEvents();
         int listHeight = this.contentHeight - (y - this.contentY) - 4;
         int maxRows = Math.max(1, listHeight / EVENTS_ROW_STEP);
         int totalSize = events.size();
         if (totalSize == 0) {
             drawRowBox(drawContext, x, y, this.contentWidth - 4, EVENTS_ROW_HEIGHT);
-            drawContext.drawTextWithShadow(this.textRenderer, tr("bosses.none"), x, y + 2, COLOR_TEXT_DIM);
+            drawContext.text(this.font, tr("bosses.none"), x, y + 2, COLOR_TEXT_DIM);
             return;
         }
         int end = Math.min(totalSize, this.eventsOffset + maxRows);
@@ -1365,7 +1578,7 @@ public final class MinepieceMenuScreen extends Screen {
         }
     }
 
-    private void drawTranslationRuleLabels(DrawContext drawContext, int x, int y) {
+    private void drawTranslationRuleLabels(GuiGraphicsExtractor drawContext, int x, int y) {
         List<ConfigManager.ModConfig.ChatTranslationRule> rules = this.mod.getConfig().chatTranslationRules;
         int listHeight = this.contentHeight - (y - this.contentY) - 4;
         int maxRows = Math.max(1, listHeight / LANGUAGE_RULE_ROW_STEP);
@@ -1398,25 +1611,63 @@ public final class MinepieceMenuScreen extends Screen {
         this.removeActions.add(new RemoveAction(x, buttonY, onPress));
     }
 
-    private void drawFittedText(DrawContext drawContext, String raw, int x, int y, int maxWidth, int color) {
+    private void drawTitleBar(GuiGraphicsExtractor drawContext) {
+        drawContext.fill(this.panelX + 1, this.panelY + 24, this.panelX + PANEL_WIDTH - 1, this.panelY + 25, GOLD);
+        String brand = "Minepiece QoL";
+        drawContext.text(this.font, brand, this.panelX + 8, this.panelY + 8, 0xFFFFFFFF);
+        int crumbX = this.panelX + 16 + this.font.width(brand);
+        String version = VERSION.isEmpty() ? "" : "v" + VERSION;
+        int versionWidth = this.font.width(version) + 8;
+        int versionX = closeButtonX() - versionWidth - 6;
+        String crumb = isSearching() ? tr("menu.search")
+            : tr(groupFor(currentTab).key) + "  ›  " + currentTab.label(this);
+        drawFittedText(drawContext, crumb, crumbX, this.panelY + 8, versionX - crumbX - 6, COLOR_TEXT_DIM);
+        if (!version.isEmpty()) {
+            drawOutline(drawContext, versionX, this.panelY + 5, versionWidth, 13, GOLD);
+            drawContext.text(this.font, version, versionX + 4, this.panelY + 8, GOLD);
+        }
+    }
+
+    private void drawFooter(GuiGraphicsExtractor drawContext) {
+        int y = this.panelY + this.panelHeight - 14;
+        int x = this.panelX + SIDEBAR_WIDTH + CONTENT_PADDING;
+        x = drawKeycap(drawContext, this.mod.getHudEditorShortcutName(), x, y);
+        drawContext.text(this.font, tr("menu.footer_save"), x + 4, y, COLOR_TEXT_DIM);
+        x += 4 + this.font.width(tr("menu.footer_save")) + 10;
+        x = drawKeycap(drawContext, "Esc", x, y);
+        drawContext.text(this.font, tr("menu.footer_back"), x + 4, y, COLOR_TEXT_DIM);
+        String credits = tr("menu.credits");
+        drawContext.text(this.font, credits, this.panelX + PANEL_WIDTH - this.font.width(credits) - 8, y, COLOR_TEXT_DIM);
+    }
+
+    /** Draws a small key label and returns the x just after it. */
+    private int drawKeycap(GuiGraphicsExtractor drawContext, String key, int x, int y) {
+        int width = this.font.width(key) + 6;
+        drawContext.fill(x, y - 2, x + width, y + 9, COLOR_ACTION_BUTTON);
+        drawOutline(drawContext, x, y - 2, width, 11, COLOR_PANEL_BORDER);
+        drawContext.text(this.font, key, x + 3, y, 0xFFFFFFFF);
+        return x + width;
+    }
+
+    private void drawFittedText(GuiGraphicsExtractor drawContext, String raw, int x, int y, int maxWidth, int color) {
         String text = raw == null ? "" : raw;
         if (maxWidth <= 6) {
             return;
         }
-        if (this.textRenderer.getWidth(text) <= maxWidth) {
-            drawContext.drawTextWithShadow(this.textRenderer, text, x, y, color);
+        if (this.font.width(text) <= maxWidth) {
+            drawContext.text(this.font, text, x, y, color);
             return;
         }
         String ellipsis = "...";
-        int trimmedWidth = maxWidth - this.textRenderer.getWidth(ellipsis);
+        int trimmedWidth = maxWidth - this.font.width(ellipsis);
         if (trimmedWidth <= 0) {
             return;
         }
-        String clipped = this.textRenderer.trimToWidth(text, trimmedWidth) + ellipsis;
-        drawContext.drawTextWithShadow(this.textRenderer, clipped, x, y, color);
+        String clipped = this.font.plainSubstrByWidth(text, trimmedWidth) + ellipsis;
+        drawContext.text(this.font, clipped, x, y, color);
     }
 
-    private void drawRowBox(DrawContext drawContext, int x, int y, int width, int height) {
+    private void drawRowBox(GuiGraphicsExtractor drawContext, int x, int y, int width, int height) {
         if (width <= 0 || height <= 0) {
             return;
         }
@@ -1439,42 +1690,82 @@ public final class MinepieceMenuScreen extends Screen {
         return mx >= bx && mx < bx + CLOSE_BUTTON_SIZE && my >= by && my < by + CLOSE_BUTTON_SIZE;
     }
 
-    private void drawCloseButton(DrawContext drawContext, int mouseX, int mouseY) {
+    private void drawCloseButton(GuiGraphicsExtractor drawContext, int mouseX, int mouseY) {
         int bx = closeButtonX();
         int by = closeButtonY();
         boolean hover = closeButtonContains(mouseX, mouseY);
         int bg = hover ? COLOR_ACTION_BUTTON_HOVER : COLOR_ACTION_BUTTON;
         drawContext.fill(bx, by, bx + CLOSE_BUTTON_SIZE, by + CLOSE_BUTTON_SIZE, bg);
         drawOutline(drawContext, bx, by, CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE, COLOR_ACTION_BORDER);
-        int textX = bx + (CLOSE_BUTTON_SIZE - this.textRenderer.getWidth("X")) / 2;
+        int textX = bx + (CLOSE_BUTTON_SIZE - this.font.width("X")) / 2;
         int textY = by + (CLOSE_BUTTON_SIZE - 8) / 2;
-        drawContext.drawTextWithShadow(this.textRenderer, "X", textX, textY, 0xFFFFFFFF);
+        drawContext.text(this.font, "X", textX, textY, 0xFFFFFFFF);
     }
 
-    private void drawSapphirePanel(DrawContext drawContext) {
-        // Outer border
-        drawContext.fill(this.panelX - 1, this.panelY - 1, this.panelX + PANEL_WIDTH + 1, this.panelY + PANEL_HEIGHT + 1, COLOR_PANEL_BORDER);
-        drawContext.fill(this.panelX, this.panelY, this.panelX + PANEL_WIDTH, this.panelY + PANEL_HEIGHT, COLOR_PANEL_BG);
-        // Header strip
-        drawContext.fill(this.panelX, this.panelY, this.panelX + PANEL_WIDTH, this.panelY + 24, 0xFF132E66);
-        drawContext.fill(this.panelX, this.panelY + 24, this.panelX + PANEL_WIDTH, this.panelY + 25, COLOR_PANEL_BORDER_DARK);
-        // Inner border
-        drawOutline(drawContext, this.panelX + 2, this.panelY + 2, PANEL_WIDTH - 4, PANEL_HEIGHT - 4, 0x6638629E);
+    private void refreshPalette() {
+        var a = this.mod.getConfig().appearance;
+        COLOR_BG_OVERLAY = net.minepiece.qol.config.UiSettings.color(a.background, a.menuOpacity / 2);
+        COLOR_PANEL_BG = net.minepiece.qol.config.UiSettings.color(a.background, a.menuOpacity);
+        COLOR_PANEL_BORDER = net.minepiece.qol.config.UiSettings.color(a.border, a.menuOpacity);
+        COLOR_SIDEBAR_BG = COLOR_PANEL_BG;
+        COLOR_TAB_NORMAL = net.minepiece.qol.config.UiSettings.color(a.accent, a.menuOpacity / 5);
+        COLOR_TAB_HOVER = net.minepiece.qol.config.UiSettings.color(a.accent, a.menuOpacity / 3);
+        COLOR_TAB_ACTIVE = net.minepiece.qol.config.UiSettings.color(a.accent, a.menuOpacity / 2);
+        COLOR_TAB_ACCENT = net.minepiece.qol.config.UiSettings.color(a.accent, 100);
+        COLOR_TEXT = net.minepiece.qol.config.UiSettings.color(a.text, 100);
+        COLOR_TEXT_DIM = net.minepiece.qol.config.UiSettings.color(a.text, 75);
+        COLOR_HEADER = COLOR_TAB_ACCENT;
+        COLOR_DIVIDER = net.minepiece.qol.config.UiSettings.color(a.border, a.menuOpacity / 2);
+        COLOR_ACTION_BUTTON = COLOR_TAB_NORMAL;
+        COLOR_ACTION_BUTTON_HOVER = COLOR_TAB_HOVER;
+        COLOR_ACTION_BUTTON_DISABLED = COLOR_PANEL_BG;
+        COLOR_ACTION_BORDER = COLOR_PANEL_BORDER;
+        COLOR_ROW_BOX = COLOR_TAB_NORMAL;
+        COLOR_ROW_BOX_BORDER = COLOR_DIVIDER;
     }
 
-    private static void drawOutline(DrawContext drawContext, int x, int y, int width, int height, int color) {
-        drawContext.fill(x, y, x + width, y + 1, color);
-        drawContext.fill(x, y + height - 1, x + width, y + height, color);
-        drawContext.fill(x, y, x + 1, y + height, color);
-        drawContext.fill(x + width - 1, y, x + width, y + height, color);
+    private void drawSapphirePanel(GuiGraphicsExtractor drawContext) {
+        drawContext.fill(this.panelX, this.panelY, this.panelX + PANEL_WIDTH, this.panelY + this.panelHeight, COLOR_PANEL_BG);
+        drawContext.fill(this.panelX, this.panelY, this.panelX + PANEL_WIDTH, this.panelY + 24, COLOR_TAB_NORMAL);
+        drawOutline(drawContext, this.panelX, this.panelY, PANEL_WIDTH, this.panelHeight, COLOR_PANEL_BORDER);
     }
 
-    private static void drawDivider(DrawContext drawContext, int x1, int y1, int x2, int y2) {
+    private void drawOutline(GuiGraphicsExtractor drawContext, int x, int y, int width, int height, int color) {
+        for (int i = 0; i < this.mod.getConfig().appearance.borderWidth; i++) {
+            drawContext.fill(x + i, y + i, x + width - i, y + i + 1, color);
+            drawContext.fill(x + i, y + height - i - 1, x + width - i, y + height - i, color);
+            drawContext.fill(x + i, y + i, x + i + 1, y + height - i, color);
+            drawContext.fill(x + width - i - 1, y + i, x + width - i, y + height - i, color);
+        }
+    }
+
+    private void drawDivider(GuiGraphicsExtractor drawContext, int x1, int y1, int x2, int y2) {
         drawContext.fill(x1, y1, x2, y2, COLOR_DIVIDER);
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean doubled) {
+        return clickMenu(scaledClick(click), doubled);
+    }
+
+    private boolean clickMenu(net.minecraft.client.input.MouseButtonEvent click, boolean doubled) {
+        if (!this.resetHudLayoutConfirmOpen && this.searchBox.isMouseOver(click.x(), click.y())) {
+            setFocused(this.searchBox);
+            this.searchBox.mouseClicked(click, doubled);
+            return true;
+        }
+        if (getFocused() == this.searchBox) setFocused(null);
+        if (!this.resetHudLayoutConfirmOpen && click.button() == 0 && !isSearching()) {
+            Tab[] pages = groupFor(currentTab).pages();
+            int[][] chips = subpageChips(pages);
+            for (int i = 0; i < pages.length; i++) {
+                int[] r = chips[i];
+                if (click.x() >= r[0] && click.x() < r[0] + r[2] && click.y() >= r[1] && click.y() < r[1] + r[3]) {
+                    if (currentTab != pages[i]) { currentTab = pages[i]; rebuild(); }
+                    return true;
+                }
+            }
+        }
         if (this.resetHudLayoutConfirmOpen) {
             if (resetConfirmAcceptContains(click.x(), click.y())) {
                 this.mod.resetHudLayoutToDefaults();
@@ -1490,7 +1781,7 @@ public final class MinepieceMenuScreen extends Screen {
         }
 
         for (RemoveAction action : this.removeActions) {
-            if (action.contains((int) click.x(), (int) click.y())) {
+            if (inContent(click.x(), click.y()) && action.contains((int) click.x(), (int) click.y())) {
                 action.action().run();
                 return true;
             }
@@ -1498,30 +1789,39 @@ public final class MinepieceMenuScreen extends Screen {
 
         // Close (X) button
         if (closeButtonContains(click.x(), click.y())) {
-            close();
+            onClose();
             return true;
         }
         // Sidebar tab clicks
         for (TabButton button : this.tabButtons) {
             if (button.contains((int) click.x(), (int) click.y())) {
-                if (this.currentTab != button.tab) {
-                    this.currentTab = button.tab;
-                    this.bossActiveOffset = 0;
-                    this.bossRegistryOffset = 0;
-                    this.moneyHistoryOffset = 0;
-                    this.eventsOffset = 0;
-                    this.translationRulesOffset = 0;
-                    clearEventEditState();
+                if (this.currentTab != button.tab || isSearching()) {
+                    Group group = groupFor(button.tab);
+                    this.currentTab = selectedPages.getOrDefault(group, button.tab);
+                    this.searchQuery = "";
+                    this.searchBox.setValue("");
                     rebuild();
                 }
                 return true;
             }
         }
-        return super.mouseClicked(click, doubled);
+        return inContent(click.x(), click.y()) && super.mouseClicked(click, doubled);
+    }
+
+    private net.minecraft.client.input.MouseButtonEvent scaledClick(net.minecraft.client.input.MouseButtonEvent click) {
+        return new net.minecraft.client.input.MouseButtonEvent(click.x() / menuScale, click.y() / menuScale, click.buttonInfo());
+    }
+
+    @Override public void mouseMoved(double x, double y) { super.mouseMoved(x / menuScale, y / menuScale); }
+    @Override public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent click) { return super.mouseReleased(scaledClick(click)); }
+    @Override public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent click, double dx, double dy) {
+        return super.mouseDragged(scaledClick(click), dx / menuScale, dy / menuScale);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        mouseX /= menuScale; mouseY /= menuScale;
+        if (!inContent(mouseX, mouseY)) return false;
         if (this.resetHudLayoutConfirmOpen) {
             return true;
         }
@@ -1541,8 +1841,9 @@ public final class MinepieceMenuScreen extends Screen {
                 if (containsRect(mx, my, this.contentX, activeY, this.contentWidth, activeHeight)) {
                     int totalRows = buildTrackedBossRows().size();
                     int maxOffset = Math.max(0, totalRows - activeMaxRows);
-                    this.bossActiveOffset = clampOffset(this.bossActiveOffset + step, maxOffset);
-                    handled = true;
+                    int nextOffset = clampOffset(this.bossActiveOffset + step, maxOffset);
+                    handled = nextOffset != this.bossActiveOffset;
+                    this.bossActiveOffset = nextOffset;
                 }
 
                 int registryY = activeY + activeHeight + BOSSES_REGISTRY_GAP;
@@ -1551,8 +1852,9 @@ public final class MinepieceMenuScreen extends Screen {
                 if (containsRect(mx, my, this.contentX, registryY, this.contentWidth, registryHeight)) {
                     int totalRows = this.mod.getBossTracker().getBossRegistry().size();
                     int maxOffset = Math.max(0, totalRows - registryMaxRows);
-                    this.bossRegistryOffset = clampOffset(this.bossRegistryOffset + step, maxOffset);
-                    handled = true;
+                    int nextOffset = clampOffset(this.bossRegistryOffset + step, maxOffset);
+                    handled = nextOffset != this.bossRegistryOffset;
+                    this.bossRegistryOffset = nextOffset;
                 }
             }
             case MONEY -> {
@@ -1562,8 +1864,9 @@ public final class MinepieceMenuScreen extends Screen {
                 if (containsRect(mx, my, this.contentX, listY, this.contentWidth, listHeight)) {
                     int totalRows = this.mod.getMoneyTracker().getHistory().size();
                     int maxOffset = Math.max(0, totalRows - maxRows);
-                    this.moneyHistoryOffset = clampOffset(this.moneyHistoryOffset + step, maxOffset);
-                    handled = true;
+                    int nextOffset = clampOffset(this.moneyHistoryOffset + step, maxOffset);
+                    handled = nextOffset != this.moneyHistoryOffset;
+                    this.moneyHistoryOffset = nextOffset;
                 }
             }
             case EVENTS -> {
@@ -1573,8 +1876,9 @@ public final class MinepieceMenuScreen extends Screen {
                 if (containsRect(mx, my, this.contentX, listY, this.contentWidth, listHeight)) {
                     int totalRows = this.mod.getEventCountdownTracker().getRawEvents().size();
                     int maxOffset = Math.max(0, totalRows - maxRows);
-                    this.eventsOffset = clampOffset(this.eventsOffset + step, maxOffset);
-                    handled = true;
+                    int nextOffset = clampOffset(this.eventsOffset + step, maxOffset);
+                    handled = nextOffset != this.eventsOffset;
+                    this.eventsOffset = nextOffset;
                 }
             }
             case LANGUAGE -> {
@@ -1584,8 +1888,9 @@ public final class MinepieceMenuScreen extends Screen {
                 if (containsRect(mx, my, this.contentX, listY, this.contentWidth, listHeight)) {
                     int totalRows = this.mod.getConfig().chatTranslationRules.size();
                     int maxOffset = Math.max(0, totalRows - maxRows);
-                    this.translationRulesOffset = clampOffset(this.translationRulesOffset + step, maxOffset);
-                    handled = true;
+                    int nextOffset = clampOffset(this.translationRulesOffset + step, maxOffset);
+                    handled = nextOffset != this.translationRulesOffset;
+                    this.translationRulesOffset = nextOffset;
                 }
             }
             default -> {
@@ -1596,14 +1901,27 @@ public final class MinepieceMenuScreen extends Screen {
             rebuild();
             return true;
         }
+        if (inContent(mouseX, mouseY) && maxPageScroll > 0 && Math.abs(verticalAmount) > 0.001) {
+            int before = pageScroll.getOrDefault(currentTab, 0);
+            int after = Math.clamp(before - (int) Math.round(verticalAmount * 22), 0, maxPageScroll);
+            int change = after - before;
+            pageScroll.put(currentTab, after);
+            contentY -= change;
+            for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget) widget.setY(widget.getY() - change);
+            for (int i = 0; i < removeActions.size(); i++) {
+                var old = removeActions.get(i); removeActions.set(i, new RemoveAction(old.x(), old.y() - change, old.action()));
+            }
+            updateContentVisibility();
+            return true;
+        }
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     @Override
-    public void close() {
-        MinecraftClient client = MinecraftClient.getInstance();
+    public void onClose() {
+        Minecraft client = Minecraft.getInstance();
         if (client != null) {
-            client.setScreen(null);
+            client.gui.setScreen(null);
         }
     }
 
@@ -1623,7 +1941,7 @@ public final class MinepieceMenuScreen extends Screen {
     }
 
     private int resetConfirmY() {
-        return this.panelY + (PANEL_HEIGHT - RESET_CONFIRM_HEIGHT) / 2;
+        return this.panelY + (this.panelHeight - RESET_CONFIRM_HEIGHT) / 2;
     }
 
     private boolean resetConfirmAcceptContains(double mx, double my) {
@@ -1638,26 +1956,26 @@ public final class MinepieceMenuScreen extends Screen {
         return mx >= x && mx < x + RESET_CONFIRM_BUTTON_SIZE && my >= y && my < y + RESET_CONFIRM_BUTTON_SIZE;
     }
 
-    private void drawResetHudConfirmPopup(DrawContext drawContext, int mouseX, int mouseY) {
+    private void drawResetHudConfirmPopup(GuiGraphicsExtractor drawContext, int mouseX, int mouseY) {
         int x = resetConfirmX();
         int y = resetConfirmY();
         int acceptX = x + RESET_CONFIRM_WIDTH / 2 - RESET_CONFIRM_BUTTON_GAP - RESET_CONFIRM_BUTTON_SIZE;
         int cancelX = x + RESET_CONFIRM_WIDTH / 2 + RESET_CONFIRM_BUTTON_GAP;
         int buttonsY = y + RESET_CONFIRM_HEIGHT - RESET_CONFIRM_BUTTON_SIZE - 10;
 
-        drawContext.fill(this.panelX + 3, this.panelY + 25, this.panelX + PANEL_WIDTH - 3, this.panelY + PANEL_HEIGHT - 3, 0x8801030B);
+        drawContext.fill(this.panelX + 3, this.panelY + 25, this.panelX + PANEL_WIDTH - 3, this.panelY + this.panelHeight - 3, 0x8801030B);
         drawContext.fill(x, y, x + RESET_CONFIRM_WIDTH, y + RESET_CONFIRM_HEIGHT, 0xEE0E2650);
         drawOutline(drawContext, x, y, RESET_CONFIRM_WIDTH, RESET_CONFIRM_HEIGHT, COLOR_ACTION_BORDER);
 
-        drawContext.drawCenteredTextWithShadow(
-            this.textRenderer,
+        drawContext.centeredText(
+            this.font,
             this.tr("main.reset_hud_confirm_title"),
             x + RESET_CONFIRM_WIDTH / 2,
             y + 16,
             COLOR_HEADER
         );
-        drawContext.drawCenteredTextWithShadow(
-            this.textRenderer,
+        drawContext.centeredText(
+            this.font,
             this.tr("main.reset_hud_confirm_body"),
             x + RESET_CONFIRM_WIDTH / 2,
             y + 34,
@@ -1673,11 +1991,11 @@ public final class MinepieceMenuScreen extends Screen {
         drawOutline(drawContext, acceptX, buttonsY, RESET_CONFIRM_BUTTON_SIZE, RESET_CONFIRM_BUTTON_SIZE, COLOR_ACTION_BORDER);
         drawOutline(drawContext, cancelX, buttonsY, RESET_CONFIRM_BUTTON_SIZE, RESET_CONFIRM_BUTTON_SIZE, COLOR_ACTION_BORDER);
 
-        int checkX = acceptX + (RESET_CONFIRM_BUTTON_SIZE - this.textRenderer.getWidth("✓")) / 2;
-        int xX = cancelX + (RESET_CONFIRM_BUTTON_SIZE - this.textRenderer.getWidth("X")) / 2;
+        int checkX = acceptX + (RESET_CONFIRM_BUTTON_SIZE - this.font.width("✓")) / 2;
+        int xX = cancelX + (RESET_CONFIRM_BUTTON_SIZE - this.font.width("X")) / 2;
         int textY = buttonsY + (RESET_CONFIRM_BUTTON_SIZE - 8) / 2;
-        drawContext.drawTextWithShadow(this.textRenderer, "✓", checkX, textY, 0xFFFFFFFF);
-        drawContext.drawTextWithShadow(this.textRenderer, "X", xX, textY, 0xFFFFFFFF);
+        drawContext.text(this.font, "✓", checkX, textY, 0xFFFFFFFF);
+        drawContext.text(this.font, "X", xX, textY, 0xFFFFFFFF);
     }
 
     private boolean isEditingEvent() {
@@ -1688,10 +2006,10 @@ public final class MinepieceMenuScreen extends Screen {
         this.editingEventOriginalName = name == null ? "" : name;
         this.editingEventOriginalTime = time == null ? "" : time;
         if (this.eventNameField != null) {
-            this.eventNameField.setText(this.editingEventOriginalName);
+            this.eventNameField.setValue(this.editingEventOriginalName);
         }
         if (this.eventTimeField != null) {
-            this.eventTimeField.setText(this.editingEventOriginalTime);
+            this.eventTimeField.setValue(this.editingEventOriginalTime);
         }
     }
 
@@ -1722,8 +2040,8 @@ public final class MinepieceMenuScreen extends Screen {
         return this.mod.tr(key);
     }
 
-    private Text trText(String key) {
-        return Text.literal(tr(key));
+    private Component trText(String key) {
+        return Component.literal(tr(key));
     }
 
     private boolean hasAnyTranslationRoutesEnabled(ConfigManager.ModConfig cfg) {
@@ -1775,28 +2093,6 @@ public final class MinepieceMenuScreen extends Screen {
     private static String capitalize(String s) {
         if (s == null || s.isEmpty()) return s;
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
-    }
-
-    private static String prettyColorName(String raw) {
-        String normalized = MinepieceQolClient.normalizeHudColorName(raw);
-        if ("default".equals(normalized)) {
-            return "Default";
-        }
-        String[] words = normalized.split(" ");
-        StringBuilder result = new StringBuilder();
-        for (String word : words) {
-            if (word.isBlank()) {
-                continue;
-            }
-            if (!result.isEmpty()) {
-                result.append(' ');
-            }
-            result.append(Character.toUpperCase(word.charAt(0)));
-            if (word.length() > 1) {
-                result.append(word.substring(1));
-            }
-        }
-        return result.toString();
     }
 
     private static String formatTimer(long ms) {
@@ -1858,21 +2154,22 @@ public final class MinepieceMenuScreen extends Screen {
             return mx >= this.x && mx < this.x + this.width && my >= this.y && my < this.y + this.height;
         }
 
-        void render(DrawContext drawContext, int mouseX, int mouseY) {
-            boolean active = MinepieceMenuScreen.this.currentTab == this.tab;
+        void extractRenderState(GuiGraphicsExtractor drawContext, int mouseX, int mouseY) {
+            boolean active = groupFor(MinepieceMenuScreen.this.currentTab) == groupFor(this.tab);
             boolean hover = contains(mouseX, mouseY);
             int bg = active ? COLOR_TAB_ACTIVE : (hover ? COLOR_TAB_HOVER : COLOR_TAB_NORMAL);
             drawContext.fill(this.x, this.y, this.x + this.width, this.y + this.height, bg);
-            if (active) {
-                drawContext.fill(this.x, this.y, this.x + 2, this.y + this.height, COLOR_TAB_ACCENT);
-            }
-            drawOutline(drawContext, this.x, this.y, this.width, this.height, 0x553D78E0);
-            int textY = this.y + (this.height - 8) / 2;
-            drawContext.drawTextWithShadow(MinepieceMenuScreen.this.textRenderer, this.tab.label(MinepieceMenuScreen.this), this.x + 8, textY, COLOR_TEXT);
+            drawOutline(drawContext, this.x, this.y, this.width, this.height, active ? COLOR_TAB_ACCENT : COLOR_DIVIDER);
+            Group group = groupFor(this.tab);
+            boolean icon = this.height >= 18;
+            if (icon) drawContext.item(new net.minecraft.world.item.ItemStack(group.icon()), this.x + 4, this.y + (this.height - 16) / 2);
+            if (active) drawContext.fill(this.x + this.width - 7, this.y + this.height / 2 - 2, this.x + this.width - 3, this.y + this.height / 2 + 2, GOLD);
+            int textX = this.x + (icon ? 24 : 8);
+            drawFittedText(drawContext, tr(group.key), textX, this.y + (this.height - 8) / 2, this.x + this.width - 10 - textX, active ? 0xFFFFFFFF : COLOR_TEXT);
         }
     }
 
-    private void drawRemoveButtons(DrawContext drawContext, int mouseX, int mouseY) {
+    private void drawRemoveButtons(GuiGraphicsExtractor drawContext, int mouseX, int mouseY) {
         for (RemoveAction action : this.removeActions) {
             boolean hover = action.contains(mouseX, mouseY);
             int bg = hover ? COLOR_ACTION_BUTTON_HOVER : COLOR_ACTION_BUTTON;
@@ -1881,48 +2178,100 @@ public final class MinepieceMenuScreen extends Screen {
             int y = action.y();
             drawContext.fill(x, y, x + REMOVE_BUTTON_SIZE, y + REMOVE_BUTTON_SIZE, bg);
             drawOutline(drawContext, x, y, REMOVE_BUTTON_SIZE, REMOVE_BUTTON_SIZE, border);
-            int textX = x + (REMOVE_BUTTON_SIZE - this.textRenderer.getWidth("X")) / 2;
+            int textX = x + (REMOVE_BUTTON_SIZE - this.font.width("X")) / 2;
             int textY = y + (REMOVE_BUTTON_SIZE - 8) / 2;
-            drawContext.drawTextWithShadow(this.textRenderer, "X", textX, textY, 0xFFFFFFFF);
+            drawContext.text(this.font, "X", textX, textY, 0xFFFFFFFF);
         }
     }
 
-    private void drawStyledVanillaButtons(DrawContext drawContext, int mouseX, int mouseY) {
-        for (var child : this.children()) {
-            if (!(child instanceof ButtonWidget button)) {
-                continue;
-            }
-            int x = button.getX();
-            int y = button.getY();
-            int width = button.getWidth();
-            int height = button.getHeight();
-            boolean hovered = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
-            int bg = button.active
-                ? (hovered ? COLOR_ACTION_BUTTON_HOVER : COLOR_ACTION_BUTTON)
-                : COLOR_ACTION_BUTTON_DISABLED;
-            drawContext.fill(x, y, x + width, y + height, bg);
-            drawOutline(drawContext, x, y, width, height, COLOR_ACTION_BORDER);
-            drawFittedCenteredText(drawContext, button.getMessage().getString(), x, y, width, height, 0xFFFFFFFF);
-        }
-    }
-
-    private void drawFittedCenteredText(DrawContext drawContext, String text, int x, int y, int width, int height, int color) {
+    private void drawFittedCenteredText(GuiGraphicsExtractor drawContext, String text, int x, int y, int width, int height, int color) {
         String value = text == null ? "" : text;
         int maxWidth = Math.max(2, width - 8);
-        if (this.textRenderer.getWidth(value) > maxWidth) {
+        if (this.font.width(value) > maxWidth) {
             String ellipsis = "...";
-            int trimWidth = Math.max(2, maxWidth - this.textRenderer.getWidth(ellipsis));
-            value = this.textRenderer.trimToWidth(value, trimWidth) + ellipsis;
+            int trimWidth = Math.max(2, maxWidth - this.font.width(ellipsis));
+            value = this.font.plainSubstrByWidth(value, trimWidth) + ellipsis;
         }
-        int tx = x + (width - this.textRenderer.getWidth(value)) / 2;
+        int tx = x + (width - this.font.width(value)) / 2;
         int ty = y + (height - 8) / 2;
-        drawContext.drawTextWithShadow(this.textRenderer, value, tx, ty, color);
+        drawContext.text(this.font, value, tx, ty, color);
     }
 
     private record RemoveAction(int x, int y, Runnable action) {
         boolean contains(int mx, int my) {
             return mx >= this.x && mx < this.x + REMOVE_BUTTON_SIZE && my >= this.y && my < this.y + REMOVE_BUTTON_SIZE;
         }
+    }
+
+    private boolean inContent(double x, double y) {
+        return x >= contentX && x < contentX + contentWidth && y >= contentTop && y < contentBottom;
+    }
+
+    private void updateContentVisibility() {
+        for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget && child != this.searchBox)
+            widget.visible = widget.getY() >= contentTop && widget.getY() + widget.getHeight() <= contentBottom;
+    }
+
+    /** One {x, y, width, height} per page tab; they share the row and shrink evenly when the labels are long. */
+    private int[][] subpageChips(Tab[] pages) {
+        int gap = 4, y = panelY + 32, height = 16, available = contentWidth - 4;
+        int[] widths = new int[pages.length];
+        int total = gap * (pages.length - 1);
+        for (int i = 0; i < pages.length; i++) total += widths[i] = this.font.width(pages[i].label(this)) + 14;
+        if (total > available) java.util.Arrays.fill(widths, (available - gap * (pages.length - 1)) / pages.length);
+        int[][] chips = new int[pages.length][];
+        int x = contentX;
+        for (int i = 0; i < pages.length; i++) {
+            chips[i] = new int[]{x, y, widths[i], height};
+            x += widths[i] + gap;
+        }
+        return chips;
+    }
+
+    private void drawSubpages(GuiGraphicsExtractor context, int mouseX, int mouseY) {
+        if (isSearching()) return;
+        Tab[] pages = groupFor(currentTab).pages();
+        int[][] chips = subpageChips(pages);
+        for (int i = 0; i < pages.length; i++) {
+            int[] r = chips[i];
+            boolean active = pages[i] == currentTab;
+            boolean hover = mouseX >= r[0] && mouseX < r[0] + r[2] && mouseY >= r[1] && mouseY < r[1] + r[3];
+            context.fill(r[0], r[1], r[0] + r[2], r[1] + r[3], active ? COLOR_TAB_ACTIVE : hover ? COLOR_TAB_HOVER : COLOR_TAB_NORMAL);
+            drawOutline(context, r[0], r[1], r[2], r[3], active ? GOLD : COLOR_DIVIDER);
+            drawFittedCenteredText(context, pages[i].label(this), r[0] + 3, r[1], r[2] - 6, r[3], active ? 0xFFFFFFFF : COLOR_TEXT_DIM);
+        }
+    }
+
+    private enum Group {
+        GENERAL("menu.group.general"), HUD("menu.group.hud"), COMBAT("menu.group.combat"),
+        PROGRESS("menu.group.progress"), ECONOMY("menu.group.economy"), TOOLS("menu.group.tools");
+        final String key;
+        Group(String key) { this.key = key; }
+        net.minecraft.world.item.Item icon() {
+            return switch (this) {
+                case GENERAL -> net.minecraft.world.item.Items.COMPASS;
+                case HUD -> net.minecraft.world.item.Items.PAINTING;
+                case COMBAT -> net.minecraft.world.item.Items.IRON_SWORD;
+                case PROGRESS -> net.minecraft.world.item.Items.EXPERIENCE_BOTTLE;
+                case ECONOMY -> net.minecraft.world.item.Items.GOLD_INGOT;
+                case TOOLS -> net.minecraft.world.item.Items.IRON_PICKAXE;
+            };
+        }
+        Tab[] pages() {
+            return switch (this) {
+                case GENERAL -> new Tab[]{Tab.MAIN, Tab.LANGUAGE};
+                case HUD -> new Tab[]{Tab.APPEARANCE};
+                case COMBAT -> new Tab[]{Tab.BOSSES, Tab.COMBAT_SETTINGS};
+                case PROGRESS -> new Tab[]{Tab.PROGRESS, Tab.STAT_DISPLAY, Tab.PROFILE, Tab.PASS_PETS};
+                case ECONOMY -> new Tab[]{Tab.MONEY, Tab.JOBS, Tab.AUCTION_HOUSE, Tab.COOKING};
+                case TOOLS -> new Tab[]{Tab.EVENTS, Tab.SCROLLS, Tab.EXTRAS, Tab.HELP};
+            };
+        }
+    }
+
+    private static Group groupFor(Tab tab) {
+        for (var group : Group.values()) for (var page : group.pages()) if (page == tab) return group;
+        throw new IllegalArgumentException("Unknown page " + tab);
     }
 
     private enum Tab {
@@ -1933,8 +2282,16 @@ public final class MinepieceMenuScreen extends Screen {
         EVENTS("tab.events"),
         PROFILE("tab.profile"),
         LANGUAGE("tab.language"),
-        AUCTION_HOUSE("tab.other"),
-        TELEMETRY("tab.telemetry");
+        AUCTION_HOUSE("ui.auction_house"),
+        PROGRESS("tab.progress"),
+        COOKING("hud.panel.cooking"),
+        EXTRAS("ui.inventory_helpers"),
+        APPEARANCE("ui.hud_customization"),
+        COMBAT_SETTINGS("bosses.settings"),
+        STAT_DISPLAY("ui.selected_stats"),
+        PASS_PETS("ui.pass_pets"),
+        SCROLLS("hud.panel.scrolls"),
+        HELP("extras.help");
 
         final String key;
 

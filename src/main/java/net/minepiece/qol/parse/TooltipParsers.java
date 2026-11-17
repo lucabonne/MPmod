@@ -27,9 +27,13 @@ public final class TooltipParsers {
         "Satis fiyati",
         "Satış fiyatı"
     };
+    private static final String[] AUCTION_AVERAGE_LABELS = {
+        "Average price", "Prix moyen", "Precio medio", "Durchschnittspreis", "Prezzo medio",
+        "Preço médio", "Srednia cena", "Średnia cena", "Harga rata-rata", "Ortalama fiyat"
+    };
     private static final String AUCTION_SELLING_LABEL_PATTERN = String.join("|", AUCTION_SELLING_LABELS);
     private static final Pattern SELLING_PATTERN = Pattern.compile("(?:" + AUCTION_SELLING_LABEL_PATTERN + ")\\s*:?\\s*(" + NUMBER_TOKEN + ")\\s*([KMB])?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern AVERAGE_PATTERN = Pattern.compile("(?:Average price|Prix moyen|Precio medio|Durchschnittspreis|Prezzo medio|Preço médio|Srednia cena|Średnia cena|Harga rata-rata|Ortalama fiyat)\\s*:?\\s*(" + NUMBER_TOKEN + ")\\s*([KMB])?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern AVERAGE_PATTERN = Pattern.compile("(?:" + String.join("|", AUCTION_AVERAGE_LABELS) + ")\\s*:?\\s*(" + NUMBER_TOKEN + ")\\s*([KMB])?", Pattern.CASE_INSENSITIVE);
     private static final Pattern COORDS_PATTERN =
         Pattern.compile("(?:Coord|Coordonnees|Coordonnées|Coordenadas|Koordinaten|Coordinate|Koordynaty|Koordinat)[^0-9-]*(-?\\d+)\\D+(-?\\d+)\\D+(-?\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern CYCLE_MINUTES_PATTERN =
@@ -92,7 +96,7 @@ public final class TooltipParsers {
         }
 
         double unitPrice = selling / quantity;
-        double delta = (unitPrice - average) / average;
+        double delta = (selling - average) / average;
         double intensity = Math.min(1.0D, Math.max(0.0D, Math.abs(delta) / 0.5D));
         return Optional.of(new AuctionParseResult(selling, average, quantity, unitPrice, delta, intensity));
     }
@@ -101,7 +105,41 @@ public final class TooltipParsers {
         return LocalizedText.startsWithAny(line, AUCTION_SELLING_LABELS);
     }
 
+    public static boolean isAuctionAveragePriceLine(String line) {
+        return LocalizedText.startsWithAny(line, AUCTION_AVERAGE_LABELS);
+    }
+
     public static Optional<BossTooltipData> parseBossTooltip(List<String> lines, String fallbackName) {
+        return parseBossTooltips(lines, fallbackName).stream().findFirst();
+    }
+
+    public static List<BossTooltipData> parseBossTooltips(List<String> lines, String fallbackName) {
+        List<Integer> coordinates = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            if (COORDS_PATTERN.matcher(lines.get(i)).find()) coordinates.add(i);
+        }
+        if (coordinates.isEmpty()) return List.of();
+        List<BossTooltipData> bosses = new ArrayList<>();
+        for (int n = 0; n < coordinates.size(); n++) {
+            int coordinate = coordinates.get(n);
+            int heading = coordinate - 1;
+            while (heading >= 0 && lines.get(heading).isBlank()) heading--;
+            String rawName = heading >= 0 ? lines.get(heading) : fallbackName;
+            String name = rawName == null ? "" : rawName.replaceFirst("^[^\\p{L}\\p{N}]+", "").trim();
+            if (coordinates.size() == 1 && (heading <= 0 || name.equals(rawName))) {
+                return parseSingleBossTooltip(lines, fallbackName).stream().toList();
+            }
+            if (name.isBlank() || isBossInfoLine(rawName)) continue;
+            int end = n + 1 < coordinates.size() ? coordinates.get(n + 1) : lines.size();
+            List<String> section = new ArrayList<>();
+            section.add(name);
+            section.addAll(lines.subList(coordinate, end));
+            parseSingleBossTooltip(section, name).ifPresent(bosses::add);
+        }
+        return bosses;
+    }
+
+    private static Optional<BossTooltipData> parseSingleBossTooltip(List<String> lines, String fallbackName) {
         Integer x = null;
         Integer y = null;
         Integer z = null;
@@ -123,7 +161,8 @@ public final class TooltipParsers {
                 int minutes = findFirstInt(MINUTES_PATTERN, line, 0);
                 int seconds = findFirstInt(SECONDS_PATTERN, line, 0);
                 boolean ready = LocalizedText.containsAny(line, "ready", "pret", "prêt", "listo", "bereit", "pronto", "gotowy", "siap", "hazir", "hazır");
-                boolean hasExplicitDuration = ready || hours > 0 || minutes > 0 || seconds > 0;
+                boolean hasExplicitDuration = ready || HOURS_PATTERN.matcher(line).find()
+                    || MINUTES_PATTERN.matcher(line).find() || SECONDS_PATTERN.matcher(line).find();
                 int explicitRemainingSeconds = ready ? 0 : (hours * 3600 + minutes * 60 + seconds);
 
                 Integer cycleMinutes = findCycleMinutes(line);
@@ -581,18 +620,18 @@ public final class TooltipParsers {
             || key.startsWith("schaden von ");
     }
 
-    private static boolean isPetEffectsHeader(String line) {
+    public static boolean isPetEffectsHeader(String line) {
         return PET_EFFECTS_HEADER_PATTERN.matcher(line).matches()
             || FAMILIAR_EFFECTS_HEADER_PATTERN.matcher(line).matches()
             || LocalizedText.startsWithAny(line,
-                "pet effects", "familiar effects", "stats", "statistics", "estadisticas", "estadísticas",
+                "pet effects", "familiar effects", "familier effects", "stats", "statistics", "estadisticas", "estadísticas",
                 "effets du familier", "efectos de mascota", "efectos de familiar", "efectos del familiar",
                 "haustier effekte", "vertrauten effekte", "effetti pet", "effetti famiglio", "efeitos do pet",
                 "efeitos do familiar", "efekty peta", "efekty towarzysza", "efek pet", "efek familiar",
                 "evcil hayvan etkileri", "yoldas etkileri", "yoldaş etkileri");
     }
 
-    private static boolean isMinionEffectsHeader(String line) {
+    public static boolean isMinionEffectsHeader(String line) {
         return MINION_EFFECTS_HEADER_PATTERN.matcher(line).matches()
             || LocalizedText.startsWithAny(line,
                 "minion effects", "effets du serviteur", "efectos de esbirro", "efectos de minion", "efectos del minion", "diener effekte",
@@ -717,6 +756,9 @@ public final class TooltipParsers {
 
     public record AuctionParseResult(double sellingPrice, double averagePrice, int quantity, double unitPrice, double delta,
                                      double intensity) {
+        public double averageUnitPrice() {
+            return this.averagePrice / this.quantity;
+        }
     }
 
     public record BossTooltipData(String bossName, int x, int y, int z, int remainingSeconds, int cycleSeconds) {

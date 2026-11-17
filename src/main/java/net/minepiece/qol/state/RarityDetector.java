@@ -3,14 +3,15 @@ package net.minepiece.qol.state;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.LoreComponent;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemLore;
 import org.jetbrains.annotations.Nullable;
 
 public final class RarityDetector {
     public enum Rarity {
+        PRIMORDIAL,
         MYTHIC,
         LEGENDARY,
         EPIC,
@@ -18,6 +19,7 @@ public final class RarityDetector {
         COMMON
     }
 
+    private static final Pattern TRACK_RARITY = Pattern.compile("tracks\\.==(COMMON|RARE|EPIC|LEGENDARY|MYTHIC|PRIMORDIAL)\\b");
     private static final Pattern NON_LETTER_SPLIT = Pattern.compile("[^A-Z]+");
     private static final Pattern NON_LETTERS = Pattern.compile("[^A-Z]");
     private static final String HIDDEN_LEGENDARY_MARKER = "伴叹";
@@ -33,31 +35,51 @@ public final class RarityDetector {
         return detect(stack, null);
     }
 
-    public static Optional<Rarity> detect(ItemStack stack, @Nullable List<Text> tooltipLines) {
+    public static Optional<Rarity> detect(ItemStack stack, @Nullable List<Component> tooltipLines) {
         if (stack == null || stack.isEmpty()) {
             return Optional.empty();
         }
 
         // Primary path: use the actual tooltip text visible in GUI.
         if (tooltipLines != null) {
-            return Optional.ofNullable(findSingleRarity(tooltipLines));
+            Rarity rarity = findSingleRarity(tooltipLines);
+            return rarity != null ? Optional.of(rarity) : detectCustomData(stack);
         }
 
         // Fallback path for callers that don't have tooltip lines.
-        LoreComponent lore = stack.get(DataComponentTypes.LORE);
+        ItemLore lore = stack.get(DataComponents.LORE);
         if (lore != null) {
-            return Optional.ofNullable(findSingleRarity(lore.lines()));
+            Rarity rarity = findSingleRarity(lore.lines());
+            return rarity != null ? Optional.of(rarity) : detectCustomData(stack);
         }
-        return Optional.empty();
+        return detectCustomData(stack);
     }
 
-    private static Rarity findSingleRarity(List<Text> lines) {
+    private static Optional<Rarity> detectCustomData(ItemStack stack) {
+        var data = stack.get(DataComponents.CUSTOM_DATA);
+        if (data == null) return Optional.empty();
+        var match = TRACK_RARITY.matcher(data.copyTag().toString());
+        Rarity found = null;
+        while (match.find()) {
+            Rarity rarity = Rarity.valueOf(match.group(1));
+            if (found != null && rarity != found) return Optional.empty();
+            found = rarity;
+        }
+        return Optional.ofNullable(found);
+    }
+
+    public static boolean isBadgeLine(String line) {
+        LineRarity rarity = extractLineRarity(line);
+        return rarity != null && (rarity.isStandalone() || rarity.hasCaret());
+    }
+
+    private static Rarity findSingleRarity(List<Component> lines) {
         Rarity caretPriority = null;
         Rarity standalonePriority = null;
         Rarity uniqueAcrossAll = null;
         boolean multipleAcrossAll = false;
 
-        for (Text line : lines) {
+        for (Component line : lines) {
             if (line == null) {
                 continue;
             }
@@ -176,6 +198,7 @@ public final class RarityDetector {
 
     private static Rarity mapToken(String token) {
         return switch (token) {
+            case "PRIMORDIAL", "PRIMORDIALE" -> Rarity.PRIMORDIAL;
             case "MYTHIC", "MYTHICAL" -> Rarity.MYTHIC;
             case "LEGENDARY" -> Rarity.LEGENDARY;
             case "EPIC" -> Rarity.EPIC;
@@ -187,6 +210,7 @@ public final class RarityDetector {
 
     private static boolean isStandaloneCollapsed(String collapsed, Rarity rarity) {
         return switch (rarity) {
+            case PRIMORDIAL -> "PRIMORDIAL".equals(collapsed) || "PRIMORDIALE".equals(collapsed);
             case MYTHIC -> "MYTHIC".equals(collapsed) || "MYTHICAL".equals(collapsed);
             case LEGENDARY -> "LEGENDARY".equals(collapsed);
             case EPIC -> "EPIC".equals(collapsed);

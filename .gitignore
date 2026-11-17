@@ -15,3 +15,6 @@ bin/
 .claude/
 files.txt
 handoff.json
+
+# Runtime logs
+logs/

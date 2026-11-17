@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.16.1'
+    id 'net.fabricmc.fabric-loom' version '1.17.21'
     id 'maven-publish'
 }
 
@@ -19,12 +19,8 @@ repositories {
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-    implementation include("org.xerial:sqlite-jdbc:3.53.2.0")
-    implementation include("org.dhatim:fastexcel:0.20.2")
-    implementation include("com.github.rzymek:opczip:1.2.0")
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
     testImplementation "org.junit.jupiter:junit-jupiter:5.12.2"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.12.2"
 }
@@ -38,7 +34,11 @@ processResources {
 }
 
 tasks.withType(JavaCompile).configureEach {
-    it.options.release = 21
+    it.options.release = 25
+}
+
+tasks.withType(Jar).configureEach {
+    archiveVersion = "${project.mod_version}+mc${project.minecraft_version}"
 }
 
 tasks.withType(Test).configureEach {
@@ -46,9 +46,10 @@ tasks.withType(Test).configureEach {
 }
 
 java {
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
     withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 publishing {
@@ -57,4 +58,10 @@ publishing {
             from components.java
         }
     }
+}
+
+fabricApi.configureTests {
+    createSourceSet = true
+    modId = 'minepiece-qol-client-tests'
+    enableGameTests = false
 }

@@ -2,12 +2,12 @@ package net.minepiece.qol.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
 import java.util.Locale;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.network.chat.Component;
 import net.minepiece.qol.MinepieceQolClient;
 import net.minepiece.qol.config.ConfigManager;
 import net.minepiece.qol.state.ChatTranslationManager;
-import net.minecraft.text.Text;
 
 import static com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg;
 import static com.mojang.brigadier.arguments.DoubleArgumentType.getDouble;
@@ -22,35 +22,8 @@ public final class ModCommands {
     }
 
     public static void register(CommandDispatcher<FabricClientCommandSource> dispatcher, MinepieceQolClient mod) {
-        dispatcher.register(ClientCommandManager.literal("mptelemetry")
-            .executes(context -> {
-                reply(context.getSource(), mod.getTelemetryManager().status());
-                return 1;
-            })
-            .then(ClientCommandManager.literal("status")
-                .executes(context -> {
-                    reply(context.getSource(), mod.getTelemetryManager().status());
-                    return 1;
-                }))
-            .then(ClientCommandManager.literal("export")
-                .then(ClientCommandManager.literal("session")
-                    .executes(context -> {
-                        reply(context.getSource(), mod.getTelemetryManager().exportCurrentSession());
-                        return 1;
-                    }))
-                .then(ClientCommandManager.literal("all")
-                    .executes(context -> {
-                        reply(context.getSource(), mod.getTelemetryManager().exportAllHistory());
-                        return 1;
-                    })))
-            .then(ClientCommandManager.literal("test")
-                .executes(context -> {
-                    reply(context.getSource(), mod.getTelemetryManager().testDiscord());
-                    return 1;
-                })));
-
-        dispatcher.register(ClientCommandManager.literal("mpdebug")
-            .then(ClientCommandManager.literal("copylast")
+        dispatcher.register(ClientCommands.literal("mpdebug")
+            .then(ClientCommands.literal("copylast")
                 .executes(context -> {
                     String lastLine = mod.getDebugLogManager().getLastLine();
                     if (lastLine.isBlank()) {
@@ -62,8 +35,23 @@ public final class ModCommands {
                     return 1;
                 })));
 
-        dispatcher.register(ClientCommandManager.literal("mptranslate")
-            .then(ClientCommandManager.literal("routes")
+        // Diagnostic: what the safes panel reads from the floating text right now.
+        dispatcher.register(ClientCommands.literal("mpsafes").executes(context -> {
+            var client = net.minecraft.client.Minecraft.getInstance();
+            String[] texts = mod.readSafeTexts(client);
+            String spawn = mod.getBossTracker().getCurrentSpawnId();
+            reply(context.getSource(), "Current spawn: " + (spawn.isBlank() ? "(unknown)" : spawn));
+            for (int i = 0; i < texts.length; i++) {
+                var safe = net.minepiece.qol.state.SafeChestTracker.SAFES.get(i);
+                reply(context.getSource(), mod.tr("safes." + safe.key()) + ": "
+                    + mod.getSafeChests().status(spawn, i, System.currentTimeMillis()) + "  <-  "
+                    + (texts[i] == null ? "(no floating text loaded)" : texts[i]));
+            }
+            return 1;
+        }));
+
+        dispatcher.register(ClientCommands.literal("mptranslate")
+            .then(ClientCommands.literal("routes")
                 .executes(context -> {
                     ConfigManager.ModConfig cfg = mod.getConfig();
                     reply(context.getSource(), trf(
@@ -95,7 +83,7 @@ public final class ModCommands {
                     }
                     return 1;
                 }))
-            .then(ClientCommandManager.literal("checklist")
+            .then(ClientCommands.literal("checklist")
                 .executes(context -> {
                     reply(context.getSource(), tr(mod, "cmd.translate.checklist.title", "Classification checklist:"));
                     reply(context.getSource(), tr(mod, "cmd.translate.checklist.public", "- Public chat usually has a sender prefix and no private markers."));
@@ -104,8 +92,8 @@ public final class ModCommands {
                     reply(context.getSource(), tr(mod, "cmd.translate.checklist.classify_hint", "Use /mptranslate classify <line> to inspect one raw line."));
                     return 1;
                 }))
-            .then(ClientCommandManager.literal("classify")
-                .then(ClientCommandManager.argument("line", greedyString())
+            .then(ClientCommands.literal("classify")
+                .then(ClientCommands.argument("line", greedyString())
                     .executes(context -> {
                         String line = getString(context, "line");
                         ChatTranslationManager.ChatLineClassification classification = ChatTranslationManager.classifyLine(line);
@@ -148,34 +136,34 @@ public final class ModCommands {
                         return classification.valid() ? 1 : 0;
                     }))));
 
-        dispatcher.register(ClientCommandManager.literal("mpall")
-            .then(ClientCommandManager.literal("show")
+        dispatcher.register(ClientCommands.literal("mpall")
+            .then(ClientCommands.literal("show")
                 .executes(context -> {
                     reply(context.getSource(), mod.setAllFeaturesVisible(true));
                     return 1;
                 }))
-            .then(ClientCommandManager.literal("hide")
+            .then(ClientCommands.literal("hide")
                 .executes(context -> {
                     reply(context.getSource(), mod.setAllFeaturesVisible(false));
                     return 1;
                 })));
 
-        dispatcher.register(ClientCommandManager.literal("mpjobs")
+        dispatcher.register(ClientCommands.literal("mpjobs")
             .executes(context -> {
                 reply(context.getSource(), mod.getJobsTracker().summary(mod::tr));
                 return 1;
             })
-            .then(ClientCommandManager.literal("init")
-                .then(ClientCommandManager.argument("spec", greedyString())
+            .then(ClientCommands.literal("init")
+                .then(ClientCommands.argument("spec", greedyString())
                     .executes(context -> {
                         String result = mod.getJobsTracker().initFromSpec(getString(context, "spec"), mod::tr);
                         reply(context.getSource(), result);
                         return 1;
                     })))
-            .then(ClientCommandManager.literal("set")
-                .then(ClientCommandManager.argument("job", word())
-                    .then(ClientCommandManager.argument("level", integer(0))
-                        .then(ClientCommandManager.argument("needed", doubleArg(10.0D, 1_000_000_000.0D))
+            .then(ClientCommands.literal("set")
+                .then(ClientCommands.argument("job", word())
+                    .then(ClientCommands.argument("level", integer(0))
+                        .then(ClientCommands.argument("needed", doubleArg(10.0D, 1_000_000_000.0D))
                             .executes(context -> {
                                 String result = mod.getJobsTracker().setJobBaseline(
                                     getString(context, "job"),
@@ -186,46 +174,46 @@ public final class ModCommands {
                                 reply(context.getSource(), result);
                                 return 1;
                             })))))
-            .then(ClientCommandManager.literal("dailyreset")
+            .then(ClientCommands.literal("dailyreset")
                 .executes(context -> {
                     reply(context.getSource(), mod.getJobsTracker().resetDailyXp(mod::tr));
                     return 1;
                 })
-                .then(ClientCommandManager.argument("job", word())
+                .then(ClientCommands.argument("job", word())
                     .executes(context -> {
                         String result = mod.getJobsTracker().resetDailyXp(getString(context, "job"), mod::tr);
                         reply(context.getSource(), result);
                         return result.startsWith(tr(mod, "cmd.jobs.reset_daily_prefix", "Reset ")) ? 1 : 0;
                     })))
-            .then(ClientCommandManager.literal("show")
+            .then(ClientCommands.literal("show")
                 .executes(context -> {
                     reply(context.getSource(), mod.setJobsOverviewVisible(true));
                     return 1;
                 }))
-            .then(ClientCommandManager.literal("hide")
+            .then(ClientCommands.literal("hide")
                 .executes(context -> {
                     reply(context.getSource(), mod.setJobsOverviewVisible(false));
                     return 1;
                 }))
-            .then(ClientCommandManager.literal("reset")
+            .then(ClientCommands.literal("reset")
                 .executes(context -> {
                     mod.getJobsTracker().reset();
                     reply(context.getSource(), tr(mod, "cmd.jobs.progress_reset", "Job progress reset."));
                     return 1;
                 }))
-            .then(ClientCommandManager.literal("forget")
+            .then(ClientCommands.literal("forget")
                 .executes(context -> {
                     mod.getJobsTracker().forget();
                     reply(context.getSource(), tr(mod, "cmd.jobs.baselines_cleared", "All job baselines cleared."));
                     return 1;
                 }))
-            .then(ClientCommandManager.literal("debug")
+            .then(ClientCommands.literal("debug")
                 .executes(context -> {
                     reply(context.getSource(), mod.getJobsTracker().debugSummary(mod::tr));
                     return 1;
                 })));
 
-        dispatcher.register(ClientCommandManager.literal("mpbosses")
+        dispatcher.register(ClientCommands.literal("mpbosses")
             .executes(context -> {
                 reply(
                     context.getSource(),
@@ -236,23 +224,23 @@ public final class ModCommands {
                 }
                 return 1;
             })
-            .then(ClientCommandManager.literal("on")
+            .then(ClientCommands.literal("on")
                 .executes(context -> {
                     reply(context.getSource(), mod.setBossTrackingEnabled(true));
                     return 1;
                 }))
-            .then(ClientCommandManager.literal("off")
+            .then(ClientCommands.literal("off")
                 .executes(context -> {
                     reply(context.getSource(), mod.setBossTrackingEnabled(false));
                     return 1;
                 }))
-            .then(ClientCommandManager.literal("clear")
+            .then(ClientCommands.literal("clear")
                 .executes(context -> {
                     mod.getBossTracker().clear();
                     reply(context.getSource(), tr(mod, "cmd.bosses.cleared", "Cleared saved bosses."));
                     return 1;
                 })
-                .then(ClientCommandManager.argument("index", integer(1, 15))
+                .then(ClientCommands.argument("index", integer(1, 15))
                     .executes(context -> {
                         int index = getInteger(context, "index");
                         boolean removed = mod.getBossTracker().clearDisplayedIndex(index);
@@ -262,22 +250,22 @@ public final class ModCommands {
                         return removed ? 1 : 0;
                     }))));
 
-        dispatcher.register(ClientCommandManager.literal("mpevents")
+        dispatcher.register(ClientCommands.literal("mpevents")
             .executes(context -> {
                 for (String line : mod.getEventCountdownTracker().infoLines(mod::tr)) {
                     reply(context.getSource(), line);
                 }
                 return 1;
             })
-            .then(ClientCommandManager.literal("info")
+            .then(ClientCommands.literal("info")
                 .executes(context -> {
                     for (String line : mod.getEventCountdownTracker().infoLines(mod::tr)) {
                         reply(context.getSource(), line);
                     }
                     return 1;
                 }))
-            .then(ClientCommandManager.literal("add")
-                .then(ClientCommandManager.argument("spec", greedyString())
+            .then(ClientCommands.literal("add")
+                .then(ClientCommands.argument("spec", greedyString())
                     .executes(context -> {
                         EventSpec spec = parseEventSpec(getString(context, "spec"));
                         if (spec == null) {
@@ -288,8 +276,8 @@ public final class ModCommands {
                         reply(context.getSource(), result);
                         return result.startsWith(tr(mod, "cmd.events.added_prefix", "Added ")) ? 1 : 0;
                     })))
-            .then(ClientCommandManager.literal("remove")
-                .then(ClientCommandManager.argument("spec", greedyString())
+            .then(ClientCommands.literal("remove")
+                .then(ClientCommands.argument("spec", greedyString())
                     .executes(context -> {
                         EventSpec spec = parseEventSpec(getString(context, "spec"));
                         if (spec == null) {
@@ -301,7 +289,7 @@ public final class ModCommands {
                         return result.startsWith(tr(mod, "cmd.events.removed_prefix", "Removed ")) ? 1 : 0;
                     }))));
 
-        dispatcher.register(ClientCommandManager.literal("mpmoney")
+        dispatcher.register(ClientCommands.literal("mpmoney")
             .executes(context -> {
                 for (String line : mod.getMoneyTracker().commandSummaryLines(mod::tr)) {
                     reply(context.getSource(), line);
@@ -312,7 +300,7 @@ public final class ModCommands {
                 }
                 return 1;
             })
-            .then(ClientCommandManager.literal("log")
+            .then(ClientCommands.literal("log")
                 .executes(context -> {
                     var lines = mod.getMoneyTracker().recentLogLines(10, mod::tr);
                     if (lines.isEmpty()) {
@@ -324,7 +312,7 @@ public final class ModCommands {
                     }
                     return 1;
                 }))
-            .then(ClientCommandManager.literal("stats")
+            .then(ClientCommands.literal("stats")
                 .executes(context -> {
                     for (String line : mod.getMoneyTracker().commandSummaryLines(mod::tr)) {
                         reply(context.getSource(), line);
@@ -335,7 +323,7 @@ public final class ModCommands {
                     }
                     return 1;
                 }))
-            .then(ClientCommandManager.literal("export")
+            .then(ClientCommands.literal("export")
                 .executes(context -> {
                     var exportPath = mod.getMoneyTracker().exportCsv();
                     reply(context.getSource(), exportPath == null
@@ -343,14 +331,14 @@ public final class ModCommands {
                         : trf(mod, "cmd.money.exported_to", "Exported to %s", exportPath));
                     return exportPath == null ? 0 : 1;
                 }))
-            .then(ClientCommandManager.literal("sync")
+            .then(ClientCommands.literal("sync")
                 .executes(context -> {
                     mod.getMoneyTracker().sync();
                     mod.savePersistentState();
                     reply(context.getSource(), tr(mod, "cmd.money.synced", "Money state synced."));
                     return 1;
                 }))
-            .then(ClientCommandManager.literal("reset")
+            .then(ClientCommands.literal("reset")
                 .executes(context -> {
                     mod.getMoneyTracker().resetAll();
                     mod.savePersistentState();
@@ -358,7 +346,7 @@ public final class ModCommands {
                     return 1;
                 })));
 
-        dispatcher.register(ClientCommandManager.literal("talkto")
+        dispatcher.register(ClientCommands.literal("talkto")
             .executes(context -> {
                 String activeTarget = mod.getTalkTarget();
                 if (activeTarget == null || activeTarget.isBlank()) {
@@ -373,14 +361,14 @@ public final class ModCommands {
                 ));
                 return 1;
             })
-            .then(ClientCommandManager.argument("name", word())
+            .then(ClientCommands.argument("name", word())
                 .executes(context -> {
                     String name = getString(context, "name");
                     reply(context.getSource(), mod.setTalkTarget(name));
                     return 1;
                 })));
 
-        dispatcher.register(ClientCommandManager.literal("talkoff")
+        dispatcher.register(ClientCommands.literal("talkoff")
             .executes(context -> {
                 reply(context.getSource(), mod.clearTalkTarget());
                 return 1;
@@ -388,7 +376,7 @@ public final class ModCommands {
     }
 
     private static void reply(FabricClientCommandSource source, String message) {
-        source.sendFeedback(Text.literal(message));
+        source.sendFeedback(Component.literal(message));
     }
 
     private static String tr(MinepieceQolClient mod, String key, String fallback) {

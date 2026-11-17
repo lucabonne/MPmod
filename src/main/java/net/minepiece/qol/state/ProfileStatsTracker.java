@@ -10,6 +10,8 @@ import java.util.function.Function;
 import net.minepiece.qol.parse.TooltipParsers;
 
 public final class ProfileStatsTracker {
+    public static final List<String> STAT_KEYS = List.of("health", "strength", "damage", "critical_chance",
+        "critical_damage", "power", "energy", "energy_regeneration", "speed", "dexterity", "defense", "regeneration");
     private Double health;
     private Double strength;
     private Double damage;
@@ -185,10 +187,28 @@ public final class ProfileStatsTracker {
     }
 
     public List<String> getHudLines(Function<String, String> localizer) {
-        List<String> lines = new ArrayList<>(3);
-        lines.add(localized(localizer, "profile.power", "Power") + ": " + formatValue(this.power));
-        lines.add(localized(localizer, "profile.strength", "Strength") + ": " + formatValue(this.strength));
-        lines.add(localized(localizer, "profile.speed", "Speed") + ": " + formatValue(this.speed));
+        return getHudLines(localizer, List.of("power", "strength", "speed"));
+    }
+
+    public List<String> getHudLines(Function<String, String> localizer, List<String> selected) {
+        List<String> lines = new ArrayList<>();
+        for (String key : selected) {
+            Double value = switch (key) {
+                case "health" -> health; case "strength" -> strength; case "damage" -> damage;
+                case "critical_chance" -> criticalChance; case "critical_damage" -> criticalDamage;
+                case "power" -> power; case "energy" -> energy; case "energy_regeneration" -> energyRegeneration;
+                case "speed" -> speed; case "dexterity" -> dexterity; case "defense" -> defense;
+                case "regeneration" -> regeneration; default -> null;
+            };
+            if (!STAT_KEYS.contains(key)) continue;
+            String fallback = switch (key) {
+                case "critical_chance" -> "Critical Chance"; case "critical_damage" -> "Critical Damage";
+                case "energy_regeneration" -> "Energy Regeneration";
+                default -> key.substring(0, 1).toUpperCase(Locale.ROOT) + key.substring(1);
+            };
+            lines.add(localized(localizer, "profile." + key, fallback) + ": " + formatValue(value)
+                + (key.equals("critical_chance") && value != null ? "%" : ""));
+        }
         return lines;
     }
 

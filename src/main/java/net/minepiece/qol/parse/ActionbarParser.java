@@ -33,6 +33,8 @@ public final class ActionbarParser {
             return Optional.empty();
         }
 
+        // Reject a signed numerator rather than reading the digits of a negative value as positive XP.
+        if (actionbar.substring(0, xpMatcher.start()).matches("(?s).*[-+]\\s*$")) return Optional.empty();
         double currentXp = NumberParser.parse(xpMatcher.group(1), null);
         double neededXp = NumberParser.parse(xpMatcher.group(2), null);
         return Optional.of(new ActionbarSnapshot(moneyGain == null ? 0.0D : moneyGain, xpGain == null ? 0.0D : xpGain, currentXp, neededXp));

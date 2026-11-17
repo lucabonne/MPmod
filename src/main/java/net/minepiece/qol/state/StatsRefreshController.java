@@ -3,13 +3,13 @@ package net.minepiece.qol.state;
 import java.util.ArrayDeque;
 import java.util.Locale;
 import java.util.function.Function;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
 import net.minepiece.qol.util.TextUtil;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
 
 public final class StatsRefreshController {
     private static final long DEBOUNCE_MS = 500L;
@@ -71,7 +71,7 @@ public final class StatsRefreshController {
         this.localizer = localizer;
     }
 
-    public void tick(MinecraftClient client) {
+    public void tick(Minecraft client) {
         if (client == null || client.player == null) {
             return;
         }
@@ -82,7 +82,7 @@ public final class StatsRefreshController {
         }
 
         snapshotChanges(client);
-        resolvePetsScreenLifecycle(client.currentScreen);
+        resolvePetsScreenLifecycle(client.gui.screen());
         resolveCalibrationRequest(client);
         resolvePendingAction(client);
         resolveProfileRequestTimeout();
@@ -154,13 +154,13 @@ public final class StatsRefreshController {
         return shouldClose;
     }
 
-    private void snapshotChanges(MinecraftClient client) {
-        PlayerInventory inventory = client.player.getInventory();
+    private void snapshotChanges(Minecraft client) {
+        Inventory inventory = client.player.getInventory();
         int selectedSlot = inventory.getSelectedSlot();
-        String mainHandFingerprint = fingerprint(inventory.getSelectedStack());
+        String mainHandFingerprint = fingerprint(inventory.getSelectedItem());
         String[] armorFingerprints = new String[ARMOR_SLOTS.length];
         for (int i = 0; i < ARMOR_SLOTS.length; i++) {
-            armorFingerprints[i] = fingerprint(client.player.getEquippedStack(ARMOR_SLOTS[i]));
+            armorFingerprints[i] = fingerprint(client.player.getItemBySlot(ARMOR_SLOTS[i]));
         }
 
         if (!this.primed) {
@@ -187,7 +187,7 @@ public final class StatsRefreshController {
         }
     }
 
-    private void resolvePendingAction(MinecraftClient client) {
+    private void resolvePendingAction(Minecraft client) {
         long now = System.currentTimeMillis();
         if (this.scheduledProfileAtMs == 0L || now < this.scheduledProfileAtMs || this.awaitingProfileSync) {
             return;
@@ -267,7 +267,7 @@ public final class StatsRefreshController {
         }
     }
 
-    private void resolveCalibrationRequest(MinecraftClient client) {
+    private void resolveCalibrationRequest(Minecraft client) {
         if (!this.calibrationRequested || this.calibrationInProgress || this.awaitingProfileSync) {
             return;
         }
@@ -297,7 +297,7 @@ public final class StatsRefreshController {
         log("profile-trigger " + reason);
     }
 
-    private void startCalibration(MinecraftClient client) {
+    private void startCalibration(Minecraft client) {
         if (this.calibrationInProgress) {
             return;
         }
@@ -327,7 +327,7 @@ public final class StatsRefreshController {
         scheduleProfile("slot-calibration", CALIBRATION_STEP_DELAY_MS);
     }
 
-    private void restoreSelectedSlotIfNeeded(MinecraftClient client) {
+    private void restoreSelectedSlotIfNeeded(Minecraft client) {
         if (!this.restoreSelectedSlotPending || this.calibrationRestoreSlot < 0) {
             return;
         }
@@ -367,7 +367,7 @@ public final class StatsRefreshController {
         if (stack == null || stack.isEmpty()) {
             return "";
         }
-        return Registries.ITEM.getId(stack.getItem()) + "|"
-            + TextUtil.normalize(stack.getName());
+        return BuiltInRegistries.ITEM.getKey(stack.getItem()) + "|"
+            + TextUtil.normalize(stack.getHoverName());
     }
 }

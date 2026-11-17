@@ -3,7 +3,7 @@ package net.minepiece.qol.util;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 public final class TextUtil {
     private static final Pattern LEGACY_FORMATTING = Pattern.compile("\u00a7.");
@@ -12,7 +12,7 @@ public final class TextUtil {
     private TextUtil() {
     }
 
-    public static String normalize(Text text) {
+    public static String normalize(Component text) {
         return text == null ? "" : normalize(text.getString());
     }
 
@@ -25,9 +25,9 @@ public final class TextUtil {
         return WHITESPACE.matcher(noFormatting.trim()).replaceAll(" ");
     }
 
-    public static List<String> normalizeLines(List<Text> lines) {
+    public static List<String> normalizeLines(List<Component> lines) {
         List<String> normalized = new ArrayList<>(lines.size());
-        for (Text line : lines) {
+        for (Component line : lines) {
             normalized.add(normalize(line));
         }
         return normalized;

@@ -84,6 +84,12 @@ public final class ConfigManager {
     }
 
     private static void normalizeConfig(ModConfig config) {
+        if (config.appearance == null) config.appearance = new UiSettings();
+        config.appearance.normalize();
+        if (config.uiLoadouts == null) config.uiLoadouts = new ArrayList<>();
+        config.uiLoadouts.removeIf(layout -> layout == null || layout.name == null || layout.name.isBlank()
+            || layout.panels == null || layout.appearance == null);
+        for (UiSettings.Loadout layout : config.uiLoadouts) layout.appearance.normalize();
         if (config.bossTrackingEnabled == null) {
             config.bossTrackingEnabled = true;
         }
@@ -147,6 +153,25 @@ public final class ConfigManager {
         if (config.inventoryXpHudScale <= 0.0F) {
             config.inventoryXpHudScale = 1.0F;
         }
+        if (config.grindingHudColor == null || config.grindingHudColor.isBlank()) {
+            config.grindingHudColor = "default";
+        }
+        if (config.grindingHudScale <= 0.0F) {
+            config.grindingHudScale = 1.0F;
+        }
+        if (!Float.isFinite(config.dailyQuestsHudScale) || config.dailyQuestsHudScale <= 0) config.dailyQuestsHudScale = 0.8F;
+        if (!Float.isFinite(config.activePetsHudScale) || config.activePetsHudScale <= 0) config.activePetsHudScale = 0.8F;
+        if (config.dailyQuestsHudColor == null) config.dailyQuestsHudColor = "default";
+        if (config.activePetsHudColor == null) config.activePetsHudColor = "default";
+        if (!Float.isFinite(config.safeChestsHudScale) || config.safeChestsHudScale <= 0) config.safeChestsHudScale = 0.8F;
+        if (config.safeChestsHudColor == null) config.safeChestsHudColor = "default";
+        config.cookingQuantity = Math.max(1, Math.min(64, config.cookingQuantity));
+        if (config.cookingHudScale <= 0.0F) {
+            config.cookingHudScale = 1.0F;
+        }
+        if (config.cookingHudColor == null || config.cookingHudColor.isBlank()) {
+            config.cookingHudColor = "default";
+        }
         if (config.chatTranslationRules == null) {
             config.chatTranslationRules = new ArrayList<>();
         }
@@ -200,6 +225,9 @@ public final class ConfigManager {
     }
 
     public static final class ModConfig {
+        public UiSettings appearance = new UiSettings();
+        public List<UiSettings.Loadout> uiLoadouts = new ArrayList<>();
+        public String activeUiLoadout = "";
         public boolean modEnabled = true;
         public boolean allFeaturesVisible = true;
         public boolean debugEnabled = false;
@@ -211,15 +239,52 @@ public final class ConfigManager {
         public boolean eventsEnabled = true;
         public boolean profileStatsEnabled = true;
         public boolean auctionHighlightEnabled = true;
+        public boolean auctionPriceKeyEnabled = true;
         public boolean hakiEnabled = true;
         public Boolean scrollsEnabled = true;
         public boolean inventoryXpHudEnabled = true;
+        public boolean profileXpHudEnabled = true;
+        public boolean grindingHudEnabled = true;
+        public boolean cookingHudEnabled = true;
+        public int clockHudX = 200;
+        public int clockHudY = 8;
+        public float clockHudScale = 1.0F;
+        public String clockHudColor = "default";
+        public int cookingQuantity = 1;
+        public int cookingHudX = 440;
+        public int cookingHudY = 120;
+        public float cookingHudScale = 1.0F;
+        public String cookingHudColor = "default";
         public boolean chatTranslationEnabled = false;
         public boolean chatTranslationAggressiveEnabled = false;
         public boolean chatTranslationPublicEnabled = true;
         public boolean chatTranslationPrivateEnabled = true;
         public boolean chatTranslationSystemEnabled = false;
         public String uiLanguage = UiLocalization.DEFAULT_LANGUAGE;
+        public boolean petRollsEnabled = true;
+        public boolean minionCalculatorEnabled = true;
+        public boolean dailyQuestsEnabled = true;
+        public boolean activePetsEnabled = true;
+        public boolean backgroundRefreshEnabled = true;
+        public boolean automaticBossReads = true;
+        public boolean bossAlertsEnabled = true;
+        public boolean rarityFilterEnabled = true;
+        public boolean inventorySortingEnabled = true;
+        public boolean hotbarRarityEnabled = true;
+        public boolean updateCheckEnabled = false;
+        public int dailyQuestsHudX = 440;
+        public int dailyQuestsHudY = 8;
+        public float dailyQuestsHudScale = 0.8F;
+        public String dailyQuestsHudColor = "default";
+        public int activePetsHudX = 440;
+        public int activePetsHudY = 190;
+        public float activePetsHudScale = 0.8F;
+        public String activePetsHudColor = "default";
+        public boolean safeChestsEnabled = true;
+        public int safeChestsHudX = 440;
+        public int safeChestsHudY = 260;
+        public float safeChestsHudScale = 0.8F;
+        public String safeChestsHudColor = "default";
         public boolean rarityIconsEnabled = true;
         public boolean petStatIconsEnabled = true;
         public List<ChatTranslationRule> chatTranslationRules = new ArrayList<>();
@@ -261,6 +326,10 @@ public final class ConfigManager {
         public int inventoryXpHudY = 224;
         public float inventoryXpHudScale = 1.0F;
         public String inventoryXpHudColor = "default";
+        public int grindingHudX = 220;
+        public int grindingHudY = 190;
+        public float grindingHudScale = 1.0F;
+        public String grindingHudColor = "default";
         public int cooldownHudOffsetY = 54;
 
         public static final class ChatTranslationRule {

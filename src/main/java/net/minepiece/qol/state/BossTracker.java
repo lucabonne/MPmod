@@ -18,7 +18,7 @@ import net.minepiece.qol.parse.TooltipParsers;
 import net.minepiece.qol.util.NumberParser;
 
 public final class BossTracker {
-    private static final int MAX_BOSSES_PER_SPAWN = 15;
+    private static final int MAX_MINIBOSSES_PER_SPAWN = 15;
     private static final int MINIBOSS_TIMER_SECONDS = 300;
     private static final int MINIBOSS_REMOVE_GRACE_SECONDS = 30;
     private static final long MINIBOSS_REGISTER_COOLDOWN_MS = 5_000L;
@@ -40,6 +40,8 @@ public final class BossTracker {
     private final Map<String, SymbolProgress> minibossProgress = new HashMap<>();
 
     private String currentSpawnId = "";
+    private String currentIslandId = BossIslands.UNKNOWN;
+    private List<String> lastLocationBars = List.of();
     private long lastMinibossProgressMs;
     private long lastMinibossRegisterMs;
     private boolean minibossRegistrationEnabled = true;
@@ -55,16 +57,47 @@ public final class BossTracker {
         this.currentSpawnId = ChatParsers.parseSpawnId(footerText).orElse("");
     }
 
+    public void observeLocationBars(List<String> bars) {
+        if (bars.equals(this.lastLocationBars)) return;
+        this.lastLocationBars = List.copyOf(bars);
+        String island = BossIslands.fromLocationBars(bars);
+        if (!BossIslands.UNKNOWN.equals(island)) this.currentIslandId = island;
+    }
+
+    public String getCurrentIslandId() { return this.currentIslandId; }
+
+    public void resetLocation() {
+        this.currentIslandId = BossIslands.UNKNOWN;
+        this.lastLocationBars = List.of();
+    }
+
     public void setMinibossRegistrationEnabled(boolean enabled) {
         this.minibossRegistrationEnabled = enabled;
     }
 
     public void captureTooltip(String fallbackName, List<String> tooltipLines) {
-        Optional<TooltipParsers.BossTooltipData> parsed = TooltipParsers.parseBossTooltip(tooltipLines, fallbackName);
-        parsed.ifPresent(this::captureParsedTooltip);
+        captureParsedTooltips(fallbackName, TooltipParsers.parseBossTooltips(tooltipLines, fallbackName));
+    }
+
+    public void captureParsedTooltips(String title, List<TooltipParsers.BossTooltipData> parsed) {
+        // Replace only the old island entry whose coordinates belong to this tooltip.
+        boolean removed = this.state.bosses.values().removeIf(entry -> !entry.miniboss
+            && activeOrGlobalSpawnId().equals(entry.spawnId) && bossNameMatches(entry.bossName, title)
+            && parsed.stream().anyMatch(data -> !bossNameMatches(data.bossName(), title)
+                && entry.x == data.x() && entry.y == data.y() && entry.z == data.z()));
+        if (removed) {
+            this.state.bossRegistry.removeIf(name -> bossNameMatches(name, title));
+            this.stateSaver.accept(this.state);
+        }
+        String islandId = BossIslands.fromMenuTitle(title);
+        parsed.forEach(data -> captureParsedTooltip(data, islandId, title));
     }
 
     public void captureParsedTooltip(TooltipParsers.BossTooltipData data) {
+        captureParsedTooltip(data, BossIslands.UNKNOWN, "");
+    }
+
+    private void captureParsedTooltip(TooltipParsers.BossTooltipData data, String islandId, String islandName) {
         if (!isCompleteBossData(data)) {
             return;
         }
@@ -88,7 +121,9 @@ public final class BossTracker {
         }
 
         long candidateNextSpawn = System.currentTimeMillis() + data.remainingSeconds() * 1000L;
-        boolean changed = !effectiveSpawnId.equals(entry.spawnId)
+        boolean islandKnown = !BossIslands.UNKNOWN.equals(islandId);
+        boolean changed = islandKnown && (!islandId.equals(entry.islandId) || !islandName.equals(entry.islandName))
+            || !effectiveSpawnId.equals(entry.spawnId)
             || !bossName.equals(entry.bossName)
             || entry.x != data.x()
             || entry.y != data.y()
@@ -98,6 +133,10 @@ public final class BossTracker {
 
         entry.spawnId = effectiveSpawnId;
         entry.bossName = bossName;
+        if (islandKnown) {
+            entry.islandId = islandId;
+            entry.islandName = islandName;
+        }
         entry.x = data.x();
         entry.y = data.y();
         entry.z = data.z();
@@ -262,9 +301,8 @@ public final class BossTracker {
         progress.lastSeenMs = now;
 
         boolean hasLargeRewardChunk = largeOtherDelta >= 100 || largeOtherValue >= 100;
-        boolean explicitPlusTenBounty = actionbar.contains("+10 军");
-        boolean minibossBountyChunk = bountyDelta == 10 || (explicitPlusTenBounty && hasLargeRewardChunk);
-        boolean bossBountyValue = bountyValue >= 50 || bountyDelta >= 50;
+        boolean minibossBountyChunk = bountyDelta == 10;
+        boolean bossBountyValue = bountyDelta >= 50;
         boolean minibossDetected = hasLargeRewardChunk && minibossBountyChunk && !bossBountyValue;
         this.debugLogManager.logInternal(String.format(
             Locale.ROOT,
@@ -342,50 +380,78 @@ public final class BossTracker {
     }
 
     public List<HudLine> getZoneBossHudLines(boolean includeCoords, Function<String, String> localizer) {
+        return getZoneBossHudLines(includeCoords, localizer, List.of());
+    }
+
+    public List<HudLine> getZoneBossHudLines(boolean includeCoords, Function<String, String> localizer, List<String> collapsedIslands) {
+        return getZoneBossHudLines(includeCoords, localizer, collapsedIslands, false);
+    }
+
+    public List<HudLine> getZoneBossHudLines(boolean includeCoords, Function<String, String> localizer, List<String> collapsedIslands, boolean byTime) {
         long now = System.currentTimeMillis();
         List<HudLine> lines = new ArrayList<>();
-
-        List<PersistentState.BossSpawnState> zoneBosses = new ArrayList<>();
-        for (PersistentState.BossSpawnState entry : this.state.bosses.values()) {
-            if (entry.miniboss || entry.nextSpawnEpochMs <= 0L) {
-                continue;
+        var spawns = new java.util.TreeMap<String, List<PersistentState.BossSpawnState>>(
+            Comparator.comparing(BossTracker::sortableSpawnId).thenComparing(id -> id));
+        for (var entry : this.state.bosses.values()) {
+            if (!entry.miniboss && entry.nextSpawnEpochMs > 0L && !isBossIgnored(entry.bossName)) {
+                spawns.computeIfAbsent(normalizedSpawnId(entry.spawnId), key -> new ArrayList<>()).add(entry);
             }
-            if (isBossIgnored(entry.bossName)) {
-                continue;
-            }
-            zoneBosses.add(entry);
         }
-        zoneBosses.sort(Comparator
-            .comparing((PersistentState.BossSpawnState entry) -> sortableSpawnId(entry.spawnId))
-            .thenComparingLong(entry -> entry.nextSpawnEpochMs)
-            .thenComparing(entry -> normalizeBossName(entry.bossName)));
-
-        String activeSpawnGroup = null;
-        for (PersistentState.BossSpawnState entry : zoneBosses) {
-            String entrySpawnId = normalizedSpawnId(entry.spawnId);
-            if (!entrySpawnId.equals(activeSpawnGroup)) {
-                String spawnLabel = "unknown".equals(entrySpawnId)
-                    ? localized(localizer, "common.unknown", "UNKNOWN")
-                    : entrySpawnId;
-                lines.add(new HudLine(localized(localizer, "bosses.spawn", "Spawn") + " " + spawnLabel, HUD_SPAWN_HEADER_COLOR));
-                activeSpawnGroup = entrySpawnId;
+        for (var spawn : spawns.entrySet()) {
+            String spawnLabel = "unknown".equals(spawn.getKey())
+                ? localized(localizer, "common.unknown", "UNKNOWN") : spawn.getKey();
+            lines.add(new HudLine(localized(localizer, "bosses.spawn", "Spawn") + " " + spawnLabel, HUD_SPAWN_HEADER_COLOR));
+            if (byTime) {
+                spawn.getValue().sort(Comparator.comparingLong((PersistentState.BossSpawnState boss) -> Math.max(0, boss.nextSpawnEpochMs - now))
+                    .thenComparing(boss -> normalizeBossName(boss.bossName)));
+                for (var boss : spawn.getValue()) {
+                    long remaining = boss.nextSpawnEpochMs - now;
+                    lines.add(new HudLine("  " + toHudDisplayName(boss.bossName, localized(localizer, "bosses.boss", "Boss"))
+                        + " • " + islandLabel(boss, localizer) + " - "
+                        + (remaining <= 0 ? localized(localizer, "common.ready", "READY") : NumberParser.formatTimer(remaining)),
+                        remaining <= 0 ? 0xFFD08484 : 0xFFC36B6B));
+                    if (includeCoords && hasKnownCoords(boss)) lines.add(new HudLine(
+                        String.format(Locale.ROOT, "    %s %d %d %d", localized(localizer, "bosses.wp", "WP"), boss.x, boss.y, boss.z), 0xFFA85E5E));
+                }
+                continue;
             }
-
-            long remaining = entry.nextSpawnEpochMs - now;
-            boolean ready = remaining <= 0L;
-            int color = ready ? 0xFFD08484 : 0xFFC36B6B; // muted red
-            int waypointColor = 0xFFA85E5E;
-            String label = "  " + toHudDisplayName(entry.bossName, localized(localizer, "bosses.boss", "Boss"))
-                + " - " + (ready ? localized(localizer, "common.ready", "READY") : NumberParser.formatTimer(remaining));
-            lines.add(new HudLine(label, color));
-            if (includeCoords && hasKnownCoords(entry)) {
-                lines.add(new HudLine(
-                    String.format(Locale.ROOT, "    %s %d %d %d", localized(localizer, "bosses.wp", "WP"), entry.x, entry.y, entry.z),
-                    waypointColor
-                ));
+            var islands = new HashMap<String, List<PersistentState.BossSpawnState>>();
+            for (var boss : spawn.getValue()) islands.computeIfAbsent(islandId(boss), key -> new ArrayList<>()).add(boss);
+            var ordered = new ArrayList<>(islands.keySet());
+            ordered.sort(Comparator.comparing((String id) -> !id.equals(this.currentIslandId))
+                .thenComparing(id -> islandLabel(islands.get(id).getFirst(), localizer), String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(id -> id));
+            for (String island : ordered) {
+                var bosses = islands.get(island);
+                bosses.sort(Comparator.comparingLong((PersistentState.BossSpawnState boss) -> boss.nextSpawnEpochMs)
+                    .thenComparing(boss -> normalizeBossName(boss.bossName)));
+                boolean collapsed = collapsedIslands.contains(island);
+                String heading = "  " + (collapsed ? "▸ " : "▾ ")
+                    + (island.equals(this.currentIslandId) && !BossIslands.UNKNOWN.equals(island) ? "★ " : "")
+                    + islandLabel(bosses.getFirst(), localizer) + " (" + bosses.size() + ")";
+                lines.add(new HudLine(heading, HUD_SPAWN_HEADER_COLOR, island));
+                if (collapsed) continue;
+                for (var entry : bosses) {
+                    long remaining = entry.nextSpawnEpochMs - now;
+                    boolean ready = remaining <= 0L;
+                    lines.add(new HudLine("    " + toHudDisplayName(entry.bossName, localized(localizer, "bosses.boss", "Boss"))
+                        + " - " + (ready ? localized(localizer, "common.ready", "READY") : NumberParser.formatTimer(remaining)),
+                        ready ? 0xFFD08484 : 0xFFC36B6B));
+                    if (includeCoords && hasKnownCoords(entry)) lines.add(new HudLine(
+                        String.format(Locale.ROOT, "      %s %d %d %d", localized(localizer, "bosses.wp", "WP"), entry.x, entry.y, entry.z), 0xFFA85E5E));
+                }
             }
         }
         return lines;
+    }
+
+    private static String islandId(PersistentState.BossSpawnState boss) {
+        return boss.islandId == null || boss.islandId.isBlank() ? BossIslands.UNKNOWN : boss.islandId;
+    }
+
+    private static String islandLabel(PersistentState.BossSpawnState boss, Function<String, String> localizer) {
+        return BossIslands.UNKNOWN.equals(islandId(boss)) || boss.islandName == null || boss.islandName.isBlank()
+            ? localized(localizer, "bosses.unknown_island", "Unknown island") : boss.islandName;
     }
 
     public List<HudLine> getMinibossHudLines(boolean includeCoords) {
@@ -726,10 +792,10 @@ public final class BossTracker {
 
     private boolean pruneSpawnEntries(String spawnId, String keepKey) {
         boolean removed = false;
-        while (countSpawnEntries(spawnId) > MAX_BOSSES_PER_SPAWN) {
+        while (countSpawnEntries(spawnId) > MAX_MINIBOSSES_PER_SPAWN) {
             String removableKey = null;
             for (Map.Entry<String, PersistentState.BossSpawnState> entry : this.state.bosses.entrySet()) {
-                if (!spawnId.equals(entry.getValue().spawnId)) {
+                if (!entry.getValue().miniboss || !spawnId.equals(entry.getValue().spawnId)) {
                     continue;
                 }
                 if (entry.getKey().equals(keepKey)) {
@@ -750,7 +816,7 @@ public final class BossTracker {
     private int countSpawnEntries(String spawnId) {
         int count = 0;
         for (PersistentState.BossSpawnState value : this.state.bosses.values()) {
-            if (spawnId.equals(value.spawnId)) {
+            if (value.miniboss && spawnId.equals(value.spawnId)) {
                 count++;
             }
         }
@@ -1081,7 +1147,8 @@ public final class BossTracker {
         return states;
     }
 
-    public record HudLine(String text, int color) {
+    public record HudLine(String text, int color, String islandId) {
+        public HudLine(String text, int color) { this(text, color, ""); }
     }
 
     public record MinibossWaypoint(String name, String symbol, int x, int y, int z, long remainingMs) {

@@ -1,0 +1,58 @@
+package net.minepiece.qol.ui;
+
+import java.util.ArrayList;
+import java.util.List;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minepiece.qol.MinepieceQolClient;
+import net.minepiece.qol.state.BossTracker;
+import net.minepiece.qol.util.TextUtil;
+
+public final class HudIcons {
+    private HudIcons() { }
+
+    public static ItemStack findInventoryItem(String name) {
+        var player = Minecraft.getInstance().player;
+        if (player == null) return ItemStack.EMPTY;
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (!stack.isEmpty() && TextUtil.normalize(stack.getHoverName()).equalsIgnoreCase(name)) return stack.copy();
+        }
+        return ItemStack.EMPTY;
+    }
+
+    public static List<IconGridTooltipComponent.Row> rows(MinepieceQolClient mod, String title, List<BossTracker.HudLine> lines) {
+        int id = 0;
+        for (int i = 1; i <= 15; i++) if (mod.getHudPanelName(i).equals(title)) { id = i; break; }
+        ItemStack header = switch (id) {
+            case 1 -> new ItemStack(Items.IRON_PICKAXE);
+            case 2 -> new ItemStack(Items.GOLD_NUGGET);
+            case 3, 9 -> new ItemStack(Items.PLAYER_HEAD);
+            case 4, 5 -> new ItemStack(Items.IRON_SWORD);
+            case 8 -> new ItemStack(Items.PAPER);
+            case 10 -> new ItemStack(Items.EXPERIENCE_BOTTLE);
+            case 11 -> new ItemStack(Items.BOWL);
+            case 12 -> new ItemStack(Items.CLOCK);
+            case 13 -> new ItemStack(Items.BOOK);
+            case 14 -> new ItemStack(Items.RABBIT_FOOT);
+            case 15 -> new ItemStack(Items.CHEST);
+            default -> ItemStack.EMPTY;
+        };
+        int profileRows = id == 9 && mod.getConfig().profileXpHudEnabled
+            ? mod.getProgressHudController().profile().getHudLines(mod::tr).size() : 0;
+        List<ItemStack> xpIcons = id == 9 && mod.getConfig().inventoryXpHudEnabled ? mod.getInventoryXpTracker().getIcons() : List.of();
+        List<IconGridTooltipComponent.Row> rows = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            var line = lines.get(i);
+            ItemStack icon = i == 0 ? header : ItemStack.EMPTY;
+            if (id == 9 && i >= profileRows && i - profileRows < xpIcons.size()) icon = xpIcons.get(i - profileRows);
+            if (id == 11 && i > 0) {
+                int end = line.text().indexOf(" (");
+                if (end > 0) icon = findInventoryItem(line.text().substring(0, end));
+            }
+            rows.add(new IconGridTooltipComponent.Row(line.text(), line.color(), icon, null));
+        }
+        return rows;
+    }
+}

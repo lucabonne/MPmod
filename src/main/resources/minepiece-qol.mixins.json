@@ -1,13 +1,20 @@
 {
   "required": true,
   "package": "net.minepiece.qol.mixin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
   "client": [
     "ChatHudMixin",
-    "ClientPlayerInteractionManagerMixin",
+    "BackgroundMenuMixin",
+    "ChatScreenMixin",
+    "HudEditorKeyboardMixin",
+    "HudEditorMouseMixin",
+    "ModWidgetAudioMixin",
+    "BossBarHudAccessor",
     "HandledScreenDrawSlotMixin",
     "InGameHudMixin",
-    "PlayerListHudAccessor"
+    "PlayerListHudAccessor",
+    "ItemStackTooltipMixin",
+    "DrawContextTooltipMixin"
   ],
   "injectors": {
     "defaultRequire": 1

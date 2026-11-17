@@ -9,7 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 public final class DebugLogManager {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -63,9 +63,9 @@ public final class DebugLogManager {
         return this.lastLine;
     }
 
-    public void copyLastToClipboard(MinecraftClient client) {
+    public void copyLastToClipboard(Minecraft client) {
         if (client != null && !this.lastLine.isBlank()) {
-            client.keyboard.setClipboard(this.lastLine);
+            client.keyboardHandler.setClipboard(this.lastLine);
         }
     }
 

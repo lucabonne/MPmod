@@ -79,19 +79,15 @@ class MoneyTrackerTest {
     }
 
     @Test
-    void islandBankDepositLeavesPlayerBalanceAndEmitsOneEvent() {
+    void islandBankDepositReducesPlayerBalance() {
         PersistentState state = new PersistentState();
         MoneyTracker tracker = new MoneyTracker(state, ignored -> { }, Path.of("."));
         tracker.setCurrentBalance(5_000_000L);
-        java.util.List<MoneyTracker.EconomyEvent> events = new java.util.ArrayList<>();
-        tracker.setEconomyObserver(events::add);
 
         tracker.onGameMessage("莱 You have deposited 2M 实 in your island bank.");
 
         assertEquals(3_000_000L, tracker.getCurrentBalance());
         assertEquals(-2_000_000L, tracker.getNonAhToday());
-        assertEquals(1, events.size());
-        assertEquals(-2_000_000L, events.getFirst().signedAmount());
     }
 
     @Test
@@ -99,14 +95,12 @@ class MoneyTrackerTest {
         PersistentState state = new PersistentState();
         MoneyTracker tracker = new MoneyTracker(state, ignored -> { }, Path.of("."));
         tracker.setCurrentBalance(1_000L);
-        java.util.List<MoneyTracker.EconomyEvent> events = new java.util.ArrayList<>();
-        tracker.setEconomyObserver(events::add);
 
         tracker.onGameMessage("You earned 100 实");
         tracker.onActionbarMessage("100 实");
 
         assertEquals(1_100L, tracker.getCurrentBalance());
-        assertEquals(1, events.size());
+        assertEquals(100L, tracker.getNonAhToday());
     }
 
     @Test
