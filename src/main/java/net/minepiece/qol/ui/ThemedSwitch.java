@@ -15,10 +15,17 @@ public final class ThemedSwitch extends AbstractWidget {
     static final int ON = 0xFF2E8B57, ON_BORDER = 0xFF6FD39A, OFF = 0xFF1A2B49, OFF_BORDER = 0xFF3A5378;
     private final MinepieceQolClient mod;
     private final Checkbox checkbox;
+    /** A dim second line under the label, or null. */
+    private final String description;
 
     public ThemedSwitch(MinepieceQolClient mod, Checkbox checkbox, int width) {
-        super(checkbox.getX(), checkbox.getY(), width, Math.max(14, checkbox.getHeight() - 2), checkbox.getMessage());
+        this(mod, checkbox, width, null);
+    }
+
+    public ThemedSwitch(MinepieceQolClient mod, Checkbox checkbox, int width, String description) {
+        super(checkbox.getX(), checkbox.getY(), width, description != null ? 23 : Math.max(14, checkbox.getHeight() - 2), checkbox.getMessage());
         this.mod = mod;
+        this.description = description;
         this.checkbox = checkbox;
         this.active = checkbox.active;
         this.visible = checkbox.visible;
@@ -44,8 +51,15 @@ public final class ThemedSwitch extends AbstractWidget {
         context.fill(kx, sy + 2, kx + knob, sy + 2 + knob, on ? 0xFFFFFFFF : 0xFF89A8DA);
         if (labelled) {
             var font = Minecraft.getInstance().font;
-            String text = font.plainSubstrByWidth(getMessage().getString(), Math.max(1, sx - x - 10));
-            context.text(font, text, x + 5, y + (h - 8) / 2, UiSettings.color(a.text, active ? 100 : 50), a.shadows);
+            int room = Math.max(1, sx - x - 10);
+            String text = font.plainSubstrByWidth(getMessage().getString(), room);
+            int textColor = UiSettings.color(a.text, active ? 100 : 50);
+            if (this.description == null) {
+                context.text(font, text, x + 5, y + (h - 8) / 2, textColor, a.shadows);
+            } else {
+                context.text(font, text, x + 5, y + 3, textColor, a.shadows);
+                context.text(font, font.plainSubstrByWidth(this.description, room), x + 5, y + 13, UiSettings.color(a.text, 60), false);
+            }
         }
     }
 

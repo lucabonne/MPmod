@@ -156,6 +156,16 @@ public final class MinepieceMenuScreen extends Screen {
     private final MinepieceQolClient mod;
     private Tab currentTab = Tab.MAIN;
     private EditBox searchBox;
+    // Section layout for the simple settings pages: a running y offset and the boxes to draw behind the rows.
+    private static final int SECTION_HEADER = 14, SECTION_GAP = 6, SECTION_INSET = 4;
+    private record Section(String title, int top, int bottom) { }
+    private record SectionText(String text, int y) { }
+    private final List<Section> sections = new ArrayList<>();
+    private final List<SectionText> sectionTexts = new ArrayList<>();
+    private final Map<Checkbox, String> switchDescriptions = new java.util.IdentityHashMap<>();
+    private int layoutY;
+    private String openSection;
+    private int openSectionTop;
     private String searchQuery = "";
     private List<SearchEntry> searchIndex;
     private final Map<Group, Tab> selectedPages = new java.util.EnumMap<>(Group.class);
@@ -209,6 +219,12 @@ public final class MinepieceMenuScreen extends Screen {
     public MinepieceMenuScreen(MinepieceQolClient mod) {
         super(Component.literal(mod == null ? "Minepiece QoL" : mod.tr("menu.title")));
         this.mod = mod;
+    }
+
+    /** Opens on a named page, e.g. "EXTRAS" (used by the client smoke test). */
+    public MinepieceMenuScreen(MinepieceQolClient mod, String page) {
+        this(mod);
+        this.currentTab = Tab.valueOf(page);
     }
 
     @Override
@@ -266,8 +282,10 @@ public final class MinepieceMenuScreen extends Screen {
         if (this.searchBox != null) addWidget(this.searchBox);
         this.contentY = contentTop - pageScroll.getOrDefault(currentTab, 0);
         this.removeActions.clear();
+        resetSections();
         if (isSearching()) buildSearchResults();
         else buildPage(this.currentTab);
+        endSection();
         List<net.minecraft.client.gui.components.AbstractWidget> built = new ArrayList<>();
         for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget && child != this.searchBox) built.add(widget);
         for (var child : List.copyOf(children())) {
@@ -276,8 +294,10 @@ public final class MinepieceMenuScreen extends Screen {
                 addRenderableWidget(new ThemedButton(this.mod, button));
             } else if (child instanceof Checkbox box) {
                 removeWidget(box);
-                int width = box.getMessage().getString().isEmpty() ? box.getWidth() : switchWidth(box, built);
-                addRenderableWidget(new ThemedSwitch(this.mod, box, width));
+                boolean inSection = box.getX() == this.contentX + SECTION_INSET;
+                int width = box.getMessage().getString().isEmpty() ? box.getWidth()
+                    : inSection ? this.contentWidth - 6 - SECTION_INSET * 2 : switchWidth(box, built);
+                addRenderableWidget(new ThemedSwitch(this.mod, box, width, this.switchDescriptions.get(box)));
             }
         }
         if (!isSearching()) selectedPages.put(groupFor(currentTab), currentTab);
@@ -311,8 +331,10 @@ public final class MinepieceMenuScreen extends Screen {
             this.currentTab = tab;
             clearWidgets();
             this.removeActions.clear();
+            resetSections();
             try {
                 buildPage(tab);
+                endSection();
             } catch (RuntimeException ignored) {
                 // a page that cannot build off-screen is still found by its name
             }
@@ -324,6 +346,7 @@ public final class MinepieceMenuScreen extends Screen {
         this.currentTab = saved;
         clearWidgets();
         this.removeActions.clear();
+        resetSections();
         if (this.searchBox != null) addWidget(this.searchBox);
         this.searchIndex = entries;
         return entries;
@@ -364,8 +387,13 @@ public final class MinepieceMenuScreen extends Screen {
             case PROFILE -> buildProfileTab();
             case LANGUAGE -> buildLanguageTab();
             case AUCTION_HOUSE -> {
-                featureToggle("setting.auction_highlight", this.mod.getConfig().auctionHighlightEnabled, 0, v -> this.mod.setAuctionHighlightEnabled(v));
-                featureToggle("setting.auction_price_key", this.mod.getConfig().auctionPriceKeyEnabled, 24, v -> this.mod.getConfig().auctionPriceKeyEnabled = v);
+                section("menu.section.colors");
+                describedSwitch("setting.auction_highlight", this.mod.getConfig().auctionHighlightEnabled, v -> this.mod.setAuctionHighlightEnabled(v));
+                describedSwitch("setting.auction_price_key", this.mod.getConfig().auctionPriceKeyEnabled, v -> this.mod.getConfig().auctionPriceKeyEnabled = v);
+                section("menu.section.how_it_works");
+                sectionText(tr("auction.how1"));
+                sectionText(tr("auction.how2"));
+                sectionText(tr("auction.how3"));
             }
             case PROGRESS -> buildProgressTab();
             case COOKING -> buildCookingTab();
@@ -373,30 +401,30 @@ public final class MinepieceMenuScreen extends Screen {
             case COMBAT_SETTINGS -> buildCombatSettings();
             case STAT_DISPLAY -> buildStatDisplay();
             case PASS_PETS -> buildPassPets();
-            case SCROLLS -> featureToggle("setting.scrolls_hud", this.mod.getConfig().scrollsEnabled, 0, v -> this.mod.setScrollsEnabled(v));
+            case SCROLLS -> {
+                section("menu.section.panels");
+                describedSwitch("setting.scrolls_hud", this.mod.getConfig().scrollsEnabled, v -> this.mod.setScrollsEnabled(v));
+            }
             case HELP -> addRenderableWidget(Button.builder(trText("extras.help"), b -> this.minecraft.gui.setScreen(new HelpScreen(this.mod, this)))
                 .bounds(this.contentX, this.contentY, 220, 18).build());
             case APPEARANCE -> {
+                section("menu.section.customize");
                 String[] labels = {"ui.panels", "ui.appearance", "ui.loadouts", "ui.pictures"};
                 int[] pages = {3, 0, 1, 2};
                 for (int i = 0; i < pages.length; i++) {
                     final int page = pages[i];
-                    addRenderableWidget(Button.builder(trText(labels[i]), button ->
-                        this.minecraft.gui.setScreen(new AppearanceScreen(this.mod, this, page)))
-                        .bounds(this.contentX, this.contentY + i * 24, 220, 18).build());
+                    sectionButton(trText(labels[i]), button -> this.minecraft.gui.setScreen(new AppearanceScreen(this.mod, this, page)));
                 }
-                addRenderableWidget(Button.builder(trText("button.edit_hud_layout"), b -> this.mod.openHudLayoutEditor())
-                    .bounds(this.contentX, this.contentY + 110, 220, 18).build());
-                addRenderableWidget(Button.builder(trText("button.reset_hud_layout"), b -> this.resetHudLayoutConfirmOpen = true)
-                    .bounds(this.contentX, this.contentY + 134, 220, 18).build());
+                section("menu.section.layout");
+                sectionButton(trText("button.edit_hud_layout"), b -> this.mod.openHudLayoutEditor());
+                sectionButton(trText("button.reset_hud_layout"), b -> this.resetHudLayoutConfirmOpen = true);
             }
         }
     }
 
     private void finishTabContent() {
         int extent = isSearching() ? 0 : switch (currentTab) {
-            case PROGRESS -> 255; case COOKING -> 255; case MAIN -> 180;
-            case AUCTION_HOUSE -> 100;
+            case COOKING -> 255;
             case BOSSES -> BOSSES_ACTIVE_LIST_Y_OFFSET + BOSSES_ACTIVE_LIST_HEIGHT + BOSSES_REGISTRY_GAP + BOSSES_REGISTRY_LIST_HEIGHT;
             case MONEY, EVENTS, LANGUAGE -> contentHeight - 4;
             default -> 0;
@@ -404,6 +432,7 @@ public final class MinepieceMenuScreen extends Screen {
         for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget && child != this.searchBox)
             extent = Math.max(extent, widget.getY() + widget.getHeight() - contentY);
         for (var remove : removeActions) extent = Math.max(extent, remove.y() + REMOVE_BUTTON_SIZE - contentY);
+        for (var section : sections) extent = Math.max(extent, section.bottom());
         maxPageScroll = Math.max(0, extent - (contentBottom - contentTop));
         int offset = pageScroll.getOrDefault(currentTab, 0);
         if (offset > maxPageScroll) { pageScroll.put(currentTab, maxPageScroll); buildTabContent(); }
@@ -412,18 +441,23 @@ public final class MinepieceMenuScreen extends Screen {
 
     private void buildMainTab() {
         var cfg = this.mod.getConfig();
-        featureToggle("setting.mod_enabled", cfg.modEnabled, 0, this.mod::setModEnabled);
-        featureToggle("setting.show_all_features", cfg.allFeaturesVisible, 24, this.mod::setAllFeaturesVisible);
+        section("menu.section.core");
+        describedSwitch("setting.mod_enabled", cfg.modEnabled, this.mod::setModEnabled);
+        describedSwitch("setting.show_all_features", cfg.allFeaturesVisible, this.mod::setAllFeaturesVisible);
+        section("menu.section.language_updates");
         var languages = this.mod.getSupportedUiLanguages();
         uiLanguageIndex = findUiLanguageIndex(languages, this.mod.getUiLanguage());
-        addRenderableWidget(Button.builder(Component.literal(tr("main.mod_language") + ": " + languages.get(uiLanguageIndex).label()), b -> {
+        sectionButton(Component.literal(tr("main.mod_language") + ": " + languages.get(uiLanguageIndex).label()), b -> {
             uiLanguageIndex = (uiLanguageIndex + 1) % languages.size();
             this.mod.setUiLanguage(languages.get(uiLanguageIndex).code()); rebuild();
-        }).bounds(contentX, contentY + 52, 328, 18).build());
-        if (this.mod.isDebugToolsAvailable()) featureToggle("setting.debug_logging", cfg.debugEnabled, 80, this.mod::setDebugEnabled);
-        featureToggle("extras.updates", cfg.updateCheckEnabled, 104, v -> cfg.updateCheckEnabled = v);
-        addRenderableWidget(Button.builder(trText("button.edit_hud_layout"), b -> this.mod.openHudLayoutEditor())
-            .bounds(contentX, contentY + 132, 220, 18).build());
+        });
+        describedSwitch("extras.updates", cfg.updateCheckEnabled, v -> cfg.updateCheckEnabled = v);
+        section("menu.section.layout");
+        sectionButton(trText("button.edit_hud_layout"), b -> this.mod.openHudLayoutEditor());
+        if (this.mod.isDebugToolsAvailable()) {
+            section("menu.section.developer");
+            describedSwitch("setting.debug_logging", cfg.debugEnabled, this.mod::setDebugEnabled);
+        }
     }
 
     private void featureToggle(String label, boolean value, int dy, java.util.function.Consumer<Boolean> setter) {
@@ -433,27 +467,29 @@ public final class MinepieceMenuScreen extends Screen {
 
     private void buildCombatSettings() {
         var cfg = this.mod.getConfig();
-        featureToggle("bosses.automatic_reads", cfg.automaticBossReads, 0, v -> cfg.automaticBossReads = v);
-        featureToggle("extras.boss_alerts", cfg.bossAlertsEnabled, 24, v -> cfg.bossAlertsEnabled = v);
-        featureToggle("setting.haki_cooldown", cfg.hakiEnabled, 48, this.mod::setHakiEnabled);
-        addRenderableWidget(Button.builder(Component.literal(tr("bosses.order") + ": " + tr(cfg.appearance.bossesByTime ? "bosses.by_time" : "bosses.by_island")), b -> {
+        section("menu.section.boss_timers");
+        describedSwitch("bosses.automatic_reads", cfg.automaticBossReads, v -> cfg.automaticBossReads = v);
+        describedSwitch("extras.boss_alerts", cfg.bossAlertsEnabled, v -> cfg.bossAlertsEnabled = v);
+        sectionButton(Component.literal(tr("bosses.order") + ": " + tr(cfg.appearance.bossesByTime ? "bosses.by_time" : "bosses.by_island")), b -> {
             cfg.appearance.bossesByTime = !cfg.appearance.bossesByTime;
             this.mod.saveConfig(); rebuild();
-        }).bounds(contentX, contentY + 80, 328, 18).build());
-        addRenderableWidget(Button.builder(trText("extras.refresh"), b -> this.mod.getEssentials().refresh())
-            .bounds(contentX, contentY + 108, 220, 18).build());
+        });
+        sectionButton(trText("extras.refresh"), b -> this.mod.getEssentials().refresh());
+        section("menu.section.cooldowns");
+        describedSwitch("setting.haki_cooldown", cfg.hakiEnabled, this.mod::setHakiEnabled);
     }
 
     private void buildPassPets() {
         var cfg = this.mod.getConfig();
-        featureToggle("extras.daily_quests", cfg.dailyQuestsEnabled, 0, v -> cfg.dailyQuestsEnabled = v);
-        featureToggle("extras.active_pets", cfg.activePetsEnabled, 24, v -> cfg.activePetsEnabled = v);
-        featureToggle("extras.background", cfg.backgroundRefreshEnabled, 48, v -> cfg.backgroundRefreshEnabled = v);
-        featureToggle("extras.safes", cfg.safeChestsEnabled, 72, v -> cfg.safeChestsEnabled = v);
-        addRenderableWidget(Button.builder(trText("extras.refresh"), b -> this.mod.getEssentials().refresh())
-            .bounds(contentX, contentY + 104, 220, 18).build());
-        addRenderableWidget(Button.builder(trText("extras.safes_reset"), b -> this.mod.getSafeChests().clear())
-            .bounds(contentX, contentY + 128, 220, 18).build());
+        section("menu.section.panels");
+        describedSwitch("extras.daily_quests", cfg.dailyQuestsEnabled, v -> cfg.dailyQuestsEnabled = v);
+        describedSwitch("extras.active_pets", cfg.activePetsEnabled, v -> cfg.activePetsEnabled = v);
+        describedSwitch("extras.safes", cfg.safeChestsEnabled, v -> cfg.safeChestsEnabled = v);
+        section("menu.section.background");
+        describedSwitch("extras.background", cfg.backgroundRefreshEnabled, v -> cfg.backgroundRefreshEnabled = v);
+        sectionButton(trText("extras.refresh"), b -> this.mod.getEssentials().refresh());
+        section("menu.section.safes");
+        sectionButton(trText("extras.safes_reset"), b -> this.mod.getSafeChests().clear());
     }
 
     private void buildStatDisplay() {
@@ -1038,15 +1074,18 @@ public final class MinepieceMenuScreen extends Screen {
 
     private void buildExtrasTab() {
         var cfg = this.mod.getConfig();
-        featureToggle("setting.rarity_icons", cfg.rarityIconsEnabled, 0, this.mod::setRarityIconsEnabled);
-        featureToggle("setting.pet_icons", cfg.petStatIconsEnabled, 22, this.mod::setPetStatIconsEnabled);
-        featureToggle("extras.minion", cfg.minionCalculatorEnabled, 44, v -> cfg.minionCalculatorEnabled = v);
-        featureToggle("extras.pet_rolls", cfg.petRollsEnabled, 66, v -> cfg.petRollsEnabled = v);
-        featureToggle("extras.rarity_filter", cfg.rarityFilterEnabled, 88, v -> cfg.rarityFilterEnabled = v);
-        featureToggle("extras.sorting", cfg.inventorySortingEnabled, 110, v -> cfg.inventorySortingEnabled = v);
-        featureToggle("extras.hotbar", cfg.hotbarRarityEnabled, 132, v -> cfg.hotbarRarityEnabled = v);
-        addRenderableWidget(Button.builder(trText("extras.help"), b -> this.minecraft.gui.setScreen(new HelpScreen(this.mod, this)))
-            .bounds(contentX, contentY + 164, 220, 18).build());
+        section("menu.section.item_icons");
+        describedSwitch("setting.rarity_icons", cfg.rarityIconsEnabled, this.mod::setRarityIconsEnabled);
+        describedSwitch("setting.pet_icons", cfg.petStatIconsEnabled, this.mod::setPetStatIconsEnabled);
+        describedSwitch("extras.hotbar", cfg.hotbarRarityEnabled, v -> cfg.hotbarRarityEnabled = v);
+        section("menu.section.tooltips");
+        describedSwitch("extras.minion", cfg.minionCalculatorEnabled, v -> cfg.minionCalculatorEnabled = v);
+        describedSwitch("extras.pet_rolls", cfg.petRollsEnabled, v -> cfg.petRollsEnabled = v);
+        section("menu.section.storage");
+        describedSwitch("extras.rarity_filter", cfg.rarityFilterEnabled, v -> cfg.rarityFilterEnabled = v);
+        describedSwitch("extras.sorting", cfg.inventorySortingEnabled, v -> cfg.inventorySortingEnabled = v);
+        section("menu.section.help");
+        sectionButton(trText("extras.help"), b -> this.minecraft.gui.setScreen(new HelpScreen(this.mod, this)));
     }
 
     private void buildCookingTab() {
@@ -1084,24 +1123,87 @@ public final class MinepieceMenuScreen extends Screen {
 
     private void buildProgressTab() {
         ConfigManager.ModConfig cfg = this.mod.getConfig();
-        int x = this.contentX;
-        int y = this.contentY + 8;
-        addRenderableWidget(Checkbox.builder(trText("hud.panel.profile_xp"), this.font)
-            .pos(x, y).selected(cfg.profileXpHudEnabled)
-            .onValueChange((box, checked) -> { cfg.profileXpHudEnabled = checked; this.mod.saveConfig(); }).build());
-        featureToggle("setting.xp_hud", cfg.inventoryXpHudEnabled, 24, this.mod::setInventoryXpHudEnabled);
-        addRenderableWidget(Checkbox.builder(trText("hud.panel.grinding"), this.font)
-            .pos(x, y + 48).selected(cfg.grindingHudEnabled)
-            .onValueChange((box, checked) -> { cfg.grindingHudEnabled = checked; this.mod.saveConfig(); }).build());
-        addRenderableWidget(Button.builder(trText("button.sync_profile"), button -> this.mod.runProfileCommand())
-            .bounds(x, y + 78, 150, 20).build());
-        addRenderableWidget(Button.builder(trText("grinding.reset"), button -> {
+        section("menu.section.panels");
+        describedSwitch("hud.panel.profile_xp", cfg.profileXpHudEnabled, v -> cfg.profileXpHudEnabled = v);
+        describedSwitch("setting.xp_hud", cfg.inventoryXpHudEnabled, this.mod::setInventoryXpHudEnabled);
+        describedSwitch("hud.panel.grinding", cfg.grindingHudEnabled, v -> cfg.grindingHudEnabled = v);
+        section("menu.section.actions");
+        sectionButtons(trText("button.sync_profile"), button -> this.mod.runProfileCommand(),
+            trText("grinding.reset"), button -> {
                 this.mod.getProgressHudController().grinding().reset();
                 this.mod.getProgressHudController().grinding().observeProfileXp(
                     this.mod.getProgressHudController().profile().getGainedXp(), System.currentTimeMillis());
-            }).bounds(x + 158, y + 78, 170, 20).build());
-        addRenderableWidget(Button.builder(trText("button.edit_hud_layout"), button -> this.mod.openHudLayoutEditor())
-            .bounds(x, y + 158, 328, 20).build());
+            });
+        sectionButton(trText("button.edit_hud_layout"), button -> this.mod.openHudLayoutEditor());
+        section("menu.section.tips");
+        sectionText(tr("progress.sync_hint"));
+        sectionText(tr("grinding.pause_hint"));
+        sectionText(tr("progress.estimate_hint"));
+    }
+
+    private void resetSections() {
+        this.sections.clear();
+        this.sectionTexts.clear();
+        this.switchDescriptions.clear();
+        this.layoutY = 0;
+        this.openSection = null;
+    }
+
+    /** Starts a titled box; rows added after it stack inside until the next section. */
+    private void section(String titleKey) {
+        endSection();
+        this.openSection = tr(titleKey);
+        this.openSectionTop = this.layoutY;
+        this.layoutY += SECTION_HEADER + 2;
+    }
+
+    private void endSection() {
+        if (this.openSection == null) return;
+        this.layoutY += 2;
+        this.sections.add(new Section(this.openSection, this.openSectionTop, this.layoutY));
+        this.layoutY += SECTION_GAP;
+        this.openSection = null;
+    }
+
+    /** A switch row; its description is the label key + ".desc" when that text exists. */
+    private void describedSwitch(String labelKey, boolean value, java.util.function.Consumer<Boolean> setter) {
+        Checkbox box = Checkbox.builder(trText(labelKey), this.font).pos(this.contentX + SECTION_INSET, this.contentY + this.layoutY)
+            .selected(value).onValueChange((b, checked) -> { setter.accept(checked); this.mod.saveConfig(); }).build();
+        addRenderableWidget(box);
+        boolean described = UiLocalization.has(labelKey + ".desc");
+        if (described) this.switchDescriptions.put(box, tr(labelKey + ".desc"));
+        this.layoutY += described ? 23 : 16;
+    }
+
+    private void sectionButton(Component label, Button.OnPress onPress) {
+        addRenderableWidget(Button.builder(label, onPress).bounds(this.contentX + SECTION_INSET, this.contentY + this.layoutY + 2,
+            this.contentWidth - 6 - SECTION_INSET * 2, 16).build());
+        this.layoutY += 20;
+    }
+
+    private void sectionButtons(Component left, Button.OnPress onLeft, Component right, Button.OnPress onRight) {
+        int width = (this.contentWidth - 6 - SECTION_INSET * 2 - 4) / 2;
+        addRenderableWidget(Button.builder(left, onLeft).bounds(this.contentX + SECTION_INSET, this.contentY + this.layoutY + 2, width, 16).build());
+        addRenderableWidget(Button.builder(right, onRight).bounds(this.contentX + SECTION_INSET + width + 4, this.contentY + this.layoutY + 2, width, 16).build());
+        this.layoutY += 20;
+    }
+
+    private void sectionText(String text) {
+        this.sectionTexts.add(new SectionText(text, this.layoutY + 2));
+        this.layoutY += 11;
+    }
+
+    private void drawSections(GuiGraphicsExtractor drawContext) {
+        int x = this.contentX, width = this.contentWidth - 6;
+        for (Section section : this.sections) {
+            int top = this.contentY + section.top(), bottom = this.contentY + section.bottom();
+            drawContext.fill(x, top, x + width, bottom, COLOR_ROW_BOX);
+            drawOutline(drawContext, x, top, width, bottom - top, COLOR_DIVIDER);
+            drawFittedText(drawContext, section.title().toUpperCase(Locale.ROOT), x + 5, top + 4, width - 10, GOLD);
+            drawContext.fill(x + 1, top + SECTION_HEADER, x + width - 1, top + SECTION_HEADER + 1, COLOR_DIVIDER);
+        }
+        for (SectionText text : this.sectionTexts)
+            drawFittedText(drawContext, text.text(), x + SECTION_INSET + 2, this.contentY + text.y(), width - SECTION_INSET * 2 - 4, COLOR_TEXT_DIM);
     }
 
     private void rebuild() {
@@ -1174,6 +1276,7 @@ public final class MinepieceMenuScreen extends Screen {
                 drawFittedText(drawContext, tr("menu.search_none"), x, contentY + 4, contentWidth - 4, COLOR_TEXT_DIM);
             return;
         }
+        drawSections(drawContext);
         switch (this.currentTab) {
             case MAIN -> { } // the save shortcut is in the footer now
             case BOSSES -> {
@@ -1276,20 +1379,6 @@ public final class MinepieceMenuScreen extends Screen {
                 for (int i = 0; i < Math.min(10, lines.size()); i++) {
                     drawFittedText(drawContext, lines.get(i), x, this.contentY + 108 + i * 14, this.contentWidth - 4, COLOR_TEXT);
                 }
-            }
-            case PROGRESS -> {
-                drawFittedText(drawContext, tr("progress.sync_hint"), x, this.contentY + 204, this.contentWidth - 4, COLOR_TEXT_DIM);
-                drawFittedText(drawContext, tr("grinding.pause_hint"), x, this.contentY + 222, this.contentWidth - 4, COLOR_TEXT_DIM);
-                drawFittedText(drawContext, tr("progress.estimate_hint"), x, this.contentY + 240, this.contentWidth - 4, COLOR_TEXT_DIM);
-            }
-            case AUCTION_HOUSE -> {
-                int boxY = this.contentY + 30;
-                drawRowBox(drawContext, x, boxY, this.contentWidth - 4, LIST_ROW_HEIGHT);
-                drawRowBox(drawContext, x, boxY + LIST_ROW_STEP, this.contentWidth - 4, LIST_ROW_HEIGHT);
-                drawRowBox(drawContext, x, boxY + LIST_ROW_STEP * 2, this.contentWidth - 4, LIST_ROW_HEIGHT);
-                drawFittedText(drawContext, this.tr("other.desc1"), x + LIST_TEXT_INSET, boxY + LIST_TEXT_BASELINE_OFFSET, this.contentWidth - 10, COLOR_TEXT_DIM);
-                drawFittedText(drawContext, this.tr("other.desc2"), x + LIST_TEXT_INSET, boxY + LIST_ROW_STEP + LIST_TEXT_BASELINE_OFFSET, this.contentWidth - 10, COLOR_TEXT_DIM);
-                drawFittedText(drawContext, this.tr("other.desc3"), x + LIST_TEXT_INSET, boxY + LIST_ROW_STEP * 2 + LIST_TEXT_BASELINE_OFFSET, this.contentWidth - 10, COLOR_TEXT_DIM);
             }
         }
     }

@@ -44,6 +44,13 @@ public final class FullModSmokeTest implements FabricClientGameTest {
                 }
             });
             context.takeScreenshot("2.0.5-full-menu");
+            for (String page : new String[]{"EXTRAS", "PROGRESS", "AUCTION_HOUSE"}) {
+                context.runOnClient(client -> client.gui.setScreen(new MinepieceMenuScreen(MinepieceQolClient.get(), page)));
+                context.waitTicks(5);
+                context.takeScreenshot("2.1.5-menu-" + page.toLowerCase(java.util.Locale.ROOT));
+            }
+            context.runOnClient(client -> client.gui.setScreen(new MinepieceMenuScreen(MinepieceQolClient.get())));
+            context.waitTicks(5);
             verifyPictures(context);
             context.runOnClient(client -> client.gui.setScreen(new InventoryScreen(client.player)));
             context.waitTicks(10);
