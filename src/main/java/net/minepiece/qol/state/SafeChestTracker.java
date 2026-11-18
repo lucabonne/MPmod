@@ -169,13 +169,7 @@ public final class SafeChestTracker {
     public List<Line> lines(Function<String, String> tr, long now, String currentSpawn, boolean nearIsland) {
         List<Line> lines = new ArrayList<>();
         String current = currentSpawn == null ? UNKNOWN_SPAWN : currentSpawn.trim();
-        java.util.Set<String> names = new java.util.TreeSet<>(spawns.comparator());
-        names.addAll(spawns.keySet());
-        if (nearIsland) names.add(current);
-        // Stable sort: spawns with the same soonest timer (or none) keep their name order.
-        List<String> ids = new ArrayList<>(names);
-        ids.sort(java.util.Comparator.comparingLong(id -> soonestUnlockMs(id, now)));
-        for (String id : ids) {
+        for (String id : orderedIds(now, nearIsland ? current : null)) {
             boolean here = !current.isEmpty() && id.equals(current);
             String header = tr.apply("bosses.spawn") + " " + (id.isEmpty() ? tr.apply("common.unknown") : id);
             lines.add(here
@@ -192,6 +186,34 @@ public final class SafeChestTracker {
             }
         }
         return lines;
+    }
+
+    /** Saved spawns in the panel's order: soonest running timer first, then by name, unknown ("") last. */
+    public List<String> spawnIds(long now) {
+        return orderedIds(now, null);
+    }
+
+    /** Seconds until the spawn's next running timer ends, or empty when none is running. */
+    public OptionalLong nextUnlockSeconds(String spawnId, long now) {
+        long at = soonestUnlockMs(spawnId == null ? UNKNOWN_SPAWN : spawnId.trim(), now);
+        return at == Long.MAX_VALUE ? OptionalLong.empty() : OptionalLong.of(Math.max(0, (at - now + 999) / 1000));
+    }
+
+    /** Forget one spawn's safes and timers; the others are kept. */
+    public boolean removeSpawn(String spawnId) {
+        boolean removed = spawns.remove(spawnId == null ? UNKNOWN_SPAWN : spawnId.trim()) != null;
+        if (removed) persist();
+        return removed;
+    }
+
+    /** Saved spawns plus {@code extra} (when not null), sorted by soonest running timer; ties keep the name order. */
+    private List<String> orderedIds(long now, String extra) {
+        java.util.Set<String> names = new java.util.TreeSet<>(spawns.comparator());
+        names.addAll(spawns.keySet());
+        if (extra != null) names.add(extra);
+        List<String> ids = new ArrayList<>(names);
+        ids.sort(java.util.Comparator.comparingLong(id -> soonestUnlockMs(id, now))); // stable sort
+        return ids;
     }
 
     /** When the spawn's next still-running timer ends; Ready, Picked and unknown safes don't count. */
@@ -218,7 +240,7 @@ public final class SafeChestTracker {
         return order;
     }
 
-    static String formatDuration(long seconds) {
+    public static String formatDuration(long seconds) {
         long h = seconds / 3600, m = seconds % 3600 / 60, s = seconds % 60;
         if (h > 0) return h + "h " + m + "m";
         return m > 0 ? m + "m " + s + "s" : s + "s";

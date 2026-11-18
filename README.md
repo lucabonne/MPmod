@@ -2,6 +2,8 @@
 
 2.2.1: the **Marineford safes** panel marks the spawn you're on: its header is gold and reads `» Spawn 3 (current)`, so it still stands out with a custom HUD text color. Spawns are now listed by their **soonest running timer**, so the next safe to open is always at the top and spawns swap places as timers run out; spawns with no running timer come after, by number, with the unknown spawn last. Inside each spawn, safes are listed Ready first, then running timers soonest first, then Picked, then `?`.
 
+Saved safe spawns are managed under **Combat › Marineford safes**, like the bosses list: each spawn has its own row (the current one in gold, with its next timer) and an **X** to remove only that spawn, and **Reset safe timers** removes all of them. The reset button moved here from Pass and pets; the panel's on/off switch stays there.
+
 2.2.0 brings together the redesign from 2.1.4 to 2.1.8: a restyled menu with search, sections and setting descriptions; color ribbon HUD panels with darker bodies and colored values; a new HUD editor; and the auction house price key. The notes for each step follow.
 
 2.1.8: HUD panel bodies are darker so text and value colors stand out over bright skies and blocks: they are drawn 40% darker than your background color, and the default HUD opacity is now 88% (was 72%). If your HUD opacity was still on the old default it moves to 88% once; a value you picked yourself is kept. The menu keeps your exact background color.

@@ -117,6 +117,31 @@ class SafeChestTrackerTest {
         assertEquals(0xFFFFD36B, tracker.lines(TR, 0, "4", false).get(0).color());
     }
 
+    @Test void removesOneSpawnAndKeepsTheOthers() {
+        var state = new PersistentState();
+        int[] saves = {0};
+        var tracker = new SafeChestTracker();
+        tracker.attachPersistence(state.safeChests, () -> saves[0]++);
+        tracker.observe("3", 0, "Lock Time: 2m 0s", 0);
+        tracker.observe("7", 0, "Lock Time: 1m 0s", 0);
+        tracker.observe("", 0, "Status • Awaiting lockpicking •", 0);
+        assertEquals(List.of("7", "3", ""), tracker.spawnIds(0));
+        assertEquals(60, tracker.nextUnlockSeconds("7", 0).getAsLong());
+        assertTrue(tracker.nextUnlockSeconds("", 0).isEmpty()); // only a Ready safe: nothing counting down
+
+        int before = saves[0];
+        assertTrue(tracker.removeSpawn("7"));
+        assertEquals(before + 1, saves[0]);
+        assertEquals(List.of("3", ""), tracker.spawnIds(0));
+        assertFalse(state.safeChests.containsKey("7"));
+        assertEquals(List.of("bosses.spawn 3", "bosses.spawn common.unknown"), headers(tracker.lines(TR, 0, "", false)));
+
+        assertFalse(tracker.removeSpawn("7")); // already gone: no extra save
+        assertEquals(before + 1, saves[0]);
+        assertTrue(tracker.removeSpawn(null)); // the unknown spawn
+        assertEquals(List.of("3"), tracker.spawnIds(0));
+    }
+
     private static List<String> headers(List<SafeChestTracker.Line> lines) {
         return texts(lines).stream().filter(text -> text.contains("bosses.spawn")).toList();
     }

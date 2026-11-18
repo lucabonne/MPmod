@@ -160,6 +160,10 @@ public final class MinepieceMenuScreen extends Screen {
     private static final int SECTION_HEADER = 14, SECTION_GAP = 6, SECTION_INSET = 4;
     private record Section(String title, int top, int bottom) { }
     private record SectionText(String text, int y) { }
+    /** A boxed row inside a section with an X button on its right; its texts are read each frame so timers stay live. */
+    private record SectionRow(java.util.function.Supplier<String> label, java.util.function.Supplier<String> value, int color, int y) { }
+    private static final int SECTION_ROW_HEIGHT = 16;
+    private final List<SectionRow> sectionRows = new ArrayList<>();
     private final List<Section> sections = new ArrayList<>();
     private final List<SectionText> sectionTexts = new ArrayList<>();
     private final Map<Checkbox, String> switchDescriptions = new java.util.IdentityHashMap<>();
@@ -477,6 +481,26 @@ public final class MinepieceMenuScreen extends Screen {
         sectionButton(trText("extras.refresh"), b -> this.mod.getEssentials().refresh());
         section("menu.section.cooldowns");
         describedSwitch("setting.haki_cooldown", cfg.hakiEnabled, this.mod::setHakiEnabled);
+        buildSafeSpawns();
+    }
+
+    /** Saved Marineford safe spawns, each with an X to forget it, and a button to forget all of them. */
+    private void buildSafeSpawns() {
+        var safes = this.mod.getSafeChests();
+        section("menu.section.safes");
+        String rawCurrent = this.mod.getBossTracker().getCurrentSpawnId();
+        String current = rawCurrent == null ? "" : rawCurrent.trim();
+        List<String> spawnIds = safes.spawnIds(System.currentTimeMillis());
+        if (spawnIds.isEmpty()) sectionText(tr("safes.no_spawns"));
+        for (String spawnId : spawnIds) {
+            boolean isCurrent = !current.isBlank() && spawnId.equals(current);
+            String label = tr("bosses.spawn") + " " + (spawnId.isEmpty() ? tr("common.unknown") : spawnId)
+                + (isCurrent ? " (" + tr("bosses.current") + ")" : "");
+            sectionRemovableRow(() -> label, () -> safes.nextUnlockSeconds(spawnId, System.currentTimeMillis()).stream()
+                    .mapToObj(net.minepiece.qol.state.SafeChestTracker::formatDuration).findFirst().orElse(""),
+                isCurrent ? GOLD : COLOR_HEADER, () -> { safes.removeSpawn(spawnId); rebuild(); });
+        }
+        sectionButton(trText("extras.safes_reset"), b -> { safes.clear(); rebuild(); });
     }
 
     private void buildPassPets() {
@@ -488,8 +512,6 @@ public final class MinepieceMenuScreen extends Screen {
         section("menu.section.background");
         describedSwitch("extras.background", cfg.backgroundRefreshEnabled, v -> cfg.backgroundRefreshEnabled = v);
         sectionButton(trText("extras.refresh"), b -> this.mod.getEssentials().refresh());
-        section("menu.section.safes");
-        sectionButton(trText("extras.safes_reset"), b -> this.mod.getSafeChests().clear());
     }
 
     private void buildStatDisplay() {
@@ -1144,6 +1166,7 @@ public final class MinepieceMenuScreen extends Screen {
     private void resetSections() {
         this.sections.clear();
         this.sectionTexts.clear();
+        this.sectionRows.clear();
         this.switchDescriptions.clear();
         this.layoutY = 0;
         this.openSection = null;
@@ -1193,6 +1216,15 @@ public final class MinepieceMenuScreen extends Screen {
         this.layoutY += 11;
     }
 
+    /** A row with a label, a right-aligned value and an X button that runs {@code onRemove}. */
+    private void sectionRemovableRow(java.util.function.Supplier<String> label, java.util.function.Supplier<String> value, int color, Runnable onRemove) {
+        int rowY = this.layoutY + 2;
+        this.sectionRows.add(new SectionRow(label, value, color, rowY));
+        int removeX = this.contentX + this.contentWidth - 6 - SECTION_INSET - REMOVE_BUTTON_SIZE - 2;
+        addRemoveButton(removeX, this.contentY + rowY, SECTION_ROW_HEIGHT, onRemove);
+        this.layoutY += SECTION_ROW_HEIGHT + 2;
+    }
+
     private void drawSections(GuiGraphicsExtractor drawContext) {
         int x = this.contentX, width = this.contentWidth - 6;
         for (Section section : this.sections) {
@@ -1204,6 +1236,16 @@ public final class MinepieceMenuScreen extends Screen {
         }
         for (SectionText text : this.sectionTexts)
             drawFittedText(drawContext, text.text(), x + SECTION_INSET + 2, this.contentY + text.y(), width - SECTION_INSET * 2 - 4, COLOR_TEXT_DIM);
+        int rowX = x + SECTION_INSET, rowWidth = width - SECTION_INSET * 2;
+        for (SectionRow row : this.sectionRows) {
+            int rowY = this.contentY + row.y(), textY = rowY + (SECTION_ROW_HEIGHT - 8) / 2;
+            drawRowBox(drawContext, rowX, rowY, rowWidth - 4, SECTION_ROW_HEIGHT);
+            String value = row.value().get();
+            int valueRight = rowX + rowWidth - REMOVE_BUTTON_SIZE - 8;
+            int valueWidth = value.isEmpty() ? 0 : this.font.width(value);
+            if (valueWidth > 0) drawContext.text(this.font, value, valueRight - valueWidth, textY, COLOR_TEXT_DIM);
+            drawFittedText(drawContext, row.label().get(), rowX + 5, textY, valueRight - (rowX + 5) - valueWidth - 6, row.color());
+        }
     }
 
     private void rebuild() {

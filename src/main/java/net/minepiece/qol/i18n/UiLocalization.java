@@ -40,6 +40,7 @@ public final class UiLocalization {
         add("safes.red", "Red", "Rouge", "Rojo", "Rot", "Rosso", "Vermelho", "Czerwony", "Merah", "Kırmızı");
         add("safes.yellow", "Yellow", "Jaune", "Amarillo", "Gelb", "Giallo", "Amarelo", "Żółty", "Kuning", "Sarı");
         add("safes.blue", "Blue", "Bleu", "Azul", "Blau", "Blu", "Azul", "Niebieski", "Biru", "Mavi");
+        add("safes.no_spawns", "No safe timers saved yet", "Aucun minuteur de coffre enregistré", "Aún no hay tiempos de cajas guardados", "Noch keine Tresor-Timer gespeichert", "Nessun timer delle casseforti salvato", "Nenhum timer de cofre salvo ainda", "Brak zapisanych liczników sejfów", "Belum ada timer brankas tersimpan", "Henüz kayıtlı kasa sayacı yok");
         add("extras.daily_quests", "Daily quests HUD", "HUD quêtes quotidiennes", "HUD misiones diarias", "Tägliche Quests HUD", "HUD missioni giornaliere", "HUD missões diárias", "HUD codziennych zadań", "HUD misi harian", "Günlük görev HUD");
         add("extras.active_pets", "Active pets HUD", "HUD familiers actifs", "HUD mascotas activas", "Aktive Begleiter HUD", "HUD pet attivi", "HUD mascotes ativos", "HUD aktywnych zwierzaków", "HUD pet aktif", "Aktif evcil hayvan HUD");
         add("extras.minion", "Minion resource calculator", "Calcul des ressources du minion", "Calculadora de recursos del minion", "Minion-Ressourcenrechner", "Calcolo risorse minion", "Calculadora de recursos do minion", "Kalkulator zasobów miniona", "Kalkulator sumber daya minion", "Minyon kaynak hesaplayıcı");
