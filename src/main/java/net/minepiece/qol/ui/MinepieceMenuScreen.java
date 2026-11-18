@@ -363,6 +363,7 @@ public final class MinepieceMenuScreen extends Screen {
                 section("menu.section.colors");
                 describedSwitch("setting.auction_highlight", this.mod.getConfig().auctionHighlightEnabled, v -> this.mod.setAuctionHighlightEnabled(v));
                 describedSwitch("setting.auction_price_key", this.mod.getConfig().auctionPriceKeyEnabled, v -> this.mod.getConfig().auctionPriceKeyEnabled = v);
+                describedSwitch("setting.auction_price_memory", this.mod.getConfig().auctionPriceMemoryEnabled, v -> this.mod.getConfig().auctionPriceMemoryEnabled = v);
                 section("menu.section.how_it_works");
                 sectionText(tr("auction.how1"));
                 sectionText(tr("auction.how2"));
@@ -443,6 +444,7 @@ public final class MinepieceMenuScreen extends Screen {
         section("menu.section.boss_timers");
         describedSwitch("bosses.automatic_reads", cfg.automaticBossReads, v -> cfg.automaticBossReads = v);
         describedSwitch("extras.boss_alerts", cfg.bossAlertsEnabled, v -> cfg.bossAlertsEnabled = v);
+        describedSwitch("setting.safe_alerts", cfg.safeAlertsEnabled, v -> cfg.safeAlertsEnabled = v);
         sectionButton(Component.literal(tr("bosses.order") + ": " + tr(cfg.appearance.bossesByTime ? "bosses.by_time" : "bosses.by_island")), b -> {
             cfg.appearance.bossesByTime = !cfg.appearance.bossesByTime;
             this.mod.saveConfig(); rebuild();
@@ -941,6 +943,8 @@ public final class MinepieceMenuScreen extends Screen {
         describedSwitch("hud.panel.profile_xp", cfg.profileXpHudEnabled, v -> cfg.profileXpHudEnabled = v);
         describedSwitch("setting.xp_hud", cfg.inventoryXpHudEnabled, this.mod::setInventoryXpHudEnabled);
         describedSwitch("hud.panel.grinding", cfg.grindingHudEnabled, v -> cfg.grindingHudEnabled = v);
+        section("menu.section.session");
+        describedSwitch("setting.session_summary", cfg.sessionSummaryEnabled, v -> cfg.sessionSummaryEnabled = v);
         section("menu.section.actions");
         sectionButtons(trText("button.sync_profile"), button -> this.mod.runProfileCommand(),
             trText("grinding.reset"), button -> {

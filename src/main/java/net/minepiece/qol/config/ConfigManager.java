@@ -220,6 +220,9 @@ public final class ConfigManager {
         public boolean backgroundRefreshEnabled = true;
         public boolean automaticBossReads = true;
         public boolean bossAlertsEnabled = true;
+        public boolean safeAlertsEnabled = true;
+        public boolean sessionSummaryEnabled = true;
+        public boolean auctionPriceMemoryEnabled = true;
         public boolean rarityFilterEnabled = true;
         public boolean inventorySortingEnabled = true;
         public boolean hotbarRarityEnabled = true;

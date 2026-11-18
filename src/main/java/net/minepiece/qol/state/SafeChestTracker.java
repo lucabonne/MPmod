@@ -126,14 +126,14 @@ public final class SafeChestTracker {
         if (changed) persist();
     }
 
-    /** Chat message; a successful pick marks the safe nearest to the player. */
-    public void onChatMessage(String spawnId, String message, double px, double py, double pz) {
-        if (message == null || !message.toLowerCase(Locale.ROOT).contains("lock picking successful")) return;
+    /** Chat message; a successful pick marks the safe nearest to the player. Returns whether a safe was marked. */
+    public boolean onChatMessage(String spawnId, String message, double px, double py, double pz) {
+        if (message == null || !message.toLowerCase(Locale.ROOT).contains("lock picking successful")) return false;
         int index = nearest(px, py, pz, PICK_RANGE);
-        if (index >= 0) {
-            spawn(spawnId).status[index] = Status.PICKED;
-            persist();
-        }
+        if (index < 0) return false;
+        spawn(spawnId).status[index] = Status.PICKED;
+        persist();
+        return true;
     }
 
     public Status status(String spawnId, int index, long now) {

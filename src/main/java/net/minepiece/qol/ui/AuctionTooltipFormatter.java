@@ -59,6 +59,24 @@ public final class AuctionTooltipFormatter {
         lines.add(line);
     }
 
+    /** "Lowest this week: 1.2K/item (2d ago) · Average +12% this week", from the mod's own price memory. */
+    public static void appendHistoryLine(List<Component> lines, java.util.Optional<net.minepiece.qol.state.AuctionPriceMemory.Low> low,
+                                         java.util.OptionalDouble trend, String perItemLabel, java.util.function.Function<String, String> tr) {
+        if (low.isEmpty()) return;
+        long days = low.get().daysAgo();
+        String when = days == 0 ? tr.apply("auction.history.today") : String.format(java.util.Locale.ROOT, tr.apply("auction.history.days_ago"), days);
+        MutableComponent line = Component.literal(tr.apply("auction.history.lowest") + ": " + formatPrice(low.get().price()) + perItemLabel + " (" + when + ")")
+            .withStyle(ChatFormatting.GRAY);
+        if (trend.isPresent()) {
+            double t = trend.getAsDouble();
+            String arrow = t > 0.005 ? "▲ " : t < -0.005 ? "▼ " : "";
+            line.append(Component.literal(" · " + tr.apply("auction.history.average") + " " + arrow + formatDeltaPercent(t) + " " + tr.apply("auction.history.this_week"))
+                .withStyle(t > 0.005 ? ChatFormatting.RED : t < -0.005 ? ChatFormatting.GREEN : ChatFormatting.GRAY));
+        }
+        if (!lines.isEmpty() && lines.getLast().getString().equals(line.getString())) return;
+        lines.add(line);
+    }
+
     static String formatPrice(double value) {
         BigDecimal price = BigDecimal.valueOf(value);
         String suffix = "";

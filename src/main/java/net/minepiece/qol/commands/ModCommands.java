@@ -49,6 +49,16 @@ public final class ModCommands {
             return 1;
         }));
 
+        dispatcher.register(ClientCommands.literal("mpsession")
+            .executes(context -> {
+                for (String line : mod.getSessionLines()) reply(context.getSource(), line);
+                return 1;
+            })
+            .then(ClientCommands.literal("last").executes(context -> {
+                for (String line : mod.getLastSessionLines()) reply(context.getSource(), line);
+                return 1;
+            })));
+
         dispatcher.register(ClientCommands.literal("mpall")
             .then(ClientCommands.literal("show")
                 .executes(context -> {

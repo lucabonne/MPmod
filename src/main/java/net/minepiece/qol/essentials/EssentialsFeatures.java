@@ -31,6 +31,7 @@ public final class EssentialsFeatures {
     private final DailyQuests quests = new DailyQuests();
     private final PassRefreshSchedule passRefresh = new PassRefreshSchedule();
     private final BossAlerts alerts = new BossAlerts();
+    private final SafeReadyAlerts safeAlerts = new SafeReadyAlerts();
     private final UpdateNotice updateNotice = new UpdateNotice();
     private List<String> pets = List.of();
     private boolean confirmedServer;
@@ -49,7 +50,7 @@ public final class EssentialsFeatures {
     public List<String> petLines() { return pets; }
     public void refresh() { pending = 7; manualRefresh = true; }
     public void reset() {
-        background.reset(); quests.clear(); alerts.reset(); passRefresh.reset(); pets = List.of();
+        background.reset(); quests.clear(); alerts.reset(); safeAlerts.reset(); passRefresh.reset(); pets = List.of();
         confirmedServer = false; manualRefresh = false; pending = 7; joined = System.currentTimeMillis(); lastBossRead = nextScan = 0;
         lastScreen = null; fingerprint = 0;
     }
@@ -79,6 +80,7 @@ public final class EssentialsFeatures {
         long now = System.currentTimeMillis();
         if (quests.resetDay(LocalDate.now())) pending |= 4;
         if (cfg.allFeaturesVisible && cfg.bossAlertsEnabled && mod.isBossTrackingEnabled()) alerts.tick(mod);
+        if (cfg.allFeaturesVisible && cfg.safeAlertsEnabled) safeAlerts.tick(mod);
         if (now >= nextScan) {
             nextScan = now + 200;
             if (mc.gui.screen() instanceof AbstractContainerScreen<?> screen) {

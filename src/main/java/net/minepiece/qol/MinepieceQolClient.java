@@ -101,9 +101,13 @@ public final class MinepieceQolClient implements ClientModInitializer {
     private ConfigManager configManager;
     private ConfigManager.ModConfig config;
     private PersistentState persistentState;
+    private final net.minepiece.qol.state.SessionTracker session = new net.minepiece.qol.state.SessionTracker();
+    private long sessionJoinMs, lastSessionPollMs;
+    private boolean lastSessionNoticePending;
 
     private DebugLogManager debugLogManager;
     private AuctionHighlighter auctionHighlighter;
+    private net.minepiece.qol.state.AuctionPriceMemory auctionPrices;
     private BossTracker bossTracker;
     private BossGuiAutoScanner bossGuiAutoScanner;
     private CooldownTracker cooldownTracker;
@@ -204,6 +208,8 @@ public final class MinepieceQolClient implements ClientModInitializer {
 
         this.debugLogManager = new DebugLogManager(this.configManager.getBaseDir(), debugEnabled);
         this.auctionHighlighter = new AuctionHighlighter();
+        if (this.persistentState.auctionPrices == null) this.persistentState.auctionPrices = new java.util.LinkedHashMap<>();
+        this.auctionPrices = new net.minepiece.qol.state.AuctionPriceMemory(this.persistentState.auctionPrices, () -> savePersistentState(this.persistentState));
         this.bossTracker = new BossTracker(this.persistentState, this::savePersistentState, this.debugLogManager);
         this.bossGuiAutoScanner = new BossGuiAutoScanner(this.bossTracker, this.debugLogManager);
         this.bossTracker.setMinibossRegistrationEnabled(isBossTrackingEnabled() && this.config.minibossTrackingEnabled);
@@ -262,7 +268,8 @@ public final class MinepieceQolClient implements ClientModInitializer {
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
             String normalized = TextUtil.normalize(message);
             var player = Minecraft.getInstance().player;
-            if (player != null) this.safeChests.onChatMessage(this.bossTracker.getCurrentSpawnId(), normalized, player.getX(), player.getY(), player.getZ());
+            if (player != null && this.safeChests.onChatMessage(this.bossTracker.getCurrentSpawnId(), normalized, player.getX(), player.getY(), player.getZ()))
+                this.session.onSafePicked();
             if (!overlay) { this.chatChannelTracker.onServerMessage(normalized); this.essentials.onServerMessage(normalized); }
             if (MoneyMessageClassifier.isEligibleServerMessage(normalized, overlay)) {
                 this.moneyTracker.onGameMessage(normalized);
@@ -275,18 +282,23 @@ public final class MinepieceQolClient implements ClientModInitializer {
             this.progressHudController.connect(server + "|" + client.getUser().getProfileId(), System.currentTimeMillis());
             this.inventoryXpTracker.clear();
             this.cookingTracker.clear();
+            this.sessionJoinMs = System.currentTimeMillis();
+            this.session.start(this.sessionJoinMs);
+            this.lastSessionNoticePending = this.persistentState.lastSession != null;
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             this.essentials.reset();
             this.chatChannelTracker.reset();
             this.bossTracker.resetLocation();
             this.progressHudController.disconnect(System.currentTimeMillis());
+            endSession();
             this.inventoryXpTracker.clear();
             this.cookingTracker.clear();
         });
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             this.progressHudController.persist(System.currentTimeMillis());
+            endSession();
             this.customPictures.clear();
             savePersistentState(this.persistentState);
         });
@@ -762,6 +774,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
             this.jobsTracker.captureChatMessage(normalized);
             this.cooldownTracker.onChatMessage(normalized);
             ChatParsers.parseBossKill(normalized).ifPresent(name -> {
+                this.session.onBossKill();
                 Minecraft client = Minecraft.getInstance();
                 if (client != null && client.player != null) {
                     int x = (int) Math.floor(client.player.getX());
@@ -1175,6 +1188,42 @@ public final class MinepieceQolClient implements ClientModInitializer {
         }
     }
 
+    private void tickSession(Minecraft client) {
+        long now = System.currentTimeMillis();
+        if (now - this.lastSessionPollMs >= 1_000L) {
+            this.lastSessionPollMs = now;
+            double jobXp = 0;
+            for (PersistentState.JobInfo info : this.persistentState.jobs.values()) jobXp += info.dailyXp;
+            var money = this.persistentState.money;
+            this.session.poll(now, money.dayId, money.nonAhToday, money.ahMadeToday, money.ahSpentToday,
+                this.progressHudController.grinding().getXp(), jobXp);
+        }
+        // Wait a few seconds after joining so the line isn't lost among the server's welcome messages.
+        if (this.lastSessionNoticePending && now - this.sessionJoinMs >= 5_000L) {
+            this.lastSessionNoticePending = false;
+            if (this.config.modEnabled && this.config.sessionSummaryEnabled && this.persistentState.lastSession != null)
+                for (String line : getLastSessionLines()) client.player.sendSystemMessage(Component.literal(line).withColor(0xDDBA6A));
+        }
+    }
+
+    private void endSession() {
+        var ended = this.session.end(System.currentTimeMillis());
+        // Under a minute is a reconnect or a quick check, not worth replacing the last real session.
+        if (ended == null || ended.endMs - ended.startMs < 60_000L) return;
+        this.persistentState.lastSession = ended;
+        savePersistentState(this.persistentState);
+    }
+
+    public List<String> getSessionLines() {
+        var current = this.session.current(System.currentTimeMillis());
+        return current == null ? List.of(tr("session.none")) : net.minepiece.qol.state.SessionTracker.lines(current, this::tr, "session.title");
+    }
+
+    public List<String> getLastSessionLines() {
+        var last = this.persistentState.lastSession;
+        return last == null ? List.of(tr("session.none_last")) : net.minepiece.qol.state.SessionTracker.lines(last, this::tr, "session.last_title");
+    }
+
     public void savePersistentState() {
         savePersistentState(this.persistentState);
     }
@@ -1336,6 +1385,8 @@ public final class MinepieceQolClient implements ClientModInitializer {
             String itemKey = buildAuctionItemKey(stack);
             this.auctionHighlighter.update(itemKey, result);
             this.auctionHighlightRenderCache.remove(itemKey);
+            if (this.config.modEnabled && this.config.auctionPriceMemoryEnabled)
+                this.auctionPrices.observe(priceMemoryKey(stack), result.unitPrice(), result.averageUnitPrice(), java.time.LocalDate.now());
         });
 
         if (this.config.modEnabled && (this.config.profileXpHudEnabled || this.config.grindingHudEnabled)) {
@@ -1356,6 +1407,12 @@ public final class MinepieceQolClient implements ClientModInitializer {
             auctionResult.ifPresent(result -> {
                 AuctionTooltipFormatter.appendPrices(lines, normalizedLines, result, tr("auction.per_item"));
                 AuctionTooltipFormatter.appendDealLine(lines, result.delta(), this::tr);
+                if (this.config.auctionPriceMemoryEnabled) {
+                    var today = java.time.LocalDate.now();
+                    String key = priceMemoryKey(stack);
+                    AuctionTooltipFormatter.appendHistoryLine(lines, this.auctionPrices.lowest(key, today),
+                        this.auctionPrices.weeklyTrend(key, today), tr("auction.per_item"), this::tr);
+                }
             });
         }
         for (TooltipParsers.PetStatLine petLine : this.config.petRollsEnabled ? petLines : List.<TooltipParsers.PetStatLine>of()) {
@@ -1396,6 +1453,7 @@ public final class MinepieceQolClient implements ClientModInitializer {
         }
         SafeExecutor.run(this.debugLogManager, "essentials", () -> this.essentials.tick(client));
         SafeExecutor.run(this.debugLogManager, "safe-chests", () -> scanSafeChests(client));
+        SafeExecutor.run(this.debugLogManager, "session", () -> tickSession(client));
         syncMenuKeybindConfig();
         handleMenuKeyBinding(client);
         while (this.loadoutKeyBinding.consumeClick()) {
@@ -1684,6 +1742,12 @@ public final class MinepieceQolClient implements ClientModInitializer {
             cache.clear();
         }
         cache.put(key, value);
+    }
+
+    /** Same item across listings: its type and name, not its count or listing details. */
+    private static String priceMemoryKey(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return "";
+        return BuiltInRegistries.ITEM.getKey(stack.getItem()) + "|" + TextUtil.normalize(stack.getHoverName());
     }
 
     private String buildAuctionItemKey(ItemStack stack) {
