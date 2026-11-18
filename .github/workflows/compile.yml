@@ -23,3 +23,13 @@ jobs:
 
       - name: Test and build
         run: ./gradlew --no-daemon test build
+
+      # The installable mod jar (not the sources jar), downloadable from the run's page.
+      - name: Upload mod jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: minepieceqol-jar
+          path: |
+            build/libs/*.jar
+            !build/libs/*-sources.jar
+          if-no-files-found: error
