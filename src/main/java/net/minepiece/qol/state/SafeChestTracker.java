@@ -29,6 +29,8 @@ public final class SafeChestTracker {
 
     /** Same look as the bosses panel's spawn headers. */
     private static final int SPAWN_HEADER_COLOR = 0xFF97B9EA;
+    /** The spawn the player is on: gold, plus a "»" and "(current)" so it still shows with a custom HUD text color. */
+    private static final int CURRENT_SPAWN_HEADER_COLOR = 0xFFFFD36B;
     private static final String UNKNOWN_SPAWN = "";
 
     /** Saved as-is in {@link PersistentState#safeChests}. */
@@ -159,16 +161,27 @@ public final class SafeChestTracker {
 
     /**
      * One "Spawn X" header plus six colored safe lines per spawn with data.
-     * {@code currentSpawn} is also listed (all "?") when the player is at the island but nothing is read yet.
+     * {@code currentSpawn} is also listed (all "?") when the player is at the island but nothing is read yet,
+     * and its header is marked as the current spawn.
+     * Spawns are ordered by their soonest running timer (spawns with none come after, then by name, unknown last);
+     * inside a spawn: Ready, then running timers soonest first, then Picked, then unknown.
      */
     public List<Line> lines(Function<String, String> tr, long now, String currentSpawn, boolean nearIsland) {
         List<Line> lines = new ArrayList<>();
-        java.util.Set<String> ids = new java.util.TreeSet<>(spawns.comparator());
-        ids.addAll(spawns.keySet());
-        if (nearIsland) ids.add(currentSpawn == null ? UNKNOWN_SPAWN : currentSpawn.trim());
+        String current = currentSpawn == null ? UNKNOWN_SPAWN : currentSpawn.trim();
+        java.util.Set<String> names = new java.util.TreeSet<>(spawns.comparator());
+        names.addAll(spawns.keySet());
+        if (nearIsland) names.add(current);
+        // Stable sort: spawns with the same soonest timer (or none) keep their name order.
+        List<String> ids = new ArrayList<>(names);
+        ids.sort(java.util.Comparator.comparingLong(id -> soonestUnlockMs(id, now)));
         for (String id : ids) {
-            lines.add(new Line(tr.apply("bosses.spawn") + " " + (id.isEmpty() ? tr.apply("common.unknown") : id), SPAWN_HEADER_COLOR));
-            for (int i = 0; i < SAFES.size(); i++) {
+            boolean here = !current.isEmpty() && id.equals(current);
+            String header = tr.apply("bosses.spawn") + " " + (id.isEmpty() ? tr.apply("common.unknown") : id);
+            lines.add(here
+                ? new Line("» " + header + " (" + tr.apply("bosses.current") + ")", CURRENT_SPAWN_HEADER_COLOR)
+                : new Line(header, SPAWN_HEADER_COLOR));
+            for (int i : safeOrder(id, now)) {
                 String value = switch (status(id, i, now)) {
                     case UNKNOWN -> "?";
                     case READY -> tr.apply("safes.ready");
@@ -179,6 +192,30 @@ public final class SafeChestTracker {
             }
         }
         return lines;
+    }
+
+    /** When the spawn's next still-running timer ends; Ready, Picked and unknown safes don't count. */
+    private long soonestUnlockMs(String spawnId, long now) {
+        SpawnSafes safes = spawns.get(spawnId);
+        long soonest = Long.MAX_VALUE;
+        if (safes == null) return soonest;
+        for (int i = 0; i < SAFES.size(); i++) {
+            if (status(spawnId, i, now) == Status.LOCKED) soonest = Math.min(soonest, safes.unlockAtMs[i]);
+        }
+        return soonest;
+    }
+
+    /** Safe indexes in display order: Ready, running timers soonest first, Picked, unknown; ties keep the safe order. */
+    private List<Integer> safeOrder(String spawnId, long now) {
+        SpawnSafes safes = spawns.get(spawnId);
+        List<Integer> order = new ArrayList<>();
+        for (int i = 0; i < SAFES.size(); i++) order.add(i);
+        order.sort(java.util.Comparator
+            .comparingInt((Integer i) -> switch (status(spawnId, i, now)) {
+                case READY -> 0; case LOCKED -> 1; case PICKED -> 2; case UNKNOWN -> 3;
+            })
+            .thenComparingLong(i -> status(spawnId, i, now) == Status.LOCKED ? safes.unlockAtMs[i] : 0));
+        return order;
     }
 
     static String formatDuration(long seconds) {

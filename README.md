@@ -1,4 +1,6 @@
-# Minepiece QoL 2.2.0
+# Minepiece QoL 2.2.1
+
+2.2.1: the **Marineford safes** panel marks the spawn you're on: its header is gold and reads `» Spawn 3 (current)`, so it still stands out with a custom HUD text color. Spawns are now listed by their **soonest running timer**, so the next safe to open is always at the top and spawns swap places as timers run out; spawns with no running timer come after, by number, with the unknown spawn last. Inside each spawn, safes are listed Ready first, then running timers soonest first, then Picked, then `?`.
 
 2.2.0 brings together the redesign from 2.1.4 to 2.1.8: a restyled menu with search, sections and setting descriptions; color ribbon HUD panels with darker bodies and colored values; a new HUD editor; and the auction house price key. The notes for each step follow.
 
@@ -35,7 +37,7 @@ The 2.0.2 menus, HUD panels, trackers, translation, AH highlights, pet stats, ap
 
 ## Install
 
-Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.2.0+mc26.2.jar`; install only one version of this mod at a time.
+Use Minecraft Java **26.2**, Java **25 or newer**, Fabric Loader **0.20.1 or newer**, and Fabric API **0.161.0+26.2**. Replace the older mod in your instance's `mods` folder with `minepieceqol-2.2.1+mc26.2.jar`; install only one version of this mod at a time.
 
 ## Random picture rotation
 
@@ -52,7 +54,7 @@ Use JDK 25, Loom 1.17, and the included Gradle 9.5.1 wrapper:
 ./gradlew --no-daemon runClientGameTest
 ```
 
-The installable artifact is `build/libs/minepieceqol-2.2.0+mc26.2.jar`. The sources JAR is for developers.
+The installable artifact is `build/libs/minepieceqol-2.2.1+mc26.2.jar`. The sources JAR is for developers.
 
 Production source and assets were restored from `minepieceqol-2.0.2+mc26.2-sources.jar`. The client smoke test checks full-mod initialization, restored keybindings, menu rendering, and inventory rendering. Screenshots are saved under `build/run/clientGameTest/screenshots`.
 
