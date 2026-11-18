@@ -44,7 +44,6 @@ import net.minepiece.qol.parse.TooltipParsers;
 import net.minepiece.qol.state.AuctionHighlighter;
 import net.minepiece.qol.state.BossGuiAutoScanner;
 import net.minepiece.qol.state.BossTracker;
-import net.minepiece.qol.state.ChatTranslationManager;
 import net.minepiece.qol.state.CooldownTracker;
 import net.minepiece.qol.state.DebugLogManager;
 import net.minepiece.qol.state.EventCountdownTracker;
@@ -119,7 +118,6 @@ public final class MinepieceQolClient implements ClientModInitializer {
     private final ProgressHudController progressHudController = new ProgressHudController();
     private HudOverlay hudOverlay;
     private MinibossWaypointWorldRenderer minibossWaypointWorldRenderer;
-    private ChatTranslationManager chatTranslationManager;
     private KeyMapping openMenuKeyBinding;
     private KeyMapping hudEditorKeyBinding;
     private net.minepiece.qol.essentials.EssentialsFeatures essentials;
@@ -206,7 +204,6 @@ public final class MinepieceQolClient implements ClientModInitializer {
 
         this.debugLogManager = new DebugLogManager(this.configManager.getBaseDir(), debugEnabled);
         this.auctionHighlighter = new AuctionHighlighter();
-        this.chatTranslationManager = new ChatTranslationManager(this.debugLogManager);
         this.bossTracker = new BossTracker(this.persistentState, this::savePersistentState, this.debugLogManager);
         this.bossGuiAutoScanner = new BossGuiAutoScanner(this.bossTracker, this.debugLogManager);
         this.bossTracker.setMinibossRegistrationEnabled(isBossTrackingEnabled() && this.config.minibossTrackingEnabled);
@@ -292,9 +289,6 @@ public final class MinepieceQolClient implements ClientModInitializer {
             this.progressHudController.persist(System.currentTimeMillis());
             this.customPictures.clear();
             savePersistentState(this.persistentState);
-            if (this.chatTranslationManager != null) {
-                this.chatTranslationManager.shutdown();
-            }
         });
         HudElementRegistry.attachElementAfter(
             VanillaHudElements.SUBTITLES,
@@ -755,93 +749,11 @@ public final class MinepieceQolClient implements ClientModInitializer {
         return UiLocalization.text(getUiLanguage(), key);
     }
 
-    public List<ChatTranslationManager.LanguageOption> getSupportedChatLanguages() {
-        return ChatTranslationManager.getSupportedLanguages();
-    }
-
-    public void setChatTranslationEnabled(boolean enabled) {
-        this.config.chatTranslationEnabled = enabled;
-        this.configManager.saveConfig(this.config);
-    }
-
-    public void setChatTranslationAggressiveEnabled(boolean enabled) {
-        this.config.chatTranslationAggressiveEnabled = enabled;
-        this.configManager.saveConfig(this.config);
-    }
-
-    public void setChatTranslationPublicEnabled(boolean enabled) {
-        this.config.chatTranslationPublicEnabled = enabled;
-        this.configManager.saveConfig(this.config);
-    }
-
-    public void setChatTranslationPrivateEnabled(boolean enabled) {
-        this.config.chatTranslationPrivateEnabled = enabled;
-        this.configManager.saveConfig(this.config);
-    }
-
-    public void setChatTranslationSystemEnabled(boolean enabled) {
-        this.config.chatTranslationSystemEnabled = enabled;
-        this.configManager.saveConfig(this.config);
-    }
-
-    public void addChatTranslationRule(String sourceLanguage, String targetLanguage) {
-        String source = ChatTranslationManager.normalizeLanguageCode(sourceLanguage);
-        String target = ChatTranslationManager.normalizeLanguageCode(targetLanguage);
-        if (!ChatTranslationManager.isSupportedLanguageCode(source)
-            || !ChatTranslationManager.isSupportedLanguageCode(target)
-            || source.equals(target)) {
-            return;
-        }
-        for (ConfigManager.ModConfig.ChatTranslationRule rule : this.config.chatTranslationRules) {
-            if (rule == null) {
-                continue;
-            }
-            String existingSource = ChatTranslationManager.normalizeLanguageCode(rule.sourceLanguage);
-            String existingTarget = ChatTranslationManager.normalizeLanguageCode(rule.targetLanguage);
-            if (source.equals(existingSource) && target.equals(existingTarget)) {
-                rule.enabled = true;
-                this.configManager.saveConfig(this.config);
-                return;
-            }
-        }
-
-        ConfigManager.ModConfig.ChatTranslationRule newRule = new ConfigManager.ModConfig.ChatTranslationRule();
-        newRule.enabled = true;
-        newRule.sourceLanguage = source;
-        newRule.targetLanguage = target;
-        this.config.chatTranslationRules.add(newRule);
-        this.configManager.saveConfig(this.config);
-    }
-
-    public void removeChatTranslationRule(int index) {
-        if (index < 0 || index >= this.config.chatTranslationRules.size()) {
-            return;
-        }
-        this.config.chatTranslationRules.remove(index);
-        this.configManager.saveConfig(this.config);
-    }
-
-    public void setChatTranslationRuleEnabled(int index, boolean enabled) {
-        if (index < 0 || index >= this.config.chatTranslationRules.size()) {
-            return;
-        }
-        ConfigManager.ModConfig.ChatTranslationRule rule = this.config.chatTranslationRules.get(index);
-        if (rule == null) {
-            return;
-        }
-        rule.enabled = enabled;
-        this.configManager.saveConfig(this.config);
-    }
-
     public void handleChatMessage(Component message) {
         String normalized = TextUtil.normalize(message);
         if (normalized.isBlank()) {
             return;
         }
-        if (this.chatTranslationManager != null && this.chatTranslationManager.isSyntheticTranslationLine(normalized)) {
-            return;
-        }
-
         this.debugLogManager.logChat(normalized);
         SafeExecutor.run(this.debugLogManager, "chat", () -> {
             if (this.config.modEnabled && this.config.allFeaturesVisible && this.config.profileStatsEnabled) {
@@ -860,17 +772,6 @@ public final class MinepieceQolClient implements ClientModInitializer {
                 }
                 this.bossTracker.onBossKill(name);
             });
-            if (this.config.modEnabled && this.config.allFeaturesVisible && this.config.chatTranslationEnabled
-                && this.chatTranslationManager != null) {
-                this.chatTranslationManager.onChatMessage(
-                    normalized,
-                    List.copyOf(this.config.chatTranslationRules),
-                    this.config.chatTranslationPublicEnabled,
-                    this.config.chatTranslationPrivateEnabled,
-                    this.config.chatTranslationSystemEnabled,
-                    this.config.chatTranslationAggressiveEnabled
-                );
-            }
         });
     }
 

@@ -172,9 +172,6 @@ public final class ConfigManager {
         if (config.cookingHudColor == null || config.cookingHudColor.isBlank()) {
             config.cookingHudColor = "default";
         }
-        if (config.chatTranslationRules == null) {
-            config.chatTranslationRules = new ArrayList<>();
-        }
         if (!FabricLoader.getInstance().isDevelopmentEnvironment()) {
             config.debugEnabled = false;
         }
@@ -182,46 +179,6 @@ public final class ConfigManager {
             config.menuKeybindKey = org.lwjgl.glfw.GLFW.GLFW_KEY_PERIOD;
         }
         config.uiLanguage = UiLocalization.normalizeLanguageCode(config.uiLanguage);
-        LinkedHashMap<String, ModConfig.ChatTranslationRule> dedupedRules = new LinkedHashMap<>();
-        for (ModConfig.ChatTranslationRule rule : config.chatTranslationRules) {
-            if (rule == null) {
-                continue;
-            }
-            String source = normalizeTranslationLanguageCode(rule.sourceLanguage, "fr");
-            String target = normalizeTranslationLanguageCode(rule.targetLanguage, "en");
-            if (source.equals(target)) {
-                continue;
-            }
-            String key = source + "->" + target;
-            if (dedupedRules.containsKey(key)) {
-                continue;
-            }
-            ModConfig.ChatTranslationRule normalizedRule = new ModConfig.ChatTranslationRule();
-            normalizedRule.enabled = rule.enabled;
-            normalizedRule.sourceLanguage = source;
-            normalizedRule.targetLanguage = target;
-            dedupedRules.put(key, normalizedRule);
-        }
-        config.chatTranslationRules = new ArrayList<>(dedupedRules.values());
-    }
-
-    private static String normalizeTranslationLanguageCode(String raw, String fallback) {
-        if (raw == null || raw.isBlank()) {
-            return fallback;
-        }
-        String normalized = raw.trim().toLowerCase(Locale.ROOT);
-        int dash = normalized.indexOf('-');
-        if (dash > 0) {
-            normalized = normalized.substring(0, dash);
-        }
-        int underscore = normalized.indexOf('_');
-        if (underscore > 0) {
-            normalized = normalized.substring(0, underscore);
-        }
-        if (!SUPPORTED_TRANSLATION_LANG_CODES.contains(normalized)) {
-            return fallback;
-        }
-        return normalized;
     }
 
     public static final class ModConfig {
@@ -255,11 +212,6 @@ public final class ConfigManager {
         public int cookingHudY = 120;
         public float cookingHudScale = 1.0F;
         public String cookingHudColor = "default";
-        public boolean chatTranslationEnabled = false;
-        public boolean chatTranslationAggressiveEnabled = false;
-        public boolean chatTranslationPublicEnabled = true;
-        public boolean chatTranslationPrivateEnabled = true;
-        public boolean chatTranslationSystemEnabled = false;
         public String uiLanguage = UiLocalization.DEFAULT_LANGUAGE;
         public boolean petRollsEnabled = true;
         public boolean minionCalculatorEnabled = true;
@@ -287,7 +239,6 @@ public final class ConfigManager {
         public String safeChestsHudColor = "default";
         public boolean rarityIconsEnabled = true;
         public boolean petStatIconsEnabled = true;
-        public List<ChatTranslationRule> chatTranslationRules = new ArrayList<>();
         public int menuKeybindKey = org.lwjgl.glfw.GLFW.GLFW_KEY_PERIOD;
         public int bossHudX = 8;
         public int bossHudY = 8;
@@ -331,12 +282,6 @@ public final class ConfigManager {
         public float grindingHudScale = 1.0F;
         public String grindingHudColor = "default";
         public int cooldownHudOffsetY = 54;
-
-        public static final class ChatTranslationRule {
-            public boolean enabled = true;
-            public String sourceLanguage = "fr";
-            public String targetLanguage = "en";
-        }
     }
 
 }

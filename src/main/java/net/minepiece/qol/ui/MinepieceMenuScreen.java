@@ -20,7 +20,6 @@ import net.minepiece.qol.MinepieceQolClient;
 import net.minepiece.qol.config.ConfigManager;
 import net.minepiece.qol.i18n.UiLocalization;
 import net.minepiece.qol.state.BossTracker;
-import net.minepiece.qol.state.ChatTranslationManager;
 import net.minepiece.qol.state.JobsTracker;
 import net.minepiece.qol.state.PersistentState;
 
@@ -70,31 +69,6 @@ public final class MinepieceMenuScreen extends Screen {
     private static final int EVENTS_ROW_STEP = 18;
     private static final int EVENTS_EDIT_BUTTON_WIDTH = 34;
     private static final int EVENTS_EDIT_BUTTON_HEIGHT = 14;
-    private static final int LANGUAGE_MASTER_CHECKBOX_X_OFFSET = 0;
-    private static final int LANGUAGE_AGGRESSIVE_CHECKBOX_X_OFFSET = 204;
-    private static final int LANGUAGE_CHILD_CHECKBOX_X_OFFSET = 12;
-    private static final int LANGUAGE_CHECKBOX_LABEL_GAP = 18;
-    private static final int LANGUAGE_MASTER_CHECKBOX_Y_OFFSET = 0;
-    private static final int LANGUAGE_PUBLIC_CHECKBOX_Y_OFFSET = 20;
-    private static final int LANGUAGE_PRIVATE_CHECKBOX_Y_OFFSET = 40;
-    private static final int LANGUAGE_SYSTEM_CHECKBOX_Y_OFFSET = 60;
-    private static final int LANGUAGE_SELECTOR_ROW_HEIGHT = 16;
-    private static final int LANGUAGE_SELECTOR_BUTTON_WIDTH = 16;
-    private static final int LANGUAGE_SELECTOR_BUTTON_HEIGHT = 14;
-    private static final int LANGUAGE_SELECTOR_LEFT_BUTTON_X_OFFSET = 116;
-    private static final int LANGUAGE_SELECTOR_VALUE_X_OFFSET = 136;
-    private static final int LANGUAGE_SELECTOR_RIGHT_BUTTON_X_OFFSET = 250;
-    private static final int LANGUAGE_FROM_ROW_Y_OFFSET = 92;
-    private static final int LANGUAGE_TO_ROW_Y_OFFSET = 110;
-    private static final int LANGUAGE_ADD_RULE_Y_OFFSET = 128;
-    private static final int LANGUAGE_ADD_RULE_WIDTH = 84;
-    private static final int LANGUAGE_ADD_RULE_HEIGHT = 16;
-    private static final int LANGUAGE_RULES_TITLE_Y_OFFSET = 148;
-    private static final int LANGUAGE_RULES_LIST_Y_OFFSET = 158;
-    private static final int LANGUAGE_RULE_ROW_HEIGHT = 16;
-    private static final int LANGUAGE_RULE_ROW_STEP = 18;
-    private static final int LANGUAGE_RULE_TOGGLE_WIDTH = 32;
-    private static final int LANGUAGE_RULE_TOGGLE_HEIGHT = 14;
     private static final int BOSSES_MINIBOSS_PANEL_Y_OFFSET = 20;
     private static final int BOSSES_ACTIVE_LABEL_Y_OFFSET = 48;
     private static final int BOSSES_ACTIVE_LIST_Y_OFFSET = 58;
@@ -206,10 +180,6 @@ public final class MinepieceMenuScreen extends Screen {
     private EditBox eventNameField;
     private EditBox eventTimeField;
     private int eventsOffset;
-    private int translationRulesOffset;
-    private int translationSourceIndex = 1;
-    private int translationTargetIndex = 0;
-    private boolean translationSelectionInitialized;
     private int uiLanguageIndex;
     private String editingEventOriginalName = "";
     private String editingEventOriginalTime = "";
@@ -389,7 +359,6 @@ public final class MinepieceMenuScreen extends Screen {
             case JOBS -> buildJobsTab();
             case EVENTS -> buildEventsTab();
             case PROFILE -> buildProfileTab();
-            case LANGUAGE -> buildLanguageTab();
             case AUCTION_HOUSE -> {
                 section("menu.section.colors");
                 describedSwitch("setting.auction_highlight", this.mod.getConfig().auctionHighlightEnabled, v -> this.mod.setAuctionHighlightEnabled(v));
@@ -430,7 +399,7 @@ public final class MinepieceMenuScreen extends Screen {
         int extent = isSearching() ? 0 : switch (currentTab) {
             case COOKING -> 255;
             case BOSSES -> BOSSES_ACTIVE_LIST_Y_OFFSET + BOSSES_ACTIVE_LIST_HEIGHT + BOSSES_REGISTRY_GAP + BOSSES_REGISTRY_LIST_HEIGHT;
-            case MONEY, EVENTS, LANGUAGE -> contentHeight - 4;
+            case MONEY, EVENTS -> contentHeight - 4;
             default -> 0;
         };
         for (var child : children()) if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget && child != this.searchBox)
@@ -917,183 +886,6 @@ public final class MinepieceMenuScreen extends Screen {
             .build());
     }
 
-    private void buildLanguageTab() {
-        ConfigManager.ModConfig cfg = this.mod.getConfig();
-        List<ChatTranslationManager.LanguageOption> languages = this.mod.getSupportedChatLanguages();
-        if (languages.isEmpty()) {
-            return;
-        }
-        syncLanguageSelection(cfg, languages);
-
-        int x = this.contentX;
-        int y = this.contentY;
-
-        addRenderableWidget(Checkbox.builder(Component.empty(), this.font)
-            .pos(x + LANGUAGE_MASTER_CHECKBOX_X_OFFSET, y + LANGUAGE_MASTER_CHECKBOX_Y_OFFSET).selected(cfg.chatTranslationEnabled)
-            .onValueChange((box, checked) -> {
-                this.mod.setChatTranslationEnabled(checked);
-                enforceTranslationRouteGuard();
-                rebuild();
-            })
-            .build());
-
-        addRenderableWidget(Checkbox.builder(Component.empty(), this.font)
-            .pos(x + LANGUAGE_AGGRESSIVE_CHECKBOX_X_OFFSET, y + LANGUAGE_MASTER_CHECKBOX_Y_OFFSET).selected(cfg.chatTranslationAggressiveEnabled)
-            .onValueChange((box, checked) -> {
-                this.mod.setChatTranslationAggressiveEnabled(checked);
-                rebuild();
-            })
-            .build());
-
-        addRenderableWidget(Checkbox.builder(Component.empty(), this.font)
-            .pos(x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET, y + LANGUAGE_PUBLIC_CHECKBOX_Y_OFFSET).selected(cfg.chatTranslationPublicEnabled)
-            .onValueChange((box, checked) -> {
-                this.mod.setChatTranslationPublicEnabled(checked);
-                enforceTranslationRouteGuard();
-                rebuild();
-            })
-            .build());
-        addRenderableWidget(Checkbox.builder(Component.empty(), this.font)
-            .pos(x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET, y + LANGUAGE_PRIVATE_CHECKBOX_Y_OFFSET).selected(cfg.chatTranslationPrivateEnabled)
-            .onValueChange((box, checked) -> {
-                this.mod.setChatTranslationPrivateEnabled(checked);
-                enforceTranslationRouteGuard();
-                rebuild();
-            })
-            .build());
-        addRenderableWidget(Checkbox.builder(Component.empty(), this.font)
-            .pos(x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET, y + LANGUAGE_SYSTEM_CHECKBOX_Y_OFFSET).selected(cfg.chatTranslationSystemEnabled)
-            .onValueChange((box, checked) -> {
-                this.mod.setChatTranslationSystemEnabled(checked);
-                enforceTranslationRouteGuard();
-                rebuild();
-            })
-            .build());
-
-        int fromRowY = y + LANGUAGE_FROM_ROW_Y_OFFSET;
-        int toRowY = y + LANGUAGE_TO_ROW_Y_OFFSET;
-        int fromArrowY = fromRowY + (LANGUAGE_SELECTOR_ROW_HEIGHT - LANGUAGE_SELECTOR_BUTTON_HEIGHT) / 2;
-        int toArrowY = toRowY + (LANGUAGE_SELECTOR_ROW_HEIGHT - LANGUAGE_SELECTOR_BUTTON_HEIGHT) / 2;
-
-        addRenderableWidget(Button.builder(Component.literal("<"), b -> {
-                this.translationSourceIndex = Math.floorMod(this.translationSourceIndex - 1, languages.size());
-                rebuild();
-            })
-            .bounds(x + LANGUAGE_SELECTOR_LEFT_BUTTON_X_OFFSET, fromArrowY, LANGUAGE_SELECTOR_BUTTON_WIDTH, LANGUAGE_SELECTOR_BUTTON_HEIGHT)
-            .build());
-        addRenderableWidget(Button.builder(Component.literal(">"), b -> {
-                this.translationSourceIndex = Math.floorMod(this.translationSourceIndex + 1, languages.size());
-                rebuild();
-            })
-            .bounds(x + LANGUAGE_SELECTOR_RIGHT_BUTTON_X_OFFSET, fromArrowY, LANGUAGE_SELECTOR_BUTTON_WIDTH, LANGUAGE_SELECTOR_BUTTON_HEIGHT)
-            .build());
-
-        addRenderableWidget(Button.builder(Component.literal("<"), b -> {
-                this.translationTargetIndex = Math.floorMod(this.translationTargetIndex - 1, languages.size());
-                rebuild();
-            })
-            .bounds(x + LANGUAGE_SELECTOR_LEFT_BUTTON_X_OFFSET, toArrowY, LANGUAGE_SELECTOR_BUTTON_WIDTH, LANGUAGE_SELECTOR_BUTTON_HEIGHT)
-            .build());
-        addRenderableWidget(Button.builder(Component.literal(">"), b -> {
-                this.translationTargetIndex = Math.floorMod(this.translationTargetIndex + 1, languages.size());
-                rebuild();
-            })
-            .bounds(x + LANGUAGE_SELECTOR_RIGHT_BUTTON_X_OFFSET, toArrowY, LANGUAGE_SELECTOR_BUTTON_WIDTH, LANGUAGE_SELECTOR_BUTTON_HEIGHT)
-            .build());
-
-        addRenderableWidget(Button.builder(trText("button.add_rule"), b -> {
-                ChatTranslationManager.LanguageOption source = languages.get(this.translationSourceIndex);
-                ChatTranslationManager.LanguageOption target = languages.get(this.translationTargetIndex);
-                this.mod.addChatTranslationRule(source.code(), target.code());
-                rebuild();
-            })
-            .bounds(x + this.contentWidth - LANGUAGE_ADD_RULE_WIDTH, y + LANGUAGE_ADD_RULE_Y_OFFSET, LANGUAGE_ADD_RULE_WIDTH, LANGUAGE_ADD_RULE_HEIGHT)
-            .build());
-
-        int listY = y + LANGUAGE_RULES_LIST_Y_OFFSET;
-        int listHeight = this.contentHeight - (listY - this.contentY) - 4;
-        int maxRows = Math.max(1, listHeight / LANGUAGE_RULE_ROW_STEP);
-        int totalSize = cfg.chatTranslationRules.size();
-        if (this.translationRulesOffset >= totalSize) {
-            this.translationRulesOffset = Math.max(0, totalSize - maxRows);
-        }
-        int end = Math.min(totalSize, this.translationRulesOffset + maxRows);
-        for (int i = this.translationRulesOffset; i < end; i++) {
-            ConfigManager.ModConfig.ChatTranslationRule rule = cfg.chatTranslationRules.get(i);
-            int rowY = listY + (i - this.translationRulesOffset) * LANGUAGE_RULE_ROW_STEP;
-            int index = i;
-            int toggleY = rowY + (LANGUAGE_RULE_ROW_HEIGHT - LANGUAGE_RULE_TOGGLE_HEIGHT) / 2;
-            addRenderableWidget(Button.builder(Component.literal(rule.enabled ? tr("button.on") : tr("button.off")), b -> {
-                    this.mod.setChatTranslationRuleEnabled(index, !rule.enabled);
-                    rebuild();
-                })
-                .bounds(x + this.contentWidth - 64, toggleY, LANGUAGE_RULE_TOGGLE_WIDTH, LANGUAGE_RULE_TOGGLE_HEIGHT)
-                .build());
-            addRemoveButton(x + this.contentWidth - REMOVE_BUTTON_SIZE - REMOVE_BUTTON_GAP_RIGHT, rowY, LANGUAGE_RULE_ROW_HEIGHT, () -> {
-                    this.mod.removeChatTranslationRule(index);
-                    rebuild();
-                });
-        }
-
-        if (totalSize > maxRows) {
-            addRenderableWidget(Button.builder(Component.literal("^"), b -> {
-                    this.translationRulesOffset = Math.max(0, this.translationRulesOffset - maxRows);
-                    rebuild();
-                })
-                .bounds(x + this.contentWidth - 96, listY, 20, 12)
-                .build());
-            addRenderableWidget(Button.builder(Component.literal("v"), b -> {
-                    if (this.translationRulesOffset + maxRows < totalSize) {
-                        this.translationRulesOffset += maxRows;
-                    }
-                    rebuild();
-                })
-                .bounds(x + this.contentWidth - 96, listY + 14, 20, 12)
-                .build());
-        }
-    }
-
-    private void syncLanguageSelection(ConfigManager.ModConfig cfg, List<ChatTranslationManager.LanguageOption> languages) {
-        this.translationSourceIndex = clampLanguageIndex(this.translationSourceIndex, languages.size());
-        this.translationTargetIndex = clampLanguageIndex(this.translationTargetIndex, languages.size());
-        if (this.translationSelectionInitialized || cfg.chatTranslationRules.isEmpty()) {
-            return;
-        }
-        ConfigManager.ModConfig.ChatTranslationRule fallbackRule = cfg.chatTranslationRules.get(0);
-        if (fallbackRule == null) {
-            return;
-        }
-        int source = findLanguageIndex(languages, fallbackRule.sourceLanguage);
-        int target = findLanguageIndex(languages, fallbackRule.targetLanguage);
-        if (source >= 0) {
-            this.translationSourceIndex = source;
-        }
-        if (target >= 0) {
-            this.translationTargetIndex = target;
-        }
-        this.translationSelectionInitialized = true;
-    }
-
-    private static int clampLanguageIndex(int index, int size) {
-        if (size <= 0) {
-            return 0;
-        }
-        if (index < 0 || index >= size) {
-            return 0;
-        }
-        return index;
-    }
-
-    private static int findLanguageIndex(List<ChatTranslationManager.LanguageOption> languages, String code) {
-        String normalized = ChatTranslationManager.normalizeLanguageCode(code);
-        for (int i = 0; i < languages.size(); i++) {
-            if (languages.get(i).code().equals(normalized)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
     private void buildExtrasTab() {
         var cfg = this.mod.getConfig();
         section("menu.section.item_icons");
@@ -1378,43 +1170,6 @@ public final class MinepieceMenuScreen extends Screen {
                     drawFittedCenteredText(drawContext, profileFieldLabel(i) + ":", x + 2, rowY, labelBoxWidth, PROFILE_ROW_HEIGHT, COLOR_TEXT);
                 }
             }
-            case LANGUAGE -> {
-                List<ChatTranslationManager.LanguageOption> languages = this.mod.getSupportedChatLanguages();
-                if (languages.isEmpty()) {
-                    drawContext.text(renderer, this.tr("language.no_languages"), x, this.contentY + 24, COLOR_TEXT_DIM);
-                } else {
-                    drawContext.text(renderer, this.tr("setting.chat_translate"), x + LANGUAGE_MASTER_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_MASTER_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
-                    drawContext.text(renderer, this.tr("setting.translate_aggressive"), x + LANGUAGE_AGGRESSIVE_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_MASTER_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
-                    drawContext.text(renderer, this.tr("setting.translate_public"), x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_PUBLIC_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
-                    drawContext.text(renderer, this.tr("setting.translate_private"), x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_PRIVATE_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
-                    drawContext.text(renderer, this.tr("setting.translate_system"), x + LANGUAGE_CHILD_CHECKBOX_X_OFFSET + LANGUAGE_CHECKBOX_LABEL_GAP, this.contentY + LANGUAGE_SYSTEM_CHECKBOX_Y_OFFSET + 4, COLOR_TEXT);
-                    ConfigManager.ModConfig cfg = this.mod.getConfig();
-                    if (!hasAnyTranslationRoutesEnabled(cfg)) {
-                        drawFittedText(
-                            drawContext,
-                            this.tr("language.routes_disabled_warning"),
-                            x,
-                            this.contentY + 84,
-                            this.contentWidth - 8,
-                            0xFFFFC78A
-                        );
-                    }
-                    int source = clampLanguageIndex(this.translationSourceIndex, languages.size());
-                    int target = clampLanguageIndex(this.translationTargetIndex, languages.size());
-                    int fromRowY = this.contentY + LANGUAGE_FROM_ROW_Y_OFFSET;
-                    int toRowY = this.contentY + LANGUAGE_TO_ROW_Y_OFFSET;
-                    int selectorLabelBoxWidth = LANGUAGE_SELECTOR_LEFT_BUTTON_X_OFFSET - 4;
-                    int selectorValueBoxWidth = LANGUAGE_SELECTOR_RIGHT_BUTTON_X_OFFSET - LANGUAGE_SELECTOR_VALUE_X_OFFSET;
-                    drawRowBox(drawContext, x, fromRowY, this.contentWidth - 4, LANGUAGE_SELECTOR_ROW_HEIGHT);
-                    drawRowBox(drawContext, x, toRowY, this.contentWidth - 4, LANGUAGE_SELECTOR_ROW_HEIGHT);
-                    drawFittedCenteredText(drawContext, this.tr("language.from"), x + 2, fromRowY, selectorLabelBoxWidth, LANGUAGE_SELECTOR_ROW_HEIGHT, COLOR_TEXT);
-                    drawFittedCenteredText(drawContext, languages.get(source).label(), x + LANGUAGE_SELECTOR_VALUE_X_OFFSET, fromRowY, selectorValueBoxWidth, LANGUAGE_SELECTOR_ROW_HEIGHT, COLOR_HEADER);
-                    drawFittedCenteredText(drawContext, this.tr("language.to"), x + 2, toRowY, selectorLabelBoxWidth, LANGUAGE_SELECTOR_ROW_HEIGHT, COLOR_TEXT);
-                    drawFittedCenteredText(drawContext, languages.get(target).label(), x + LANGUAGE_SELECTOR_VALUE_X_OFFSET, toRowY, selectorValueBoxWidth, LANGUAGE_SELECTOR_ROW_HEIGHT, COLOR_HEADER);
-                    drawContext.text(renderer, this.tr("language.active_rules"), x, this.contentY + LANGUAGE_RULES_TITLE_Y_OFFSET, COLOR_HEADER);
-                    drawTranslationRuleLabels(drawContext, x, this.contentY + LANGUAGE_RULES_LIST_Y_OFFSET);
-                }
-            }
             case COOKING -> {
                 drawFittedText(drawContext, tr("cooking.quantity"), x + 124, this.contentY + 44, 204, COLOR_TEXT);
                 List<String> lines = this.mod.getCookingTracker().getHudLines(this.mod::tr, this.mod.getConfig().cookingQuantity);
@@ -1617,30 +1372,6 @@ public final class MinepieceMenuScreen extends Screen {
             drawRowBox(drawContext, x, rowY, this.contentWidth - 4, EVENTS_ROW_HEIGHT);
             int maxWidth = this.contentWidth - (EVENTS_EDIT_BUTTON_WIDTH + REMOVE_BUTTON_SIZE + 14);
             drawFittedText(drawContext, ev.time + " - " + ev.name, x + LIST_TEXT_INSET, rowY + LIST_TEXT_BASELINE_OFFSET, maxWidth, COLOR_TEXT);
-        }
-    }
-
-    private void drawTranslationRuleLabels(GuiGraphicsExtractor drawContext, int x, int y) {
-        List<ConfigManager.ModConfig.ChatTranslationRule> rules = this.mod.getConfig().chatTranslationRules;
-        int listHeight = this.contentHeight - (y - this.contentY) - 4;
-        int maxRows = Math.max(1, listHeight / LANGUAGE_RULE_ROW_STEP);
-        int totalSize = rules.size();
-        if (totalSize == 0) {
-            drawRowBox(drawContext, x, y, this.contentWidth - 4, LANGUAGE_RULE_ROW_HEIGHT);
-            drawFittedCenteredText(drawContext, tr("language.none_yet"), x + 2, y, this.contentWidth - 4, LANGUAGE_RULE_ROW_HEIGHT, COLOR_TEXT_DIM);
-            return;
-        }
-        int end = Math.min(totalSize, this.translationRulesOffset + maxRows);
-        for (int i = this.translationRulesOffset; i < end; i++) {
-            ConfigManager.ModConfig.ChatTranslationRule rule = rules.get(i);
-            int rowY = y + (i - this.translationRulesOffset) * LANGUAGE_RULE_ROW_STEP;
-            drawRowBox(drawContext, x, rowY, this.contentWidth - 4, LANGUAGE_RULE_ROW_HEIGHT);
-            String source = ChatTranslationManager.languageName(rule.sourceLanguage);
-            String target = ChatTranslationManager.languageName(rule.targetLanguage);
-            String label = source + " -> " + target;
-            int color = rule.enabled ? COLOR_TEXT : COLOR_TEXT_DIM;
-            int textBoxWidth = this.contentWidth - 72;
-            drawFittedCenteredText(drawContext, label, x + 2, rowY, textBoxWidth, LANGUAGE_RULE_ROW_HEIGHT, color);
         }
     }
 
@@ -1923,18 +1654,6 @@ public final class MinepieceMenuScreen extends Screen {
                     this.eventsOffset = nextOffset;
                 }
             }
-            case LANGUAGE -> {
-                int listY = this.contentY + LANGUAGE_RULES_LIST_Y_OFFSET;
-                int listHeight = this.contentHeight - (listY - this.contentY) - 4;
-                int maxRows = Math.max(1, listHeight / LANGUAGE_RULE_ROW_STEP);
-                if (containsRect(mx, my, this.contentX, listY, this.contentWidth, listHeight)) {
-                    int totalRows = this.mod.getConfig().chatTranslationRules.size();
-                    int maxOffset = Math.max(0, totalRows - maxRows);
-                    int nextOffset = clampOffset(this.translationRulesOffset + step, maxOffset);
-                    handled = nextOffset != this.translationRulesOffset;
-                    this.translationRulesOffset = nextOffset;
-                }
-            }
             default -> {
             }
         }
@@ -2084,28 +1803,6 @@ public final class MinepieceMenuScreen extends Screen {
 
     private Component trText(String key) {
         return Component.literal(tr(key));
-    }
-
-    private boolean hasAnyTranslationRoutesEnabled(ConfigManager.ModConfig cfg) {
-        if (cfg == null) {
-            return true;
-        }
-        return cfg.chatTranslationPublicEnabled
-            || cfg.chatTranslationPrivateEnabled
-            || cfg.chatTranslationSystemEnabled;
-    }
-
-    private void enforceTranslationRouteGuard() {
-        ConfigManager.ModConfig cfg = this.mod.getConfig();
-        if (cfg == null) {
-            return;
-        }
-        if (hasAnyTranslationRoutesEnabled(cfg)) {
-            return;
-        }
-        if (cfg.chatTranslationEnabled) {
-            this.mod.setChatTranslationEnabled(false);
-        }
     }
 
     private static int findUiLanguageIndex(List<UiLocalization.LanguageOption> languages, String code) {
@@ -2301,7 +1998,7 @@ public final class MinepieceMenuScreen extends Screen {
         }
         Tab[] pages() {
             return switch (this) {
-                case GENERAL -> new Tab[]{Tab.MAIN, Tab.LANGUAGE};
+                case GENERAL -> new Tab[]{Tab.MAIN};
                 case HUD -> new Tab[]{Tab.APPEARANCE};
                 case COMBAT -> new Tab[]{Tab.BOSSES, Tab.COMBAT_SETTINGS};
                 case PROGRESS -> new Tab[]{Tab.PROGRESS, Tab.STAT_DISPLAY, Tab.PROFILE, Tab.PASS_PETS};
@@ -2323,7 +2020,6 @@ public final class MinepieceMenuScreen extends Screen {
         JOBS("tab.jobs"),
         EVENTS("tab.events"),
         PROFILE("tab.profile"),
-        LANGUAGE("tab.language"),
         AUCTION_HOUSE("ui.auction_house"),
         PROGRESS("tab.progress"),
         COOKING("hud.panel.cooking"),
