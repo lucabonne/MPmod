@@ -7,7 +7,6 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.network.chat.Component;
 import net.minepiece.qol.MinepieceQolClient;
 import net.minepiece.qol.config.ConfigManager;
-import net.minepiece.qol.state.ChatTranslationManager;
 
 import static com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg;
 import static com.mojang.brigadier.arguments.DoubleArgumentType.getDouble;
@@ -49,92 +48,6 @@ public final class ModCommands {
             }
             return 1;
         }));
-
-        dispatcher.register(ClientCommands.literal("mptranslate")
-            .then(ClientCommands.literal("routes")
-                .executes(context -> {
-                    ConfigManager.ModConfig cfg = mod.getConfig();
-                    reply(context.getSource(), trf(
-                        mod,
-                        "cmd.translate.routes",
-                        "Routes: public=%s private=%s system=%s",
-                        onOff(mod, cfg.chatTranslationPublicEnabled),
-                        onOff(mod, cfg.chatTranslationPrivateEnabled),
-                        onOff(mod, cfg.chatTranslationSystemEnabled)
-                    ));
-                    reply(context.getSource(), trf(
-                        mod,
-                        "cmd.translate.master",
-                        "Master translation: %s",
-                        onOff(mod, cfg.chatTranslationEnabled)
-                    ));
-                    reply(context.getSource(), trf(
-                        mod,
-                        "cmd.translate.aggressive",
-                        "Aggressive mode: %s",
-                        onOff(mod, cfg.chatTranslationAggressiveEnabled)
-                    ));
-                    boolean anyRoute = cfg.chatTranslationPublicEnabled || cfg.chatTranslationPrivateEnabled || cfg.chatTranslationSystemEnabled;
-                    if (!anyRoute) {
-                        reply(context.getSource(), tr(mod,
-                            "language.routes_disabled_warning",
-                            "All translation routes are OFF. Translation was auto-disabled until at least one route is enabled."
-                        ));
-                    }
-                    return 1;
-                }))
-            .then(ClientCommands.literal("checklist")
-                .executes(context -> {
-                    reply(context.getSource(), tr(mod, "cmd.translate.checklist.title", "Classification checklist:"));
-                    reply(context.getSource(), tr(mod, "cmd.translate.checklist.public", "- Public chat usually has a sender prefix and no private markers."));
-                    reply(context.getSource(), tr(mod, "cmd.translate.checklist.private", "- Private chat usually contains PM/MSG/whisper/tell/to/from markers."));
-                    reply(context.getSource(), tr(mod, "cmd.translate.checklist.system", "- System lines usually have no sender divider (›/»/>)."));
-                    reply(context.getSource(), tr(mod, "cmd.translate.checklist.classify_hint", "Use /mptranslate classify <line> to inspect one raw line."));
-                    return 1;
-                }))
-            .then(ClientCommands.literal("classify")
-                .then(ClientCommands.argument("line", greedyString())
-                    .executes(context -> {
-                        String line = getString(context, "line");
-                        ChatTranslationManager.ChatLineClassification classification = ChatTranslationManager.classifyLine(line);
-                        ConfigManager.ModConfig cfg = mod.getConfig();
-                        boolean routeEnabled = ChatTranslationManager.isLineTypeEnabled(
-                            classification.lineType(),
-                            cfg.chatTranslationPublicEnabled,
-                            cfg.chatTranslationPrivateEnabled,
-                            cfg.chatTranslationSystemEnabled
-                        );
-
-                        String divider = classification.divider().isBlank()
-                            ? tr(mod, "cmd.common.none_value", "<none>")
-                            : classification.divider();
-                        String author = classification.authorPrefix().isBlank()
-                            ? tr(mod, "cmd.common.none_value", "<none>")
-                            : classification.authorPrefix();
-                        String body = classification.messageBody().isBlank()
-                            ? tr(mod, "cmd.common.empty_value", "<empty>")
-                            : classification.messageBody();
-
-                        reply(context.getSource(), trf(mod, "cmd.translate.classify_type", "Type: %s", classification.lineType().name()));
-                        reply(context.getSource(), trf(mod, "cmd.translate.classify_divider", "Divider: %s", divider));
-                        reply(context.getSource(), trf(mod, "cmd.translate.classify_author", "Author prefix: %s", author));
-                        reply(context.getSource(), trf(mod, "cmd.translate.classify_body", "Message body: %s", body));
-                        reply(context.getSource(), trf(
-                            mod,
-                            "cmd.translate.classify_route_enabled",
-                            "Route enabled for this type: %s",
-                            onOff(mod, routeEnabled)
-                        ));
-                        if (!classification.valid()) {
-                            reply(context.getSource(), trf(
-                                mod,
-                                "cmd.translate.classify_invalid_reason",
-                                "Invalid parse reason: %s",
-                                classification.reason().isBlank() ? "unknown" : classification.reason()
-                            ));
-                        }
-                        return classification.valid() ? 1 : 0;
-                    }))));
 
         dispatcher.register(ClientCommands.literal("mpall")
             .then(ClientCommands.literal("show")
