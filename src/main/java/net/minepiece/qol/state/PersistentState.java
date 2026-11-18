@@ -21,6 +21,10 @@ public final class PersistentState {
     /** Marineford safe timers per spawn; kept until the player resets them. */
     public Map<String, SafeChestTracker.SpawnSafes> safeChests = new LinkedHashMap<>();
     public Map<String, ProgressRecord> playerProgress = new LinkedHashMap<>();
+    /** The previous play session, shown once on the next join. */
+    public SessionTracker.Summary lastSession;
+    /** Per item ("registry id|name"): the cheapest listing and server average seen each day, two weeks kept. */
+    public Map<String, List<AuctionPriceMemory.Day>> auctionPrices = new LinkedHashMap<>();
 
     public static final class ProgressRecord {
         public ProfileXpTracker.SavedProfile profile;

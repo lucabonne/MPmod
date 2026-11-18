@@ -40,6 +40,13 @@ public final class JobsTracker {
     private long lastDisplayedGainMs;
     private long visibleUntilMs;
     private long lastPersistMs;
+    /** Recent XP gains of {@link #rateJob}, for the time-to-next-level estimate. */
+    private final java.util.ArrayDeque<XpSample> rateSamples = new java.util.ArrayDeque<>();
+    private String rateJob = "";
+    private static final long RATE_WINDOW_MS = 5 * 60_000L;
+    /** Past this long without XP the player stopped grinding, so no estimate is shown. */
+    private static final long RATE_FRESH_MS = 2 * 60_000L;
+    private record XpSample(long ms, double xp) { }
 
     public JobsTracker(PersistentState state, Consumer<PersistentState> stateSaver, DebugLogManager debugLogManager) {
         this.state = state;
@@ -113,6 +120,8 @@ public final class JobsTracker {
             info.lastSeenMs = 0L;
         }
         this.state.currentJob = "";
+        this.rateSamples.clear();
+        this.rateJob = "";
         this.stateSaver.accept(this.state);
     }
 
@@ -284,6 +293,7 @@ public final class JobsTracker {
             info.currentXp = snapshot.currentXp();
             info.neededXp = snapshot.neededXp();
             info.dailyXp += xpDelta;
+            recordXpRate(this.state.currentJob, xpDelta, now);
             info.lastSeenMs = now;
             if (neededChanged || resetDetected || now - this.lastPersistMs >= 2_000L) {
                 this.lastPersistMs = now;
@@ -349,9 +359,33 @@ public final class JobsTracker {
             PersistentState.JobInfo info = this.state.jobs.get(jobName);
             lines.add(formatOverviewLine(jobName, info, localizer));
             lines.add(localized(localizer, "jobs.today_xp", "Today XP:") + " " + formatDailyValue(info == null ? 0.0D : info.dailyXp));
+            long eta = jobName.equals(this.rateJob) ? secondsToNextLevel(System.currentTimeMillis()) : -1;
+            if (eta >= 0) lines.add(localized(localizer, "jobs.next_level", "Next level:") + " ~" + SafeChestTracker.formatDuration(eta));
         }
         lines.add(localized(localizer, "jobs.today_money", "Today money:") + " " + formatDailyValue(this.state.jobsDailyMoney));
         return lines;
+    }
+
+    void recordXpRate(String job, double xp, long now) {
+        if (!job.equals(this.rateJob)) {
+            this.rateSamples.clear();
+            this.rateJob = job;
+        }
+        if (xp > 0.0D) this.rateSamples.addLast(new XpSample(now, xp));
+        while (!this.rateSamples.isEmpty() && this.rateSamples.getFirst().ms() < now - RATE_WINDOW_MS) this.rateSamples.removeFirst();
+    }
+
+    /** Seconds until the current job levels up at the XP rate of the last five minutes, or -1 when unknown. */
+    public long secondsToNextLevel(long now) {
+        if (this.rateSamples.isEmpty() || now - this.rateSamples.getLast().ms() > RATE_FRESH_MS) return -1;
+        PersistentState.JobInfo info = this.state.jobs.get(this.rateJob);
+        if (info == null || info.currentXp < 0.0D || info.neededXp <= 0.0D) return -1;
+        double xp = 0.0D;
+        for (XpSample sample : this.rateSamples) xp += sample.xp();
+        // At least a minute, so the first few gains don't promise an absurdly short time.
+        double perMs = xp / Math.max(60_000L, now - this.rateSamples.getFirst().ms());
+        if (perMs <= 0.0D) return -1;
+        return (long) Math.ceil(Math.max(0.0D, info.neededXp - info.currentXp) / perMs / 1000.0D);
     }
 
     public List<String> getHudLines() {

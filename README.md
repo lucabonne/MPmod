@@ -1,4 +1,13 @@
-# Minepiece QoL 2.2.1
+# Minepiece QoL 2.2.2
+
+2.2.2 adds four helpers, each with its own on/off switch:
+
+- **Safe-ready alert:** a chat line in the safe's color and a ping when a Marineford safe's lock timer runs out (Combat › Combat settings).
+- **Next job level:** the Jobs panel shows `Next level: ~42m` for the job you are grinding, from your XP of the last five minutes; it hides after two minutes without XP.
+- **Session summary:** `/mpsession` shows this session's time, money and money per hour, auction sold and bought, combat and job XP, bosses killed and safes picked; `/mpsession last` shows the previous one, which is also posted in chat when you join (Progress › Progress › Session).
+- **Auction price memory:** each auction tooltip adds the lowest listing seen this week and how the average moved this week, for example `Lowest this week: 1.2K/item (2d ago) · Average ▲ +12% this week` (Economy › Auction house).
+
+The mod's own chat translation is removed (the Language page and `/mptranslate`), since the server now translates chat itself.
 
 2.2.1: the **Marineford safes** panel marks the spawn you're on: its header is gold and reads `» Spawn 3 (current)`, so it still stands out with a custom HUD text color. Spawns are now listed by their **soonest running timer**, so the next safe to open is always at the top and spawns swap places as timers run out; spawns with no running timer come after, by number, with the unknown spawn last. Inside each spawn, safes are listed Ready first, then running timers soonest first, then Picked, then `?`.
 
