@@ -56,7 +56,7 @@ public final class TooltipParsers {
         Pattern.compile("(.+?)\\s*\\+\\s*(" + NUMBER_TOKEN + ")\\s*%?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PET_APPENDED_PERCENT_PATTERN = Pattern.compile("\\(\\d+%\\)\\s*$");
     private static final Pattern PET_CURRENT_LEVEL_PATTERN = Pattern.compile("(?:Level|Niveau|Nivel|Stufe|Livello|Poziom|Seviye)\\s*:?\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PET_EFFECTS_HEADER_PATTERN = Pattern.compile("^(?:Pet Effects|Stats|Statistics|Estadisticas|Estadísticas|Effets du familier|Efectos de mascota|Haustier Effekte|Effetti pet|Efeitos do pet|Efekty peta|Efek pet|Evcil hayvan etkileri)\\s*:?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PET_EFFECTS_HEADER_PATTERN = Pattern.compile("^(?:Pet Effects|Companion Effects|Stats|Statistics|Estadisticas|Estadísticas|Effets du familier|Efectos de mascota|Haustier Effekte|Effetti pet|Efeitos do pet|Efekty peta|Efek pet|Evcil hayvan etkileri)\\s*:?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern FAMILIAR_EFFECTS_HEADER_PATTERN = Pattern.compile("^(?:Familiar Effects|Effets du familier|Efectos de familiar|Efectos del familiar|Vertrauten Effekte|Effetti famiglio|Efeitos do familiar|Efekty towarzysza|Efek familiar|Yoldas etkileri|Yoldaş etkileri)\\s*:?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern MINION_EFFECTS_HEADER_PATTERN = Pattern.compile("^(?:Minion Effects|Effets du serviteur|Efectos de esbirro|Efectos de minion|Efectos del minion|Diener Effekte|Effetti servitore|Efeitos do minion|Efekty miniona|Efek minion|Minyon etkileri)\\s*:?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PET_STAT_SPACES = Pattern.compile("\\s+");
@@ -624,7 +624,7 @@ public final class TooltipParsers {
         return PET_EFFECTS_HEADER_PATTERN.matcher(line).matches()
             || FAMILIAR_EFFECTS_HEADER_PATTERN.matcher(line).matches()
             || LocalizedText.startsWithAny(line,
-                "pet effects", "familiar effects", "familier effects", "stats", "statistics", "estadisticas", "estadísticas",
+                "pet effects", "companion effects", "familiar effects", "familier effects", "stats", "statistics", "estadisticas", "estadísticas",
                 "effets du familier", "efectos de mascota", "efectos de familiar", "efectos del familiar",
                 "haustier effekte", "vertrauten effekte", "effetti pet", "effetti famiglio", "efeitos do pet",
                 "efeitos do familiar", "efekty peta", "efekty towarzysza", "efek pet", "efek familiar",

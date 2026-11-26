@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TooltipParsersTest {
     @Test
@@ -268,6 +269,31 @@ class TooltipParsersTest {
         assertEquals(1, lines.size());
         assertEquals(42.733333D, lines.getFirst().percent(), 0.0001D);
         assertEquals(43L, Math.round(lines.getFirst().percent()));
+    }
+
+    @Test
+    void parsesRollsUnderCompanionEffectsHeader() {
+        // Mihawk (Mythic) tooltip: the server titles the section "Companion Effects".
+        List<TooltipParsers.PetStatLine> lines = TooltipParsers.parsePetRolls(List.of(
+            "Mihawk",
+            "MYTHIC",
+            "Level: 10",
+            "Companion Effects",
+            "LVL 1 +20% ⚐",
+            "LVL 10 Critical Chance + 2.02",
+            "LVL 10 Critical Damage + 14.46",
+            "LVL 15 (Not discovered)",
+            "LVL 20 +20% Damage on the Blue Sea",
+            "Minion Effects:",
+            "LVL 1 Critical Chance + 0.05"
+        ));
+
+        assertEquals(2, lines.size());
+        assertEquals("Critical Chance", lines.get(0).statName());
+        assertEquals(12L, Math.round(lines.get(0).percent()));
+        assertEquals("Critical Damage", lines.get(1).statName());
+        assertEquals(43L, Math.round(lines.get(1).percent()));
+        assertTrue(TooltipParsers.isPetEffectsHeader("Companion Effects:"));
     }
 
     private static void assertPetPercent(String rarity, int level, String stat, double value, double expectedPercent) {
